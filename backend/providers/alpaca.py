@@ -48,37 +48,101 @@ class AlpacaProvider(BaseProvider):
             ]
 
     async def get_options_chain(self, symbol: str, expiration_date: str | None = None, option_type: str | None = None) -> list[dict[str, Any]]:
-        params: dict[str, Any] = {"underlying_symbols": symbol, "limit": 1000}
-        if expiration_date:
-            params["expiration_date"] = expiration_date
+        from datetime import date, timedelta
+        from services.bs import bs_greeks, iv_from_price
+
+        today = date.today()
+        exp_gte = expiration_date or today.strftime("%Y-%m-%d")
+        exp_lte = expiration_date or (today + timedelta(days=1)).strftime("%Y-%m-%d")
+
+        # 1. Fetch contracts (OI, strike, type)
+        params: dict[str, Any] = {
+            "underlying_symbols": symbol,
+            "expiration_date_gte": exp_gte,
+            "expiration_date_lte": exp_lte,
+            "limit": 500,
+        }
         if option_type:
             params["type"] = option_type
-        async with httpx.AsyncClient() as c:
+
+        async with httpx.AsyncClient(timeout=20.0) as c:
             r = await c.get(
-                f"{self._data_url}/v2/options/contracts",
+                f"https://paper-api.alpaca.markets/v2/options/contracts",
                 headers=self._headers,
                 params=params,
             )
             r.raise_for_status()
             contracts = r.json().get("option_contracts", [])
-            return [
-                {
-                    "symbol": con.get("symbol"),
-                    "strike_price": float(con.get("strike_price", 0)),
-                    "expiration_date": con.get("expiration_date"),
-                    "option_type": con.get("type"),
-                    "bid_price": None,
-                    "ask_price": None,
-                    "mark_price": None,
-                    "delta": None,
-                    "gamma": None,
-                    "theta": None,
-                    "vega": None,
-                    "open_interest": float(con.get("open_interest", 0)),
-                    "implied_volatility": None,
-                }
-                for con in contracts
-            ]
+
+            # 2. Fetch snapshots for market data (bid/ask)
+            syms = [con["symbol"] for con in contracts if con.get("symbol")]
+            snap_map: dict[str, dict] = {}
+            if syms:
+                # batch in groups of 100
+                for i in range(0, len(syms), 100):
+                    batch = syms[i:i+100]
+                    sr = await c.get(
+                        f"{self._data_url}/v1beta1/options/snapshots",
+                        headers=self._headers,
+                        params={"symbols": ",".join(batch)},
+                    )
+                    if sr.status_code == 200:
+                        snap_map.update(sr.json().get("snapshots", {}))
+
+            # 3. Get spot price for BS
+            try:
+                qr = await c.get(
+                    f"{self._data_url}/v2/stocks/{symbol}/quotes/latest",
+                    headers=self._headers,
+                )
+                spot = float(qr.json().get("quote", {}).get("ap", 0)) if qr.status_code == 200 else 0
+            except Exception:
+                spot = 0
+
+        # 4. Combine + compute BS Greeks
+        chain = []
+        for con in contracts:
+            sym = con.get("symbol", "")
+            strike = float(con.get("strike_price") or 0)
+            exp = con.get("expiration_date", "")
+            otype = con.get("type", "call")
+            oi = float(con.get("open_interest") or 0)
+            snap = snap_map.get(sym, {})
+            quote = snap.get("latestQuote", {})
+            bid = float(quote.get("bp") or 0)
+            ask = float(quote.get("ap") or 0)
+            mark = round((bid + ask) / 2, 2) if bid and ask else None
+
+            # Compute Greeks via BS
+            try:
+                exp_dt = date.fromisoformat(exp)
+                T = max((exp_dt - today).days / 365, 0.0)
+            except Exception:
+                T = 0.0
+
+            iv = 0.20
+            greeks = {"delta": None, "gamma": None, "theta": None, "vega": None}
+            if spot > 0 and T > 0 and mark and mark > 0:
+                iv = iv_from_price(mark, spot, strike, T, option_type=otype)
+                g = bs_greeks(spot, strike, T, sigma=iv, option_type=otype)
+                greeks = g
+
+            chain.append({
+                "symbol": sym,
+                "strike_price": strike,
+                "expiration_date": exp,
+                "option_type": otype,
+                "bid_price": bid or None,
+                "ask_price": ask or None,
+                "mark_price": mark,
+                "delta": greeks["delta"],
+                "gamma": greeks["gamma"],
+                "theta": greeks["theta"],
+                "vega": greeks["vega"],
+                "open_interest": oi,
+                "implied_volatility": iv,
+            })
+        return chain
 
     async def place_order(self, order: dict[str, Any]) -> dict[str, Any]:
         async with httpx.AsyncClient() as c:

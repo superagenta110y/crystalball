@@ -16,12 +16,9 @@ async def market_stream(websocket: WebSocket, symbol: str):
     await websocket.accept()
     provider: BaseProvider = get_provider_instance()
     try:
+        # WebSocket streaming disabled — use REST polling instead
+        await websocket.send_text(json.dumps({"info": "Use REST /api/market/quote/{symbol} for live quotes"}))
         while True:
-            try:
-                quote = await provider.get_quote(symbol.upper())
-                await websocket.send_text(json.dumps(quote))
-            except Exception as e:
-                await websocket.send_text(json.dumps({"error": str(e)}))
-            await asyncio.sleep(2)
+            await asyncio.sleep(30)  # keep connection alive without hammering API
     except WebSocketDisconnect:
         pass

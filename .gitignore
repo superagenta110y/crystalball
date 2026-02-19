@@ -50,3 +50,5 @@ dist/
 
 # Misc
 .turbo/
+.env
+backend/.env
