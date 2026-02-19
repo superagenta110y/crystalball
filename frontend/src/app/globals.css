@@ -35,7 +35,8 @@ html, body {
 }
 
 .widget-header {
-  @apply flex items-center justify-between px-4 py-2 border-b border-surface-border text-xs font-semibold text-neutral-400 uppercase tracking-wider;
+  @apply flex items-center justify-between px-4 py-2 border-b border-surface-border text-xs font-semibold uppercase tracking-wider;
+  color: var(--neutral);
 }
 
 /* ─── React Grid Layout ─────────────────────────────────────── */
