@@ -95,8 +95,9 @@ export function Topbar() {
             onClick={() => { setShowAddWidget((v) => !v); setShowStyle(false); }}
             className="flex items-center gap-1.5 px-2.5 py-1 bg-surface-overlay hover:bg-surface-border border border-surface-border rounded-md text-xs text-neutral-300 hover:text-white transition"
           >
-            <Plus size={13} /> Add Widget
-            <ChevronDown size={11} className={`transition-transform ${showAddWidget ? "rotate-180" : ""}`} />
+            <Plus size={13} />
+            <span className="hidden sm:inline">Add Widget</span>
+            <ChevronDown size={11} className={`hidden sm:inline transition-transform ${showAddWidget ? "rotate-180" : ""}`} />
           </button>
           {showAddWidget && (
             <div className="absolute right-0 top-full mt-1 w-52 bg-surface-raised border border-surface-border rounded-xl shadow-2xl z-50 overflow-hidden">
@@ -123,7 +124,8 @@ export function Topbar() {
             onClick={() => { setShowStyle((v) => !v); setShowAddWidget(false); }}
             className="flex items-center gap-1.5 px-2.5 py-1 bg-surface-overlay hover:bg-surface-border border border-surface-border rounded-md text-xs text-neutral-300 hover:text-white transition"
           >
-            <Palette size={13} /> Style
+            <Palette size={13} />
+            <span className="hidden sm:inline">Style</span>
           </button>
           {showStyle && (
             <div className="absolute right-0 top-full mt-1 w-56 bg-surface-raised border border-surface-border rounded-xl shadow-2xl z-50 overflow-hidden">
@@ -211,21 +213,34 @@ export function Topbar() {
   );
 }
 
-function MarketStatus() {
-  const isOpen = isMarketOpen();
-  return (
-    <div className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-full border ${
-      isOpen ? "border-bull/30 bg-bull/10" : "text-neutral-500 border-surface-border"
-    }`} style={{ color: isOpen ? "var(--bull)" : undefined }}>
-      <span className={`w-1.5 h-1.5 rounded-full ${isOpen ? "animate-pulse" : "bg-neutral-600"}`}
-        style={{ background: isOpen ? "var(--bull)" : undefined }} />
-      {isOpen ? "Market Open" : "Market Closed"}
-    </div>
-  );
+type MarketSession = "premarket" | "open" | "postmarket" | "closed";
+
+function getMarketSession(): MarketSession {
+  const et = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }));
+  const day = et.getDay();
+  const min = et.getHours() * 60 + et.getMinutes();
+  if (day < 1 || day > 5) return "closed";           // weekend
+  if (min >= 240  && min < 570)  return "premarket";  // 4:00–9:30 AM ET
+  if (min >= 570  && min < 960)  return "open";       // 9:30 AM–4:00 PM ET
+  if (min >= 960  && min < 1200) return "postmarket"; // 4:00–8:00 PM ET
+  return "closed";
 }
 
-function isMarketOpen(): boolean {
-  const et = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }));
-  const d = et.getDay(), m = et.getHours() * 60 + et.getMinutes();
-  return d >= 1 && d <= 5 && m >= 570 && m < 960;
+const SESSION_CONFIG: Record<MarketSession, { label: string; dot: string; ring: string; text: string }> = {
+  open:       { label: "Open",       dot: "bg-bull animate-pulse",   ring: "border-bull/30 bg-bull/10",           text: "text-bull"           },
+  premarket:  { label: "Pre-market", dot: "bg-blue-400 animate-pulse", ring: "border-blue-400/30 bg-blue-400/10", text: "text-blue-400"       },
+  postmarket: { label: "Post-market",dot: "bg-blue-400 animate-pulse", ring: "border-blue-400/30 bg-blue-400/10", text: "text-blue-400"       },
+  closed:     { label: "Closed",     dot: "bg-neutral-600",           ring: "border-surface-border",               text: "text-neutral-500"   },
+};
+
+function MarketStatus() {
+  const session = getMarketSession();
+  const cfg = SESSION_CONFIG[session];
+
+  return (
+    <div className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-full border ${cfg.ring} ${cfg.text}`}>
+      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.dot}`} />
+      <span className="hidden sm:inline">{cfg.label}</span>
+    </div>
+  );
 }
