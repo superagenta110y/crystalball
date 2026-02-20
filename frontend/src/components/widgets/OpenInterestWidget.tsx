@@ -9,7 +9,7 @@
  */
 "use client";
 
-import React, { useMemo } from "react";
+import React from "react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend,
   ResponsiveContainer, ReferenceLine,
@@ -30,9 +30,21 @@ function generateMockOI(base: number) {
 }
 
 export function OpenInterestWidget({ symbol = "SPY" }: OpenInterestWidgetProps) {
-  const base = symbol === "QQQ" ? 420 : 520;
-  const data = useMemo(() => generateMockOI(base), [base]);
-  const atm = base;
+  const [rawData, setRawData] = React.useState<{strike:number;callOI:number;putOI:number}[]>([]);
+  const [error, setError] = React.useState(false);
+  React.useEffect(() => {
+    const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    fetch(`${API}/api/analytics/oi/${symbol}`)
+      .then(r => r.json()).then(d => {
+        setRawData((d.data || []).map((x: any) => ({ strike: x.strike, callOI: x.oi_call, putOI: x.oi_put })));
+        setError(false);
+      }).catch(() => setError(true));
+  }, [symbol]);
+  // Find approximate ATM (highest total OI)
+  const atm = rawData.length ? rawData.reduce((best, d) => (d.callOI + d.putOI > best.callOI + best.putOI ? d : best), rawData[0])?.strike : 0;
+  // Filter ±5% around ATM for clean x-axis
+  const data = atm > 0 ? rawData.filter(d => d.strike >= atm * 0.95 && d.strike <= atm * 1.05) : rawData.slice(0, 40);
+  if (error) return <div className="flex items-center justify-center h-full text-xs text-neutral-600">Backend offline</div>;
 
   return (
     <div className="h-full w-full p-2">
@@ -43,7 +55,7 @@ export function OpenInterestWidget({ symbol = "SPY" }: OpenInterestWidgetProps) 
             tick={{ fontSize: 9, fill: "#8b8fa8" }}
             tickLine={false}
             axisLine={false}
-            interval={2}
+            interval="preserveStartEnd"
           />
           <YAxis
             tick={{ fontSize: 9, fill: "#8b8fa8" }}

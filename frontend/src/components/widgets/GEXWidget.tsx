@@ -15,7 +15,7 @@
  */
 "use client";
 
-import React, { useMemo } from "react";
+import React from "react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ReferenceLine,
   ResponsiveContainer, Cell,
@@ -41,13 +41,28 @@ function generateMockGEX(base: number): GEXBar[] {
 }
 
 export function GEXWidget({ symbol = "SPY" }: GEXWidgetProps) {
-  const base = symbol === "QQQ" ? 420 : 520;
-  const data = useMemo(() => generateMockGEX(base), [base]);
+  const [data, setData] = React.useState<GEXBar[]>([]);
+  const [spot, setSpot] = React.useState<number>(0);
+  const [error, setError] = React.useState(false);
 
-  const netGEX = data.reduce((sum, d) => sum + d.gex, 0);
-  const flipStrike = data.find((d, i) =>
-    i > 0 && Math.sign(d.gex) !== Math.sign(data[i - 1].gex)
+  React.useEffect(() => {
+    const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    fetch(`${API}/api/analytics/gex/${symbol}`)
+      .then(r => r.json())
+      .then(d => { setData(d.data || []); setSpot(d.spot || 0); setError(false); })
+      .catch(() => { setError(true); });
+  }, [symbol]);
+
+  // Filter to ±5% of spot for a clean readable chart
+  const filtered = spot > 0
+    ? data.filter(d => d.strike >= spot * 0.95 && d.strike <= spot * 1.05)
+    : data.slice(0, 40);
+
+  const netGEX = filtered.reduce((sum, d) => sum + d.gex, 0);
+  const flipStrike = filtered.find((d, i) =>
+    i > 0 && Math.sign(d.gex) !== Math.sign(filtered[i - 1].gex)
   )?.strike;
+  if (error) return <div className="flex items-center justify-center h-full text-xs text-neutral-600">Backend offline</div>;
 
   return (
     <div className="h-full w-full p-2 flex flex-col gap-1">
@@ -65,13 +80,13 @@ export function GEXWidget({ symbol = "SPY" }: GEXWidgetProps) {
       </div>
 
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
+        <BarChart data={filtered} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
           <XAxis
             dataKey="strike"
             tick={{ fontSize: 9, fill: "#8b8fa8" }}
             tickLine={false}
             axisLine={false}
-            interval={2}
+            interval="preserveStartEnd"
           />
           <YAxis
             tick={{ fontSize: 9, fill: "#8b8fa8" }}
@@ -103,7 +118,7 @@ export function GEXWidget({ symbol = "SPY" }: GEXWidgetProps) {
             }}
           />
           <Bar dataKey="gex" radius={[2, 2, 0, 0]}>
-            {data.map((entry, i) => (
+            {filtered.map((entry, i) => (
               <Cell key={i} fill={entry.gex >= 0 ? "#00d4aa" : "#ff4d6d"} fillOpacity={0.75} />
             ))}
           </Bar>

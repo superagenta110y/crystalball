@@ -13,7 +13,7 @@
  */
 "use client";
 
-import React, { useMemo } from "react";
+import React from "react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ReferenceLine,
   ResponsiveContainer, Cell,
@@ -38,9 +38,18 @@ function generateMockDEX(base: number): DEXBar[] {
 }
 
 export function DEXWidget({ symbol = "SPY" }: DEXWidgetProps) {
-  const base = symbol === "QQQ" ? 420 : 520;
-  const data = useMemo(() => generateMockDEX(base), [base]);
-  const totalDex = data.reduce((sum, d) => sum + d.dex, 0);
+  const [data, setData] = React.useState<DEXBar[]>([]);
+  const [spot, setSpot] = React.useState(0);
+  const [error, setError] = React.useState(false);
+  const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  React.useEffect(() => {
+    fetch(`${API}/api/analytics/dex/${symbol}`)
+      .then(r => r.json()).then(d => { setData(d.data || []); setSpot(d.spot || 0); setError(false); })
+      .catch(() => setError(true));
+  }, [symbol]);
+  if (error) return <div className="flex items-center justify-center h-full text-xs text-neutral-600">Backend offline</div>;
+  const filtered = spot > 0 ? data.filter(d => d.strike >= spot * 0.95 && d.strike <= spot * 1.05) : data.slice(0, 40);
+  const totalDex = filtered.reduce((sum, d) => sum + d.dex, 0);
 
   return (
     <div className="h-full w-full p-2 flex flex-col gap-1">
@@ -52,13 +61,13 @@ export function DEXWidget({ symbol = "SPY" }: DEXWidgetProps) {
       </div>
 
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
+        <BarChart data={filtered} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
           <XAxis
             dataKey="strike"
             tick={{ fontSize: 9, fill: "#8b8fa8" }}
             tickLine={false}
             axisLine={false}
-            interval={2}
+            interval="preserveStartEnd"
           />
           <YAxis
             tick={{ fontSize: 9, fill: "#8b8fa8" }}
@@ -82,7 +91,7 @@ export function DEXWidget({ symbol = "SPY" }: DEXWidgetProps) {
             }}
           />
           <Bar dataKey="dex" radius={[2, 2, 0, 0]}>
-            {data.map((entry, i) => (
+            {filtered.map((entry, i) => (
               <Cell key={i} fill={entry.dex >= 0 ? "#00d4aa" : "#ff4d6d"} fillOpacity={0.75} />
             ))}
           </Bar>
