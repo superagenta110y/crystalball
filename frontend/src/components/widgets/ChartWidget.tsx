@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -16,6 +16,11 @@ const BAR_LIMIT: Record<string, number> = {
   "1Min":390,"5Min":390,"15Min":200,"30Min":200,
   "1Hour":200,"4Hour":120,"1Day":252,"1Week":104,
 };
+// Realtime poll interval per Alpaca timeframe (seconds)
+const POLL_INTERVAL: Record<string, number> = {
+  "1Min":10,"5Min":20,"15Min":30,"30Min":60,
+  "1Hour":120,"4Hour":300,"1Day":300,"1Week":300,
+};
 
 interface ChartWidgetProps {
   symbol?: string;
@@ -23,6 +28,8 @@ interface ChartWidgetProps {
   isGlobalOverride?: boolean;
   onConfigChange?: (patch: Record<string, string>) => void;
 }
+
+type Candle = { time: number; open: number; high: number; low: number; close: number };
 
 export function ChartWidget({
   symbol: initSymbol = "SPY",
@@ -38,8 +45,9 @@ export function ChartWidget({
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
   const seriesRef = useRef<any>(null);
+  const candlesRef = useRef<Map<number, Candle>>(new Map()); // time → candle cache
 
-  // Sync with prop when global override changes symbol
+  // Sync prop → state when global override changes
   useEffect(() => {
     if (initSymbol && initSymbol !== symbol) {
       setSymbol(initSymbol);
@@ -84,37 +92,87 @@ export function ChartWidget({
     };
   }, []);
 
-  // Fetch data on symbol/timeframe change
+  // Parse bars from API response into Candle objects
+  const parseBars = (bars: any[]): Candle[] =>
+    bars
+      .filter(b => b?.timestamp && b.open != null)
+      .map(b => ({
+        time: Math.floor(new Date(b.timestamp).getTime() / 1000),
+        open: b.open, high: b.high, low: b.low, close: b.close,
+      }))
+      .sort((a, b) => a.time - b.time);
+
+  // Full initial load (clears and resets chart)
+  const loadFull = useCallback(async (sym: string, tf: Timeframe) => {
+    if (!seriesRef.current) return;
+    const alpacaTF = TF_MAP[tf] || "5Min";
+    const limit = BAR_LIMIT[alpacaTF] || 200;
+    setStatus("loading");
+    try {
+      const r = await fetch(`${API}/api/market/history/${sym}?timeframe=${alpacaTF}&limit=${limit}`);
+      const bars = await r.json();
+      if (!Array.isArray(bars) || !bars.length || !seriesRef.current) { setStatus("error"); return; }
+      const candles = parseBars(bars);
+      candlesRef.current = new Map(candles.map(c => [c.time, c]));
+      seriesRef.current.setData(candles);
+      chartRef.current?.timeScale().fitContent();
+      setLastPrice(candles[candles.length - 1]?.close ?? null);
+      setStatus("ok");
+    } catch { setStatus("error"); }
+  }, []);
+
+  // Incremental realtime update — fetch last N bars and upsert
+  const updateRealtime = useCallback(async (sym: string, tf: Timeframe) => {
+    if (!seriesRef.current || status === "error") return;
+    const alpacaTF = TF_MAP[tf] || "5Min";
+    try {
+      const r = await fetch(`${API}/api/market/history/${sym}?timeframe=${alpacaTF}&limit=5`);
+      const bars = await r.json();
+      if (!Array.isArray(bars) || !bars.length || !seriesRef.current) return;
+      const newCandles = parseBars(bars);
+      let changed = false;
+      for (const c of newCandles) {
+        const existing = candlesRef.current.get(c.time);
+        if (!existing || existing.close !== c.close || existing.high !== c.high || existing.low !== c.low) {
+          candlesRef.current.set(c.time, c);
+          seriesRef.current.update(c);
+          changed = true;
+        }
+      }
+      if (changed) {
+        const all = [...candlesRef.current.values()].sort((a,b) => a.time - b.time);
+        setLastPrice(all[all.length - 1]?.close ?? null);
+      }
+    } catch { /* silent — polling, don't flash error */ }
+  }, [status]);
+
+  // Initial load + realtime polling
   useEffect(() => {
     const alpacaTF = TF_MAP[timeframe] || "5Min";
-    const limit = BAR_LIMIT[alpacaTF] || 200;
+    const pollMs = (POLL_INTERVAL[alpacaTF] || 30) * 1000;
     let cancelled = false;
+    candlesRef.current = new Map();
 
-    const load = () => {
-      if (!seriesRef.current) { setTimeout(load, 300); return; }
-      setStatus("loading");
-      fetch(`${API}/api/market/history/${symbol}?timeframe=${alpacaTF}&limit=${limit}`)
-        .then(r => r.json())
-        .then((bars: { timestamp: string; open: number; high: number; low: number; close: number }[]) => {
-          if (cancelled || !seriesRef.current || !bars?.length) {
-            if (!cancelled) setStatus("error");
-            return;
-          }
-          const candles = bars
-            .map(b => ({
-              time: Math.floor(new Date(b.timestamp).getTime() / 1000) as any,
-              open: b.open, high: b.high, low: b.low, close: b.close,
-            }))
-            .sort((a, b) => a.time - b.time);
-          seriesRef.current.setData(candles);
-          chartRef.current?.timeScale().fitContent();
-          setLastPrice(candles[candles.length - 1]?.close ?? null);
-          setStatus("ok");
-        })
-        .catch(() => { if (!cancelled) setStatus("error"); });
+    const init = async () => {
+      // Retry until chart is mounted
+      while (!seriesRef.current && !cancelled) {
+        await new Promise(r => setTimeout(r, 300));
+      }
+      if (cancelled) return;
+      await loadFull(symbol, timeframe);
+      if (cancelled) return;
+      // Start polling
+      const id = setInterval(() => {
+        if (!cancelled) updateRealtime(symbol, timeframe);
+      }, pollMs);
+      return () => clearInterval(id);
     };
-    load();
-    return () => { cancelled = true; };
+
+    const cleanup = init();
+    return () => {
+      cancelled = true;
+      cleanup.then(fn => fn?.());
+    };
   }, [symbol, timeframe]);
 
   const handleSymbolSubmit = (e: React.FormEvent) => {
@@ -132,40 +190,40 @@ export function ChartWidget({
 
   return (
     <div className="flex flex-col h-full w-full">
-      {/* Per-widget controls */}
       <div className="flex items-center gap-2 px-2 py-1.5 border-b border-surface-border shrink-0 flex-wrap">
-        {/* Symbol input */}
         <form onSubmit={handleSymbolSubmit} className="flex items-center gap-1">
           <input
             value={symbolInput}
             onChange={e => setSymbolInput(e.target.value.toUpperCase())}
             disabled={isGlobalOverride}
-            title={isGlobalOverride ? "Controlled by global override in the header" : "Enter symbol and press Enter"}
+            title={isGlobalOverride ? "Controlled by global override" : "Enter symbol + Enter"}
             className={`border rounded px-2 py-0.5 text-xs font-mono w-16 focus:outline-none text-white transition
-              ${isGlobalOverride ? "bg-transparent border-surface-border text-neutral-500 cursor-not-allowed" : "bg-surface-overlay border-surface-border focus:border-accent/60"}`}
+              ${isGlobalOverride
+                ? "bg-transparent border-surface-border text-neutral-500 cursor-not-allowed"
+                : "bg-surface-overlay border-surface-border focus:border-accent/60"}`}
           />
-          {isGlobalOverride && <span className="text-neutral-700 text-xs" title="Global override active">⬡</span>}
+          {isGlobalOverride && <span className="text-neutral-700 text-xs">⬡</span>}
         </form>
-        {/* Timeframe selector */}
-        <div className="flex items-center gap-0.5">
+
+        <div className="flex items-center gap-0.5 flex-wrap">
           {TIMEFRAMES.map(tf => (
-            <button
-              key={tf}
-              onClick={() => handleTimeframe(tf)}
+            <button key={tf} onClick={() => handleTimeframe(tf)}
               className={`px-1.5 py-0.5 rounded text-xs font-mono transition ${
                 tf === timeframe ? "bg-accent/20 text-accent font-semibold" : "text-neutral-500 hover:text-white"
-              }`}
-            >
+              }`}>
               {tf}
             </button>
           ))}
         </div>
-        {/* Status */}
-        {lastPrice && (
-          <span className="ml-auto text-xs font-mono text-white">${lastPrice.toFixed(2)}</span>
-        )}
-        {status === "loading" && <span className="ml-auto text-xs text-neutral-600 animate-pulse">Loading…</span>}
-        {status === "error" && <span className="ml-auto text-xs text-bear">Error</span>}
+
+        <div className="ml-auto flex items-center gap-2">
+          {status === "ok" && (
+            <span className="text-xs text-neutral-700 animate-pulse" title="Realtime updates active">●</span>
+          )}
+          {lastPrice && <span className="text-xs font-mono text-white">${lastPrice.toFixed(2)}</span>}
+          {status === "loading" && <span className="text-xs text-neutral-600 animate-pulse">Loading…</span>}
+          {status === "error"   && <span className="text-xs text-bear">Error</span>}
+        </div>
       </div>
       <div ref={containerRef} className="flex-1 w-full" />
     </div>

@@ -10,22 +10,30 @@ interface OpenInterestWidgetProps {
   onConfigChange?: (patch: Record<string, string>) => void;
 }
 
+// Today's date as YYYY-MM-DD (default expiry = today, i.e. 0DTE)
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export function OpenInterestWidget({ symbol = "SPY", isGlobalOverride, onConfigChange }: OpenInterestWidgetProps) {
   const [rawData, setRawData] = useState<{ strike: number; callOI: number; putOI: number }[]>([]);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [expDate, setExpDate] = useState(todayStr());
   const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   useEffect(() => {
     setLoading(true);
-    fetch(`${API}/api/analytics/oi/${symbol}`)
+    const url = `${API}/api/analytics/oi/${symbol}?expiration_date=${expDate}`;
+    fetch(url)
       .then(r => r.json())
       .then(d => {
         setRawData((d.data || []).map((x: any) => ({ strike: x.strike, callOI: x.oi_call, putOI: x.oi_put })));
-        setError(false); setLoading(false);
+        setError(false);
+        setLoading(false);
       })
       .catch(() => { setError(true); setLoading(false); });
-  }, [symbol]);
+  }, [symbol, expDate]);
 
   const atm = rawData.length
     ? rawData.reduce((best, d) => (d.callOI + d.putOI > best.callOI + best.putOI ? d : best), rawData[0])?.strike
@@ -36,19 +44,50 @@ export function OpenInterestWidget({ symbol = "SPY", isGlobalOverride, onConfigC
 
   return (
     <div className="h-full w-full flex flex-col">
+      {/* Symbol + expiry date controls */}
       <SymbolBar
         symbol={symbol}
         isGlobalOverride={isGlobalOverride}
         onSymbolChange={(s) => onConfigChange?.({ symbol: s })}
+        extra={
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-neutral-600">Exp</span>
+            <input
+              type="date"
+              value={expDate}
+              onChange={e => setExpDate(e.target.value)}
+              className="bg-surface-overlay border border-surface-border rounded px-1.5 py-0.5 text-xs font-mono text-white focus:outline-none focus:border-accent/60 transition"
+            />
+          </div>
+        }
       />
+
       <div className="flex-1 min-h-0 p-2">
-        {loading && <div className="flex items-center justify-center h-full text-xs text-neutral-600 animate-pulse">Loading…</div>}
-        {error && !loading && <div className="flex items-center justify-center h-full text-xs text-neutral-600">Backend offline</div>}
-        {!loading && !error && (
+        {loading && (
+          <div className="flex items-center justify-center h-full text-xs text-neutral-600 animate-pulse">Loading…</div>
+        )}
+        {error && !loading && (
+          <div className="flex items-center justify-center h-full text-xs text-neutral-600">Backend offline</div>
+        )}
+        {!loading && !error && data.length === 0 && (
+          <div className="flex items-center justify-center h-full text-xs text-neutral-600">
+            No OI data for {expDate}
+          </div>
+        )}
+        {!loading && !error && data.length > 0 && (
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data} margin={{ top: 4, right: 8, bottom: 4, left: -10 }}>
-              <XAxis dataKey="strike" tick={{ fontSize: 9, fill: "#8b8fa8" }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-              <YAxis tick={{ fontSize: 9, fill: "#8b8fa8" }} tickLine={false} axisLine={false} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`} />
+              <XAxis
+                dataKey="strike"
+                tick={{ fontSize: 9, fill: "#8b8fa8" }}
+                tickLine={false} axisLine={false}
+                interval="preserveStartEnd"
+              />
+              <YAxis
+                tick={{ fontSize: 9, fill: "#8b8fa8" }}
+                tickLine={false} axisLine={false}
+                tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`}
+              />
               <Tooltip content={({ payload, label }) => {
                 if (!payload?.length) return null;
                 return (
@@ -59,10 +98,12 @@ export function OpenInterestWidget({ symbol = "SPY", isGlobalOverride, onConfigC
                   </div>
                 );
               }} />
-              <ReferenceLine x={atm} stroke="#ffffff22" strokeDasharray="4 2" label={{ value: "ATM", fill: "#555", fontSize: 9 }} />
-              <Bar dataKey="callOI" fill="#00d4aa" fillOpacity={0.7} radius={[2, 2, 0, 0]} name="Calls" />
-              <Bar dataKey="putOI" fill="#ff4d6d" fillOpacity={0.7} radius={[2, 2, 0, 0]} name="Puts" />
-              <Legend wrapperStyle={{ fontSize: 10, paddingTop: 4 }} formatter={(v) => <span style={{ color: "#8b8fa8" }}>{v}</span>} />
+              <ReferenceLine x={atm} stroke="#ffffff22" strokeDasharray="4 2"
+                label={{ value: "ATM", fill: "#555", fontSize: 9 }} />
+              <Bar dataKey="callOI" fill="#00d4aa" fillOpacity={0.7} radius={[2,2,0,0]} name="Calls" />
+              <Bar dataKey="putOI"  fill="#ff4d6d" fillOpacity={0.7} radius={[2,2,0,0]} name="Puts" />
+              <Legend wrapperStyle={{ fontSize: 10, paddingTop: 4 }}
+                formatter={(v) => <span style={{ color: "#8b8fa8" }}>{v}</span>} />
             </BarChart>
           </ResponsiveContainer>
         )}
