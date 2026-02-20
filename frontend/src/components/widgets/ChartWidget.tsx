@@ -1,54 +1,61 @@
-/**
- * ChartWidget — Candlestick chart with VWAP, Volume Profile, RSI, and footprint overlay.
- * Uses TradingView Lightweight Charts (free, open-source).
- *
- * TODO:
- *   - Connect to /api/ws/bars WebSocket for live candle stream
- *   - Implement VWAP calculation from tick data
- *   - Add Volume Profile histogram (right axis)
- *   - Add RSI sub-pane
- *   - Add footprint (bid/ask delta per bar)
- */
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 interface ChartWidgetProps {
   symbol?: string;
+  timeframe?: string;
 }
 
-export function ChartWidget({ symbol = "SPY" }: ChartWidgetProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const chartRef = useRef<unknown>(null);
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+// Map dashboard timeframe → Alpaca timeframe param
+const TF_MAP: Record<string, string> = {
+  "1s":  "1Min", "5s":  "1Min",
+  "1m":  "1Min", "5m":  "5Min",
+  "15m": "15Min","30m": "30Min",
+  "1h":  "1Hour","4h":  "4Hour",
+  "1d":  "1Day", "1w":  "1Week",
+};
+
+const BAR_LIMIT: Record<string, number> = {
+  "1Min": 390, "5Min": 390, "15Min": 200,
+  "30Min": 200, "1Hour": 200, "4Hour": 120,
+  "1Day": 252, "1Week": 104,
+};
+
+export function ChartWidget({ symbol = "SPY", timeframe = "5m" }: ChartWidgetProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<any>(null);
+  const seriesRef = useRef<any>(null);
+  const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
+  const [lastPrice, setLastPrice] = useState<number | null>(null);
+
+  // Build chart once on mount
   useEffect(() => {
     if (!containerRef.current) return;
-
-    let chart: unknown = null;
-
-    // Dynamically import to avoid SSR issues
     import("lightweight-charts").then(({ createChart, CrosshairMode }) => {
-      if (!containerRef.current) return;
+      if (!containerRef.current || chartRef.current) return;
 
-      chart = createChart(containerRef.current, {
-        layout: {
-          background: { color: "#141414" },
-          textColor: "#8b8fa8",
-        },
-        grid: {
-          vertLines: { color: "#1e1e1e" },
-          horzLines: { color: "#1e1e1e" },
-        },
+      const chart = createChart(containerRef.current, {
+        layout: { background: { color: "transparent" }, textColor: "#8b8fa8" },
+        grid: { vertLines: { color: "#1a1a1a" }, horzLines: { color: "#1a1a1a" } },
         crosshair: { mode: CrosshairMode.Normal },
         rightPriceScale: { borderColor: "#2a2a2a" },
-        timeScale: { borderColor: "#2a2a2a", timeVisible: true },
+        timeScale: {
+          borderColor: "#2a2a2a",
+          timeVisible: true,
+          secondsVisible: false,
+          tickMarkFormatter: (time: number) => {
+            const d = new Date(time * 1000);
+            return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
+          },
+        },
         width: containerRef.current.clientWidth,
         height: containerRef.current.clientHeight,
       });
 
-      chartRef.current = chart as typeof chartRef.current;
-
-      const candleSeries = (chart as ReturnType<typeof createChart>).addCandlestickSeries({
+      const series = chart.addCandlestickSeries({
         upColor: "#00d4aa",
         downColor: "#ff4d6d",
         borderVisible: false,
@@ -56,46 +63,83 @@ export function ChartWidget({ symbol = "SPY" }: ChartWidgetProps) {
         wickDownColor: "#ff4d6d",
       });
 
-      // Placeholder data — replace with live Alpaca feed
-      const now = Math.floor(Date.now() / 1000);
-      const bars = Array.from({ length: 100 }, (_, i) => {
-        const t = now - (100 - i) * 300;
-        const open = 500 + Math.random() * 10 - 5;
-        const close = open + Math.random() * 4 - 2;
-        const high = Math.max(open, close) + Math.random() * 2;
-        const low = Math.min(open, close) - Math.random() * 2;
-        return { time: t as unknown as import("lightweight-charts").Time, open, high, low, close };
+      chartRef.current = chart;
+      seriesRef.current = series;
+
+      const ro = new ResizeObserver(() => {
+        if (containerRef.current && chartRef.current) {
+          chartRef.current.applyOptions({
+            width: containerRef.current.clientWidth,
+            height: containerRef.current.clientHeight,
+          });
+        }
       });
-
-      candleSeries.setData(bars);
-
-      // TODO: Add VWAP line series
-      // TODO: Add RSI pane
+      ro.observe(containerRef.current);
+      return () => ro.disconnect();
     });
-
-    const resizeObserver = new ResizeObserver(() => {
-      if (containerRef.current && chartRef.current) {
-        (chartRef.current as { applyOptions: (opts: object) => void }).applyOptions({
-          width: containerRef.current.clientWidth,
-          height: containerRef.current.clientHeight,
-        });
-      }
-    });
-
-    if (containerRef.current) resizeObserver.observe(containerRef.current);
 
     return () => {
-      resizeObserver.disconnect();
-      if (chartRef.current) {
-        (chartRef.current as { remove: () => void }).remove();
-      }
+      if (chartRef.current) { chartRef.current.remove(); chartRef.current = null; seriesRef.current = null; }
     };
-  }, [symbol]);
+  }, []);
+
+  // Fetch data whenever symbol or timeframe changes
+  useEffect(() => {
+    const alpacaTF = TF_MAP[timeframe] || "5Min";
+    const limit = BAR_LIMIT[alpacaTF] || 200;
+    let cancelled = false;
+
+    const load = () => {
+      if (!seriesRef.current) {
+        // Chart initialising — retry shortly
+        setTimeout(load, 300);
+        return;
+      }
+      setStatus("loading");
+      fetch(`${API}/api/market/history/${symbol}?timeframe=${alpacaTF}&limit=${limit}`)
+        .then((r) => r.json())
+        .then((bars: { timestamp: string; open: number; high: number; low: number; close: number }[]) => {
+          if (cancelled || !seriesRef.current || !bars?.length) { if (!cancelled) setStatus("error"); return; }
+          const candles = bars
+            .map((b) => ({
+              time: Math.floor(new Date(b.timestamp).getTime() / 1000) as any,
+              open: b.open, high: b.high, low: b.low, close: b.close,
+            }))
+            .sort((a, b) => a.time - b.time);
+          seriesRef.current.setData(candles);
+          chartRef.current?.timeScale().fitContent();
+          setLastPrice(candles[candles.length - 1]?.close ?? null);
+          setStatus("ok");
+        })
+        .catch(() => { if (!cancelled) setStatus("error"); });
+    };
+
+    load();
+    return () => { cancelled = true; };
+  }, [symbol, timeframe]);
 
   return (
-    <div className="relative h-full w-full">
-      <div className="absolute top-2 left-2 z-10 text-xs text-neutral-500 bg-surface-raised/80 px-2 py-1 rounded font-mono">
-        {symbol} · 5m
+    <div className="relative h-full w-full bg-transparent">
+      {/* Header overlay */}
+      <div className="absolute top-2 left-2 z-10 flex items-center gap-2">
+        <span className="text-xs font-mono text-neutral-400 bg-surface-raised/90 px-2 py-0.5 rounded">
+          {symbol} · {timeframe}
+        </span>
+        {lastPrice && (
+          <span className="text-xs font-mono text-white bg-surface-raised/90 px-2 py-0.5 rounded">
+            ${lastPrice.toFixed(2)}
+          </span>
+        )}
+        {status === "loading" && (
+          <span className="text-xs text-neutral-600 bg-surface-raised/90 px-2 py-0.5 rounded animate-pulse">
+            Loading…
+          </span>
+        )}
+        {status === "error" && (
+          <span className="text-xs text-bear bg-surface-raised/90 px-2 py-0.5 rounded">
+            Error — backend offline?
+          </span>
+        )}
       </div>
       <div ref={containerRef} className="h-full w-full" />
     </div>
