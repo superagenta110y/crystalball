@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Plus, Palette, ChevronDown, X, Settings } from "lucide-react";
+import { Plus, Palette, ChevronDown, Settings } from "lucide-react";
 import Link from "next/link";
 import { useDashboardStore, type WidgetType, DEFAULT_THEME } from "@/lib/store/dashboardStore";
 
@@ -28,11 +28,19 @@ const COLOR_FIELDS: { key: keyof typeof DEFAULT_THEME; label: string }[] = [
 ];
 
 export function Topbar() {
-  const { theme, setTheme, activeTabId, addWidget } = useDashboardStore();
+  const { theme, setTheme, activeTabId, addWidget, activeTab, setGlobalSymbols } = useDashboardStore();
+  const tab = activeTab();
+
   const [showAddWidget, setShowAddWidget] = useState(false);
   const [showStyle, setShowStyle] = useState(false);
+  const [symbolInput, setSymbolInput] = useState("");
   const addRef = useRef<HTMLDivElement>(null);
   const styleRef = useRef<HTMLDivElement>(null);
+
+  // Sync local input with tab's globalSymbols when switching tabs
+  useEffect(() => {
+    setSymbolInput((tab?.globalSymbols ?? []).join(", "));
+  }, [activeTabId]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -43,16 +51,43 @@ export function Topbar() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  const handleSymbolChange = (raw: string) => {
+    setSymbolInput(raw);
+    const symbols = raw
+      .split(/[,\s]+/)
+      .map((s) => s.trim().toUpperCase())
+      .filter(Boolean);
+    setGlobalSymbols(activeTabId, symbols);
+  };
+
   return (
     <header className="flex items-center gap-3 px-4 py-2 bg-surface-raised border-b border-surface-border shrink-0 h-12">
-      {/* Logo */}
+      {/* Logo + Name */}
       <Link href="/" className="flex items-center gap-2 shrink-0">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo.svg" alt="CrystalBall" className="w-6 h-6" />
         <span className="font-bold text-white text-sm tracking-wide hidden sm:block">CrystalBall</span>
       </Link>
 
-      <div className="w-px h-5 bg-surface-border mx-1 hidden sm:block" />
+      <div className="w-px h-5 bg-surface-border hidden sm:block" />
+
+      {/* Global symbol override input */}
+      <div className="flex items-center gap-1.5">
+        <input
+          value={symbolInput}
+          onChange={(e) => handleSymbolChange(e.target.value)}
+          placeholder="SPY, QQQ…"
+          title="Global symbol override — comma-separated. Widgets use position order."
+          className="bg-surface-overlay border border-surface-border rounded-md px-2.5 py-1 text-xs font-mono w-36 focus:outline-none focus:border-accent/60 text-white placeholder-neutral-700 transition"
+        />
+        {(tab?.globalSymbols?.length ?? 0) > 0 && (
+          <button
+            onClick={() => { setSymbolInput(""); setGlobalSymbols(activeTabId, []); }}
+            className="text-neutral-600 hover:text-white text-xs transition"
+            title="Clear global override"
+          >✕</button>
+        )}
+      </div>
 
       <div className="ml-auto flex items-center gap-2">
         <MarketStatus />
@@ -72,7 +107,7 @@ export function Topbar() {
               <div className="py-1 max-h-80 overflow-y-auto">
                 {WIDGET_LIST.map(({ id, label }) => (
                   <button
-                    key={id}
+                    key={`${id}-add`}
                     onClick={() => { addWidget(activeTabId, id); setShowAddWidget(false); }}
                     className="w-full flex items-center justify-between px-3 py-2 text-sm text-neutral-300 hover:text-white hover:bg-surface-overlay transition"
                   >
@@ -114,20 +149,14 @@ export function Topbar() {
                 <button
                   onClick={() => setTheme(DEFAULT_THEME)}
                   className="mt-1 w-full py-1.5 text-xs text-neutral-500 hover:text-white border border-surface-border rounded-lg transition"
-                >
-                  Reset to defaults
-                </button>
+                >Reset to defaults</button>
               </div>
             </div>
           )}
         </div>
 
         {/* Settings */}
-        <Link
-          href="/settings"
-          className="p-1.5 rounded-md hover:bg-surface-overlay text-neutral-500 hover:text-white transition"
-          title="Settings"
-        >
+        <Link href="/settings" className="p-1.5 rounded-md hover:bg-surface-overlay text-neutral-500 hover:text-white transition" title="Settings">
           <Settings size={15} />
         </Link>
       </div>

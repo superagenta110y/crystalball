@@ -20,12 +20,14 @@ const BAR_LIMIT: Record<string, number> = {
 interface ChartWidgetProps {
   symbol?: string;
   timeframe?: string;
+  isGlobalOverride?: boolean;
   onConfigChange?: (patch: Record<string, string>) => void;
 }
 
 export function ChartWidget({
   symbol: initSymbol = "SPY",
   timeframe: initTf = "5m",
+  isGlobalOverride,
   onConfigChange,
 }: ChartWidgetProps) {
   const [symbol, setSymbol] = useState(initSymbol);
@@ -36,6 +38,14 @@ export function ChartWidget({
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
   const seriesRef = useRef<any>(null);
+
+  // Sync with prop when global override changes symbol
+  useEffect(() => {
+    if (initSymbol && initSymbol !== symbol) {
+      setSymbol(initSymbol);
+      setSymbolInput(initSymbol);
+    }
+  }, [initSymbol]);
 
   // Build chart once
   useEffect(() => {
@@ -129,8 +139,12 @@ export function ChartWidget({
           <input
             value={symbolInput}
             onChange={e => setSymbolInput(e.target.value.toUpperCase())}
-            className="bg-surface-overlay border border-surface-border rounded px-2 py-0.5 text-xs font-mono w-16 focus:outline-none focus:border-accent/60 text-white"
+            disabled={isGlobalOverride}
+            title={isGlobalOverride ? "Controlled by global override in the header" : "Enter symbol and press Enter"}
+            className={`border rounded px-2 py-0.5 text-xs font-mono w-16 focus:outline-none text-white transition
+              ${isGlobalOverride ? "bg-transparent border-surface-border text-neutral-500 cursor-not-allowed" : "bg-surface-overlay border-surface-border focus:border-accent/60"}`}
           />
+          {isGlobalOverride && <span className="text-neutral-700 text-xs" title="Global override active">⬡</span>}
         </form>
         {/* Timeframe selector */}
         <div className="flex items-center gap-0.5">

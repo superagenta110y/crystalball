@@ -23,10 +23,11 @@ function timeAgo(iso: string): string {
 }
 
 interface NewsFeedWidgetProps {
-  symbol?: string;
+  globalSymbol?: string; // from global override (first entry); no per-widget input
 }
 
-export function NewsFeedWidget({ symbol = "SPY" }: NewsFeedWidgetProps) {
+export function NewsFeedWidget({ globalSymbol }: NewsFeedWidgetProps) {
+  const symbol = globalSymbol || "SPY";
   const [news, setNews] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);

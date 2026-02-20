@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback } from "react";
+import React, { useCallback, useMemo } from "react";
 import GridLayout, { type Layout } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
@@ -23,38 +23,68 @@ import { MarketReportWidget } from "@/components/widgets/MarketReportWidget";
 import { useDashboardStore, type WidgetInstance } from "@/lib/store/dashboardStore";
 import useWindowSize from "@/lib/hooks/useWindowSize";
 
-type WidgetProps = { instance: WidgetInstance; onConfigChange: (patch: Record<string, string>) => void };
+type WidgetRenderProps = {
+  instance: WidgetInstance;
+  resolvedSymbol: string;
+  isGlobalOverride: boolean;
+  onConfigChange: (patch: Record<string, string>) => void;
+};
 
-function renderWidget({ instance, onConfigChange }: WidgetProps) {
+function renderWidget({ instance, resolvedSymbol, isGlobalOverride, onConfigChange }: WidgetRenderProps) {
   const { type, config } = instance;
-  const symbol = config.symbol;
-  const timeframe = config.timeframe;
   switch (type) {
-    case "chart":        return <ChartWidget symbol={symbol} timeframe={timeframe} onConfigChange={onConfigChange} />;
-    case "orderflow":    return <OrderFlowWidget symbol={symbol} />;
-    case "openinterest": return <OpenInterestWidget symbol={symbol} />;
-    case "openinterest3d": return <OpenInterest3DWidget symbol={symbol} />;
-    case "gex":          return <GEXWidget symbol={symbol} />;
-    case "dex":          return <DEXWidget symbol={symbol} />;
-    case "newsfeed":     return <NewsFeedWidget />;
-    case "bloomberg":    return <BloombergTVWidget />;
-    case "ai":           return <AIAssistantWidget symbol={symbol} />;
-    case "report":       return <MarketReportWidget symbol={symbol} />;
-    default:             return <div className="p-4 text-xs text-neutral-600">Unknown widget: {type}</div>;
+    case "chart":
+      return (
+        <ChartWidget
+          symbol={resolvedSymbol}
+          timeframe={config.timeframe}
+          isGlobalOverride={isGlobalOverride}
+          onConfigChange={onConfigChange}
+        />
+      );
+    case "orderflow":
+      return <OrderFlowWidget symbol={resolvedSymbol} isGlobalOverride={isGlobalOverride} onConfigChange={onConfigChange} />;
+    case "openinterest":
+      return <OpenInterestWidget symbol={resolvedSymbol} isGlobalOverride={isGlobalOverride} onConfigChange={onConfigChange} />;
+    case "openinterest3d":
+      return <OpenInterest3DWidget symbol={resolvedSymbol} />;
+    case "gex":
+      return <GEXWidget symbol={resolvedSymbol} isGlobalOverride={isGlobalOverride} onConfigChange={onConfigChange} />;
+    case "dex":
+      return <DEXWidget symbol={resolvedSymbol} isGlobalOverride={isGlobalOverride} onConfigChange={onConfigChange} />;
+    case "newsfeed":
+      return <NewsFeedWidget globalSymbol={resolvedSymbol} />;
+    case "bloomberg":
+      return <BloombergTVWidget />;
+    case "ai":
+      return <AIAssistantWidget symbol={config.symbol || "SPY"} />;
+    case "report":
+      return <MarketReportWidget symbol={config.symbol || "SPY"} />;
+    default:
+      return <div className="p-4 text-xs text-neutral-600">Unknown: {type}</div>;
   }
 }
 
 export default function Dashboard() {
-  const { activeTabId, activeTab, updateLayout, removeWidget, updateWidgetConfig, theme } = useDashboardStore();
+  const { activeTabId, activeTab, updateLayout, removeWidget, updateWidgetConfig, resolveSymbol, theme } = useDashboardStore();
   const { width } = useWindowSize();
   const tab = activeTab();
   const layout = tab?.layout ?? [];
   const widgets = tab?.widgets ?? [];
-  const gridWidth = Math.max((width ?? 1200), 400);
+  const gridWidth = Math.max(width ?? 1200, 400);
 
   const handleLayoutChange = useCallback(
     (newLayout: Layout[]) => updateLayout(activeTabId, newLayout),
     [activeTabId, updateLayout]
+  );
+
+  const isGlobalOverride = (tab?.globalSymbols?.length ?? 0) > 0;
+
+  // Memoise resolved symbols so they update when globalSymbols changes
+  const resolvedSymbols = useMemo(
+    () => Object.fromEntries(widgets.map((w) => [w.id, resolveSymbol(activeTabId, w.id)])),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeTabId, widgets, tab?.globalSymbols]
   );
 
   return (
@@ -76,7 +106,7 @@ export default function Dashboard() {
         {widgets.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-3 text-neutral-600">
             <span className="text-4xl">🔮</span>
-            <p className="text-sm">No widgets. Click <strong className="text-neutral-400">+ Add Widget</strong> to get started.</p>
+            <p className="text-sm">No widgets — click <strong className="text-neutral-400">+ Add Widget</strong> to build your dashboard.</p>
           </div>
         ) : (
           <GridLayout
@@ -98,6 +128,8 @@ export default function Dashboard() {
                 >
                   {renderWidget({
                     instance,
+                    resolvedSymbol: resolvedSymbols[instance.id] ?? "SPY",
+                    isGlobalOverride,
                     onConfigChange: (patch) => updateWidgetConfig(activeTabId, instance.id, patch),
                   })}
                 </WidgetWrapper>

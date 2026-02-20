@@ -8,19 +8,21 @@ export type WidgetType =
   | "chart" | "orderflow" | "openinterest" | "openinterest3d"
   | "gex" | "dex" | "newsfeed" | "bloomberg" | "ai" | "report";
 
+// Widget types that accept a per-widget symbol override (and global)
+export const SYMBOL_WIDGET_TYPES: WidgetType[] = [
+  "chart", "orderflow", "openinterest", "openinterest3d", "gex", "dex",
+];
+// NewsFeed respects global[0] but has no per-widget input
+
 export interface WidgetInstance {
-  id: string;           // unique UUID — used as layout `i`
+  id: string;
   type: WidgetType;
-  config: Record<string, string>; // e.g. { symbol: "QQQ", timeframe: "1d" }
+  config: Record<string, string>;
 }
 
 export interface ThemeColors {
-  bull: string;
-  bear: string;
-  accent: string;
-  background: string;
-  surface: string;
-  border: string;
+  bull: string; bear: string; accent: string;
+  background: string; surface: string; border: string;
 }
 
 export interface DashboardTab {
@@ -28,6 +30,7 @@ export interface DashboardTab {
   name: string;
   layout: Layout[];
   widgets: WidgetInstance[];
+  globalSymbols: string[]; // e.g. ["SPY", "QQQ"] — positional override
 }
 
 export interface DashboardState {
@@ -40,6 +43,7 @@ export interface DashboardState {
   removeTab: (id: string) => void;
   renameTab: (id: string, name: string) => void;
   setActiveTab: (id: string) => void;
+  setGlobalSymbols: (tabId: string, symbols: string[]) => void;
 
   addWidget: (tabId: string, type: WidgetType, config?: Record<string, string>) => void;
   removeWidget: (tabId: string, widgetId: string) => void;
@@ -47,6 +51,8 @@ export interface DashboardState {
   updateLayout: (tabId: string, layout: Layout[]) => void;
 
   activeTab: () => DashboardTab | undefined;
+  /** Resolve effective symbol for a widget, respecting global override. */
+  resolveSymbol: (tabId: string, widgetId: string, fallback?: string) => string;
 }
 
 // ─── Defaults ────────────────────────────────────────────────────────────────
@@ -56,8 +62,7 @@ export const DEFAULT_THEME: ThemeColors = {
   background: "#0d0d0d", surface: "#141414", border: "#2a2a2a",
 };
 
-function uuid(): string {
-  // Polyfill for environments without crypto.randomUUID
+export function uuid(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
   }
@@ -73,17 +78,17 @@ function makeWidget(type: WidgetType, config?: Record<string, string>): WidgetIn
 
 function makeDefaultLayout(widgets: WidgetInstance[]): Layout[] {
   const positions: Array<[number, number, number, number]> = [
-    [0,0,8,14], [8,0,4,7], [8,7,4,7],
-    [0,14,6,8], [6,14,6,8],
-    [0,22,4,9], [4,22,4,9], [8,22,4,9],
+    [0,0,8,14],[8,0,4,7],[8,7,4,7],
+    [0,14,6,8],[6,14,6,8],
+    [0,22,4,9],[4,22,4,9],[8,22,4,9],
   ];
   return widgets.map((w, i) => {
-    const [x, y, w_, h] = positions[i] ?? [0, (i * 7), 6, 7];
+    const [x, y, w_, h] = positions[i] ?? [0, i * 7, 6, 7];
     return { i: w.id, x, y, w: w_, h };
   });
 }
 
-function makeDefaultTab(name: string): DashboardTab {
+function makeMainTab(): DashboardTab {
   const widgets: WidgetInstance[] = [
     makeWidget("chart"),
     makeWidget("orderflow"),
@@ -94,12 +99,16 @@ function makeDefaultTab(name: string): DashboardTab {
     makeWidget("ai"),
     makeWidget("report"),
   ];
-  return { id: uuid(), name, layout: makeDefaultLayout(widgets), widgets };
+  return { id: uuid(), name: "Main", layout: makeDefaultLayout(widgets), widgets, globalSymbols: [] };
+}
+
+function makeBlankTab(name: string): DashboardTab {
+  return { id: uuid(), name, layout: [], widgets: [], globalSymbols: [] };
 }
 
 // ─── Store ────────────────────────────────────────────────────────────────────
 
-const INITIAL_TAB = makeDefaultTab("Main");
+const INITIAL_TAB = makeMainTab();
 
 export const useDashboardStore = create<DashboardState>()(
   persist(
@@ -111,7 +120,7 @@ export const useDashboardStore = create<DashboardState>()(
       setTheme: (patch) => set((s) => ({ theme: { ...s.theme, ...patch } })),
 
       addTab: (name) => {
-        const tab = makeDefaultTab(name ?? `Tab ${get().tabs.length + 1}`);
+        const tab = makeBlankTab(name ?? `Tab ${get().tabs.length + 1}`);
         set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }));
       },
 
@@ -126,6 +135,11 @@ export const useDashboardStore = create<DashboardState>()(
         set((s) => ({ tabs: s.tabs.map((t) => t.id === id ? { ...t, name } : t) })),
 
       setActiveTab: (id) => set({ activeTabId: id }),
+
+      setGlobalSymbols: (tabId, symbols) =>
+        set((s) => ({
+          tabs: s.tabs.map((t) => t.id === tabId ? { ...t, globalSymbols: symbols } : t),
+        })),
 
       addWidget: (tabId, type, config) =>
         set((s) => ({
@@ -170,10 +184,42 @@ export const useDashboardStore = create<DashboardState>()(
         const s = get();
         return s.tabs.find((t) => t.id === s.activeTabId);
       },
+
+      resolveSymbol: (tabId, widgetId, fallback = "SPY") => {
+        const s = get();
+        const tab = s.tabs.find((t) => t.id === tabId);
+        if (!tab) return fallback;
+
+        const widget = tab.widgets.find((w) => w.id === widgetId);
+        const globalSymbols = tab.globalSymbols ?? [];
+
+        if (globalSymbols.length > 0 && widget && SYMBOL_WIDGET_TYPES.includes(widget.type)) {
+          // Position among symbol-aware widgets (in layout order if possible)
+          const symbolWidgets = tab.widgets.filter((w) => SYMBOL_WIDGET_TYPES.includes(w.type));
+          const pos = symbolWidgets.findIndex((w) => w.id === widgetId);
+          // If 1 global symbol, use it for all; otherwise use positional
+          const sym = globalSymbols.length === 1 ? globalSymbols[0] : (globalSymbols[pos] ?? globalSymbols[0]);
+          if (sym) return sym.toUpperCase();
+        }
+
+        return (widget?.config?.symbol || fallback).toUpperCase();
+      },
     }),
     {
-      name: "crystalball-dashboard-v2",
+      name: "crystalball-dashboard-v3", // bumped version to clear stale v2 state
       partialize: (s) => ({ theme: s.theme, tabs: s.tabs, activeTabId: s.activeTabId }),
+      // Migrate old tabs that don't have globalSymbols
+      merge: (persisted: any, current) => {
+        if (!persisted) return current;
+        return {
+          ...current,
+          ...persisted,
+          tabs: (persisted.tabs ?? []).map((t: any) => ({
+            ...t,
+            globalSymbols: t.globalSymbols ?? [],
+          })),
+        };
+      },
     }
   )
 );
