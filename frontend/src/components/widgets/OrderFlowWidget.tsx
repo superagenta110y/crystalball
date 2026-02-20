@@ -10,6 +10,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { SymbolBar } from "./SymbolBar";
+import { useDashboardStore } from "@/lib/store/dashboardStore";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -63,6 +64,7 @@ export function OrderFlowWidget({ symbol = "SPY", isGlobalOverride, onConfigChan
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(false);
   const [spot, setSpot]       = useState<number | null>(null);
+  const { bull, bear } = useDashboardStore(s => s.theme);
   const pollRef               = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const load = async (sym: string) => {
@@ -170,7 +172,7 @@ export function OrderFlowWidget({ symbol = "SPY", isGlobalOverride, onConfigChan
                   return (
                     <Cell
                       key={i}
-                      fill={isPoc ? "#facc15" : "#00d4aa"}
+                      fill={isPoc ? "#facc15" : bull}
                       fillOpacity={isPoc ? 0.9 : isAtm ? 0.8 : 0.55}
                     />
                   );
@@ -183,7 +185,7 @@ export function OrderFlowWidget({ symbol = "SPY", isGlobalOverride, onConfigChan
                   return (
                     <Cell
                       key={i}
-                      fill={isPoc ? "#fb923c" : "#ff4d6d"}
+                      fill={isPoc ? "#fb923c" : bear}
                       fillOpacity={isPoc ? 0.9 : isAtm ? 0.8 : 0.55}
                     />
                   );

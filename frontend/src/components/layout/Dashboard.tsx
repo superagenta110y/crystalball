@@ -34,16 +34,19 @@ function hexToRgbTriple(hex: string): string {
 
 function applyTheme(mode: string, bull: string, bear: string) {
   const html = document.documentElement;
-  // Resolve "auto" via system preference
   const effective = mode === "auto"
     ? (window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark")
     : mode;
   html.setAttribute("data-theme", effective);
-  // Inject dynamic bull/bear
-  html.style.setProperty("--bull",     bull);
-  html.style.setProperty("--bull-rgb", hexToRgbTriple(bull));
-  html.style.setProperty("--bear",     bear);
-  html.style.setProperty("--bear-rgb", hexToRgbTriple(bear));
+  // Dynamic bull/bear + RGB triples for opacity variants
+  html.style.setProperty("--bull",      bull);
+  html.style.setProperty("--bull-rgb",  hexToRgbTriple(bull));
+  html.style.setProperty("--bear",      bear);
+  html.style.setProperty("--bear-rgb",  hexToRgbTriple(bear));
+  // Grid line colour for charts (dark: near-black, light: light grey)
+  html.style.setProperty("--grid-line", effective === "light" ? "#e5e7eb" : "#1e1e1e");
+  // Text colours for charts
+  html.style.setProperty("--chart-text", effective === "light" ? "#6b7280" : "#8b8fa8");
 }
 
 // ─── Widget renderer ─────────────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Plus, Palette, ChevronDown, Settings } from "lucide-react";
+import { Plus, Palette, ChevronDown, Settings, Moon, Sun, Monitor } from "lucide-react";
 import Link from "next/link";
 import { useDashboardStore, type WidgetType, type ThemeMode, DEFAULT_THEME } from "@/lib/store/dashboardStore";
 
@@ -18,10 +18,10 @@ const WIDGET_LIST: { id: WidgetType; label: string }[] = [
   { id: "report",         label: "Market Report" },
 ];
 
-const THEME_MODES: { id: ThemeMode; label: string; icon: string }[] = [
-  { id: "dark",  label: "Dark",  icon: "🌙" },
-  { id: "light", label: "Light", icon: "☀️" },
-  { id: "auto",  label: "Auto",  icon: "⚙️" },
+const THEME_MODES: { id: ThemeMode; label: string; Icon: React.ElementType }[] = [
+  { id: "dark",  label: "Dark",  Icon: Moon    },
+  { id: "light", label: "Light", Icon: Sun     },
+  { id: "auto",  label: "Auto",  Icon: Monitor },
 ];
 
 export function Topbar() {
@@ -134,17 +134,17 @@ export function Topbar() {
                 <div className="flex flex-col gap-1.5">
                   <span className="text-xs text-neutral-500">Theme</span>
                   <div className="flex gap-1.5">
-                    {THEME_MODES.map(({ id, label, icon }) => (
+                    {THEME_MODES.map(({ id, label, Icon }) => (
                       <button
                         key={id}
                         onClick={() => setTheme({ mode: id })}
-                        className={`flex-1 flex flex-col items-center gap-0.5 py-2 rounded-lg border text-xs transition ${
+                        className={`flex-1 flex flex-col items-center gap-1 py-2.5 rounded-lg border text-xs transition ${
                           theme.mode === id
                             ? "border-accent/60 bg-accent/10 text-accent"
                             : "border-surface-border text-neutral-500 hover:text-white hover:border-neutral-500"
                         }`}
                       >
-                        <span className="text-base">{icon}</span>
+                        <Icon size={14} />
                         <span>{label}</span>
                       </button>
                     ))}
@@ -153,30 +153,42 @@ export function Topbar() {
 
                 {/* Bull color */}
                 <div className="flex items-center justify-between">
-                  <div className="flex flex-col">
+                  <div className="flex flex-col gap-0.5">
                     <span className="text-xs text-neutral-400">Bull / Calls</span>
                     <span className="text-xs font-mono text-neutral-600">{theme.bull}</span>
                   </div>
-                  <input
-                    type="color"
-                    value={theme.bull}
-                    onChange={(e) => setTheme({ bull: e.target.value })}
-                    className="w-8 h-8 rounded-lg cursor-pointer border border-surface-border bg-transparent"
-                  />
+                  <label className="relative cursor-pointer">
+                    <span
+                      className="block w-8 h-8 rounded-full border-2 border-surface-border shadow-inner cursor-pointer"
+                      style={{ background: theme.bull }}
+                    />
+                    <input
+                      type="color"
+                      value={theme.bull}
+                      onChange={e => setTheme({ bull: e.target.value })}
+                      className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                    />
+                  </label>
                 </div>
 
                 {/* Bear color */}
                 <div className="flex items-center justify-between">
-                  <div className="flex flex-col">
+                  <div className="flex flex-col gap-0.5">
                     <span className="text-xs text-neutral-400">Bear / Puts</span>
                     <span className="text-xs font-mono text-neutral-600">{theme.bear}</span>
                   </div>
-                  <input
-                    type="color"
-                    value={theme.bear}
-                    onChange={(e) => setTheme({ bear: e.target.value })}
-                    className="w-8 h-8 rounded-lg cursor-pointer border border-surface-border bg-transparent"
-                  />
+                  <label className="relative cursor-pointer">
+                    <span
+                      className="block w-8 h-8 rounded-full border-2 border-surface-border shadow-inner cursor-pointer"
+                      style={{ background: theme.bear }}
+                    />
+                    <input
+                      type="color"
+                      value={theme.bear}
+                      onChange={e => setTheme({ bear: e.target.value })}
+                      className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                    />
+                  </label>
                 </div>
 
                 <button

@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from "recharts";
 import { SymbolBar } from "./SymbolBar";
+import { useDashboardStore } from "@/lib/store/dashboardStore";
 
 interface OpenInterestWidgetProps {
   symbol?: string;
@@ -20,6 +21,7 @@ export function OpenInterestWidget({ symbol = "SPY", isGlobalOverride, onConfigC
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [expDate, setExpDate] = useState(todayStr());
+  const { bull, bear } = useDashboardStore(s => s.theme);
   const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   useEffect(() => {
@@ -100,8 +102,8 @@ export function OpenInterestWidget({ symbol = "SPY", isGlobalOverride, onConfigC
               }} />
               <ReferenceLine x={atm} stroke="#ffffff22" strokeDasharray="4 2"
                 label={{ value: "ATM", fill: "#555", fontSize: 9 }} />
-              <Bar dataKey="callOI" fill="#00d4aa" fillOpacity={0.7} radius={[2,2,0,0]} name="Calls" />
-              <Bar dataKey="putOI"  fill="#ff4d6d" fillOpacity={0.7} radius={[2,2,0,0]} name="Puts" />
+              <Bar dataKey="callOI" fill={bull} fillOpacity={0.7} radius={[2,2,0,0]} name="Calls" />
+              <Bar dataKey="putOI"  fill={bear} fillOpacity={0.7} radius={[2,2,0,0]} name="Puts" />
               <Legend wrapperStyle={{ fontSize: 10, paddingTop: 4 }}
                 formatter={(v) => <span style={{ color: "#8b8fa8" }}>{v}</span>} />
             </BarChart>

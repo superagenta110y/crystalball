@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer, Cell } from "recharts";
 import { SymbolBar } from "./SymbolBar";
+import { useDashboardStore } from "@/lib/store/dashboardStore";
 
 interface GEXWidgetProps {
   symbol?: string;
@@ -17,6 +18,7 @@ export function GEXWidget({ symbol = "SPY", isGlobalOverride, onConfigChange }: 
   const [spot, setSpot] = useState(0);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
+  const { bull, bear } = useDashboardStore(s => s.theme);
   const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   useEffect(() => {
@@ -78,7 +80,7 @@ export function GEXWidget({ symbol = "SPY", isGlobalOverride, onConfigChange }: 
               }} />
               <Bar dataKey="gex" radius={[2, 2, 0, 0]}>
                 {filtered.map((entry, i) => (
-                  <Cell key={i} fill={entry.gex >= 0 ? "#00d4aa" : "#ff4d6d"} fillOpacity={0.75} />
+                  <Cell key={i} fill={entry.gex >= 0 ? bull : bear} fillOpacity={0.75} />
                 ))}
               </Bar>
             </BarChart>

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
+import { useDashboardStore } from "@/lib/store/dashboardStore";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -49,6 +50,24 @@ export function ChartWidget({
   const seriesRef    = useRef<any>(null);
   const cacheRef     = useRef<Map<number, Bar>>(new Map());
   const pollRef      = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Subscribe to theme — update chart colours whenever bull/bear/mode changes
+  const theme = useDashboardStore(s => s.theme);
+  useEffect(() => {
+    if (!seriesRef.current || !chartRef.current) return;
+    const bull     = getComputedStyle(document.documentElement).getPropertyValue("--bull").trim()      || theme.bull;
+    const bear     = getComputedStyle(document.documentElement).getPropertyValue("--bear").trim()      || theme.bear;
+    const gridLine = getComputedStyle(document.documentElement).getPropertyValue("--grid-line").trim() || "#1e1e1e";
+    const axisText = getComputedStyle(document.documentElement).getPropertyValue("--chart-text").trim()|| "#8b8fa8";
+    seriesRef.current.applyOptions({
+      upColor: bull, downColor: bear,
+      wickUpColor: bull, wickDownColor: bear,
+    });
+    chartRef.current.applyOptions({
+      grid: { vertLines: { color: gridLine }, horzLines: { color: gridLine } },
+      layout: { textColor: axisText },
+    });
+  }, [theme.bull, theme.bear, theme.mode]);
 
   // Sync global override → local state
   useEffect(() => {
