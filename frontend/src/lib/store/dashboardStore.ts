@@ -4,7 +4,15 @@ import type { Layout } from "react-grid-layout";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type Timeframe = "1s" | "5s" | "1m" | "5m" | "15m" | "30m" | "1h" | "4h" | "1d" | "1w";
+export type WidgetType =
+  | "chart" | "orderflow" | "openinterest" | "openinterest3d"
+  | "gex" | "dex" | "newsfeed" | "bloomberg" | "ai" | "report";
+
+export interface WidgetInstance {
+  id: string;           // unique UUID — used as layout `i`
+  type: WidgetType;
+  config: Record<string, string>; // e.g. { symbol: "QQQ", timeframe: "1d" }
+}
 
 export interface ThemeColors {
   bull: string;
@@ -19,136 +27,114 @@ export interface DashboardTab {
   id: string;
   name: string;
   layout: Layout[];
-  activeWidgets: string[];
+  widgets: WidgetInstance[];
 }
 
 export interface DashboardState {
-  // Global
-  symbol: string;
-  timeframe: Timeframe;
   theme: ThemeColors;
-
-  // Tabs
   tabs: DashboardTab[];
   activeTabId: string;
 
-  // Actions
-  setSymbol: (symbol: string) => void;
-  setTimeframe: (tf: Timeframe) => void;
   setTheme: (theme: Partial<ThemeColors>) => void;
-
   addTab: (name?: string) => void;
   removeTab: (id: string) => void;
   renameTab: (id: string, name: string) => void;
   setActiveTab: (id: string) => void;
 
-  updateLayout: (tabId: string, layout: Layout[]) => void;
-  toggleWidget: (tabId: string, widgetId: string) => void;
-  addWidget: (tabId: string, widgetId: string) => void;
+  addWidget: (tabId: string, type: WidgetType, config?: Record<string, string>) => void;
   removeWidget: (tabId: string, widgetId: string) => void;
+  updateWidgetConfig: (tabId: string, widgetId: string, config: Partial<Record<string, string>>) => void;
+  updateLayout: (tabId: string, layout: Layout[]) => void;
 
-  // Derived helper
   activeTab: () => DashboardTab | undefined;
 }
 
 // ─── Defaults ────────────────────────────────────────────────────────────────
 
 export const DEFAULT_THEME: ThemeColors = {
-  bull:       "#00d4aa",
-  bear:       "#ff4d6d",
-  accent:     "#00d4aa",
-  background: "#0d0d0d",
-  surface:    "#141414",
-  border:     "#2a2a2a",
+  bull: "#00d4aa", bear: "#ff4d6d", accent: "#00d4aa",
+  background: "#0d0d0d", surface: "#141414", border: "#2a2a2a",
 };
 
-const DEFAULT_LAYOUT: Layout[] = [
-  { i: "chart",         x: 0,  y: 0,  w: 8, h: 14 },
-  { i: "orderflow",     x: 8,  y: 0,  w: 4, h: 7  },
-  { i: "gex",           x: 8,  y: 7,  w: 4, h: 7  },
-  { i: "openinterest",  x: 0,  y: 14, w: 6, h: 7  },
-  { i: "dex",           x: 6,  y: 14, w: 6, h: 7  },
-  { i: "newsfeed",      x: 0,  y: 21, w: 4, h: 9  },
-  { i: "ai",            x: 4,  y: 21, w: 4, h: 9  },
-  { i: "report",        x: 8,  y: 21, w: 4, h: 9  },
-];
-
-const DEFAULT_WIDGETS = DEFAULT_LAYOUT.map((l) => l.i);
-
-function makeTab(name: string, id?: string): DashboardTab {
-  return {
-    id: id ?? crypto.randomUUID(),
-    name,
-    layout: DEFAULT_LAYOUT,
-    activeWidgets: DEFAULT_WIDGETS,
-  };
+function uuid(): string {
+  // Polyfill for environments without crypto.randomUUID
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+  });
 }
 
-const INITIAL_TAB = makeTab("Main", "tab-main");
+function makeWidget(type: WidgetType, config?: Record<string, string>): WidgetInstance {
+  return { id: uuid(), type, config: config ?? {} };
+}
+
+function makeDefaultLayout(widgets: WidgetInstance[]): Layout[] {
+  const positions: Array<[number, number, number, number]> = [
+    [0,0,8,14], [8,0,4,7], [8,7,4,7],
+    [0,14,6,8], [6,14,6,8],
+    [0,22,4,9], [4,22,4,9], [8,22,4,9],
+  ];
+  return widgets.map((w, i) => {
+    const [x, y, w_, h] = positions[i] ?? [0, (i * 7), 6, 7];
+    return { i: w.id, x, y, w: w_, h };
+  });
+}
+
+function makeDefaultTab(name: string): DashboardTab {
+  const widgets: WidgetInstance[] = [
+    makeWidget("chart"),
+    makeWidget("orderflow"),
+    makeWidget("gex"),
+    makeWidget("openinterest"),
+    makeWidget("dex"),
+    makeWidget("newsfeed"),
+    makeWidget("ai"),
+    makeWidget("report"),
+  ];
+  return { id: uuid(), name, layout: makeDefaultLayout(widgets), widgets };
+}
 
 // ─── Store ────────────────────────────────────────────────────────────────────
+
+const INITIAL_TAB = makeDefaultTab("Main");
 
 export const useDashboardStore = create<DashboardState>()(
   persist(
     (set, get) => ({
-      symbol: "SPY",
-      timeframe: "5m",
       theme: DEFAULT_THEME,
       tabs: [INITIAL_TAB],
       activeTabId: INITIAL_TAB.id,
 
-      setSymbol: (symbol) => set({ symbol: symbol.toUpperCase() }),
-      setTimeframe: (timeframe) => set({ timeframe }),
       setTheme: (patch) => set((s) => ({ theme: { ...s.theme, ...patch } })),
 
       addTab: (name) => {
-        const tab = makeTab(name ?? `Tab ${get().tabs.length + 1}`);
+        const tab = makeDefaultTab(name ?? `Tab ${get().tabs.length + 1}`);
         set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }));
       },
 
       removeTab: (id) => {
         const tabs = get().tabs.filter((t) => t.id !== id);
-        if (tabs.length === 0) return;
+        if (!tabs.length) return;
         const activeTabId = get().activeTabId === id ? tabs[0].id : get().activeTabId;
         set({ tabs, activeTabId });
       },
 
       renameTab: (id, name) =>
-        set((s) => ({ tabs: s.tabs.map((t) => (t.id === id ? { ...t, name } : t)) })),
+        set((s) => ({ tabs: s.tabs.map((t) => t.id === id ? { ...t, name } : t) })),
 
       setActiveTab: (id) => set({ activeTabId: id }),
 
-      updateLayout: (tabId, layout) =>
-        set((s) => ({
-          tabs: s.tabs.map((t) => (t.id === tabId ? { ...t, layout } : t)),
-        })),
-
-      toggleWidget: (tabId, widgetId) =>
+      addWidget: (tabId, type, config) =>
         set((s) => ({
           tabs: s.tabs.map((t) => {
             if (t.id !== tabId) return t;
-            const has = t.activeWidgets.includes(widgetId);
-            return {
-              ...t,
-              activeWidgets: has
-                ? t.activeWidgets.filter((w) => w !== widgetId)
-                : [...t.activeWidgets, widgetId],
-            };
-          }),
-        })),
-
-      addWidget: (tabId, widgetId) =>
-        set((s) => ({
-          tabs: s.tabs.map((t) => {
-            if (t.id !== tabId || t.activeWidgets.includes(widgetId)) return t;
-            // Place new widget at bottom
+            const w = makeWidget(type, config);
             const maxY = t.layout.reduce((m, l) => Math.max(m, l.y + l.h), 0);
-            const newLayout: Layout = { i: widgetId, x: 0, y: maxY, w: 6, h: 7 };
-            return {
-              ...t,
-              activeWidgets: [...t.activeWidgets, widgetId],
-              layout: [...t.layout, newLayout],
-            };
+            const layout: Layout = { i: w.id, x: 0, y: maxY, w: 6, h: 8 };
+            return { ...t, widgets: [...t.widgets, w], layout: [...t.layout, layout] };
           }),
         })),
 
@@ -158,10 +144,27 @@ export const useDashboardStore = create<DashboardState>()(
             if (t.id !== tabId) return t;
             return {
               ...t,
-              activeWidgets: t.activeWidgets.filter((w) => w !== widgetId),
+              widgets: t.widgets.filter((w) => w.id !== widgetId),
+              layout: t.layout.filter((l) => l.i !== widgetId),
             };
           }),
         })),
+
+      updateWidgetConfig: (tabId, widgetId, config) =>
+        set((s) => ({
+          tabs: s.tabs.map((t) => {
+            if (t.id !== tabId) return t;
+            return {
+              ...t,
+              widgets: t.widgets.map((w) =>
+                w.id === widgetId ? { ...w, config: { ...w.config, ...config } } : w
+              ),
+            };
+          }),
+        })),
+
+      updateLayout: (tabId, layout) =>
+        set((s) => ({ tabs: s.tabs.map((t) => t.id === tabId ? { ...t, layout } : t) })),
 
       activeTab: () => {
         const s = get();
@@ -169,14 +172,8 @@ export const useDashboardStore = create<DashboardState>()(
       },
     }),
     {
-      name: "crystalball-dashboard",
-      partialize: (s) => ({
-        symbol: s.symbol,
-        timeframe: s.timeframe,
-        theme: s.theme,
-        tabs: s.tabs,
-        activeTabId: s.activeTabId,
-      }),
+      name: "crystalball-dashboard-v2",
+      partialize: (s) => ({ theme: s.theme, tabs: s.tabs, activeTabId: s.activeTabId }),
     }
   )
 );

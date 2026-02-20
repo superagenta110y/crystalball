@@ -83,6 +83,18 @@ class BaseProvider(ABC):
     ) -> list[dict[str, Any]]:
         """Return a list of orders matching *status*."""
 
+    # ── Trades ───────────────────────────────────────────────────────────────
+
+    async def get_trades(self, symbol: str, limit: int = 200) -> list[dict[str, Any]]:
+        """Return recent trades. Providers may override; default returns []."""
+        return []
+
+    # ── News ─────────────────────────────────────────────────────────────────
+
+    async def get_news(self, symbols: list[str], limit: int = 20) -> list[dict[str, Any]]:
+        """Return recent news articles. Providers may override; default returns []."""
+        return []
+
     # ── Account ───────────────────────────────────────────────────────────────
 
     @abstractmethod

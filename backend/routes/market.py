@@ -20,6 +20,15 @@ async def history(
     return await provider.get_history(symbol.upper(), timeframe=timeframe, limit=limit)
 
 
+@router.get("/trades/{symbol}")
+async def trades(
+    symbol: str,
+    limit: int = Query(200, le=1000),
+    provider: BaseProvider = Depends(get_provider),
+):
+    return await provider.get_trades(symbol.upper(), limit=limit)
+
+
 @router.get("/options/{symbol}")
 async def options_chain(
     symbol: str,

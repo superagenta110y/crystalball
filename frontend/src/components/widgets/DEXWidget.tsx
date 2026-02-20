@@ -1,16 +1,3 @@
-/**
- * DEXWidget — Net Delta Exposure across the options chain.
- * Shows directional bias baked into dealer hedging flows.
- *
- * Formula: DEX = Σ (delta × OI × 100) × direction
- *   Calls contribute positive delta, puts contribute negative delta.
- *   A large negative DEX → dealers must buy to hedge = supportive.
- *
- * TODO:
- *   - Fetch /api/options/dex?symbol=SPY
- *   - Add "total DEX" and "call DEX / put DEX" breakdown
- *   - Add historical DEX line chart (DEX over time)
- */
 "use client";
 
 import React from "react";

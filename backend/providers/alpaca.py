@@ -173,6 +173,41 @@ class AlpacaProvider(BaseProvider):
             r.raise_for_status()
             return r.json()
 
+    async def get_trades(self, symbol: str, limit: int = 200) -> list[dict[str, Any]]:
+        async with httpx.AsyncClient(timeout=10.0) as c:
+            r = await c.get(
+                f"{self._data_url}/v2/stocks/{symbol}/trades",
+                headers=self._headers,
+                params={"limit": limit, "feed": "sip"},
+            )
+            if r.status_code != 200:
+                return []
+            trades = r.json().get("trades", [])
+            return [{"price": float(t.get("p", 0)), "size": int(t.get("s", 0)), "timestamp": t.get("t", "")} for t in trades]
+
+    async def get_news(self, symbols: list[str], limit: int = 20) -> list[dict[str, Any]]:
+        async with httpx.AsyncClient(timeout=10.0) as c:
+            r = await c.get(
+                f"{self._data_url}/v1beta1/news",
+                headers=self._headers,
+                params={"symbols": ",".join(symbols), "limit": limit, "sort": "desc"},
+            )
+            if r.status_code != 200:
+                return []
+            items = r.json().get("news", [])
+            return [
+                {
+                    "id": str(item.get("id", "")),
+                    "headline": item.get("headline", ""),
+                    "summary": item.get("summary", ""),
+                    "source": item.get("source", ""),
+                    "symbols": item.get("symbols", []),
+                    "url": item.get("url", ""),
+                    "createdAt": item.get("created_at", ""),
+                }
+                for item in items
+            ]
+
     async def get_account(self) -> dict[str, Any]:
         async with httpx.AsyncClient() as c:
             r = await c.get(f"{self._trade_url}/v2/account", headers=self._headers)

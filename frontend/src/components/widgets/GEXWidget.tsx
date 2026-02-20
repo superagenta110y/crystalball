@@ -1,18 +1,3 @@
-/**
- * GEXWidget — Dealer Gamma Exposure by strike.
- * Positive GEX (green) = dealers long gamma → dampening effect on price.
- * Negative GEX (red) = dealers short gamma → amplifying effect on price.
- * The GEX flip level (zero crossing) is a key S/R level.
- *
- * Formula: GEX = Σ (gamma × OI × 100 × spotPrice²) × direction
- *   direction: +1 for calls (dealer sells = short calls = long gamma)
- *              -1 for puts (dealer sells = short puts = short gamma)
- *
- * TODO:
- *   - Fetch /api/options/gex?symbol=SPY
- *   - Highlight GEX flip level with annotation
- *   - Add "net GEX" summary card at top
- */
 "use client";
 
 import React from "react";

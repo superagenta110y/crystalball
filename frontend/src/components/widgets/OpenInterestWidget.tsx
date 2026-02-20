@@ -1,12 +1,3 @@
-/**
- * OpenInterestWidget — Bar chart of open interest by strike.
- * Shows calls (green) and puts (red) side by side.
- *
- * TODO:
- *   - Connect to /api/options/chain?symbol=SPY&expiry=next
- *   - Highlight ATM strike
- *   - Add expiry selector dropdown
- */
 "use client";
 
 import React from "react";
