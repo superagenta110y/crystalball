@@ -20,9 +20,12 @@ export interface WidgetInstance {
   config: Record<string, string>;
 }
 
+export type ThemeMode = "dark" | "light" | "auto";
+
 export interface ThemeColors {
-  bull: string; bear: string; accent: string;
-  background: string; surface: string; border: string;
+  mode: ThemeMode;
+  bull: string;
+  bear: string;
 }
 
 export interface DashboardTab {
@@ -58,8 +61,9 @@ export interface DashboardState {
 // ─── Defaults ────────────────────────────────────────────────────────────────
 
 export const DEFAULT_THEME: ThemeColors = {
-  bull: "#00d4aa", bear: "#ff4d6d", accent: "#00d4aa",
-  background: "#0d0d0d", surface: "#141414", border: "#2a2a2a",
+  mode: "dark",
+  bull: "#00d4aa",
+  bear: "#ff4d6d",
 };
 
 export function uuid(): string {
@@ -206,14 +210,22 @@ export const useDashboardStore = create<DashboardState>()(
       },
     }),
     {
-      name: "crystalball-dashboard-v3", // bumped version to clear stale v2 state
+      name: "crystalball-dashboard-v4", // v4: simplified theme (mode/bull/bear only)
       partialize: (s) => ({ theme: s.theme, tabs: s.tabs, activeTabId: s.activeTabId }),
       // Migrate old tabs that don't have globalSymbols
       merge: (persisted: any, current) => {
         if (!persisted) return current;
+        // Migrate theme: drop old keys, keep only mode/bull/bear
+        const rawTheme = persisted.theme ?? {};
+        const theme: ThemeColors = {
+          mode: rawTheme.mode ?? "dark",
+          bull: rawTheme.bull ?? DEFAULT_THEME.bull,
+          bear: rawTheme.bear ?? DEFAULT_THEME.bear,
+        };
         return {
           ...current,
           ...persisted,
+          theme,
           tabs: (persisted.tabs ?? []).map((t: any) => ({
             ...t,
             globalSymbols: t.globalSymbols ?? [],

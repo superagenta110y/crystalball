@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Plus, Palette, ChevronDown, Settings } from "lucide-react";
 import Link from "next/link";
-import { useDashboardStore, type WidgetType, DEFAULT_THEME } from "@/lib/store/dashboardStore";
+import { useDashboardStore, type WidgetType, type ThemeMode, DEFAULT_THEME } from "@/lib/store/dashboardStore";
 
 const WIDGET_LIST: { id: WidgetType; label: string }[] = [
   { id: "chart",          label: "Chart" },
@@ -18,13 +18,10 @@ const WIDGET_LIST: { id: WidgetType; label: string }[] = [
   { id: "report",         label: "Market Report" },
 ];
 
-const COLOR_FIELDS: { key: keyof typeof DEFAULT_THEME; label: string }[] = [
-  { key: "bull",       label: "Bull / Calls" },
-  { key: "bear",       label: "Bear / Puts" },
-  { key: "accent",     label: "Accent" },
-  { key: "background", label: "Background" },
-  { key: "surface",    label: "Surface" },
-  { key: "border",     label: "Border" },
+const THEME_MODES: { id: ThemeMode; label: string; icon: string }[] = [
+  { id: "dark",  label: "Dark",  icon: "🌙" },
+  { id: "light", label: "Light", icon: "☀️" },
+  { id: "auto",  label: "Auto",  icon: "⚙️" },
 ];
 
 export function Topbar() {
@@ -129,27 +126,65 @@ export function Topbar() {
             <Palette size={13} /> Style
           </button>
           {showStyle && (
-            <div className="absolute right-0 top-full mt-1 w-60 bg-surface-raised border border-surface-border rounded-xl shadow-2xl z-50 overflow-hidden">
-              <div className="px-3 py-2 text-xs text-neutral-500 uppercase tracking-widest border-b border-surface-border">Theme Colors</div>
-              <div className="py-2 px-3 flex flex-col gap-2">
-                {COLOR_FIELDS.map(({ key, label }) => (
-                  <div key={key} className="flex items-center justify-between">
-                    <span className="text-xs text-neutral-400">{label}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono text-neutral-600">{theme[key]}</span>
-                      <input
-                        type="color"
-                        value={theme[key]}
-                        onChange={(e) => setTheme({ [key]: e.target.value })}
-                        className="w-7 h-7 rounded cursor-pointer border border-surface-border bg-transparent"
-                      />
-                    </div>
+            <div className="absolute right-0 top-full mt-1 w-56 bg-surface-raised border border-surface-border rounded-xl shadow-2xl z-50 overflow-hidden">
+              <div className="px-3 py-2 text-xs text-neutral-500 uppercase tracking-widest border-b border-surface-border">Style</div>
+              <div className="py-3 px-3 flex flex-col gap-4">
+
+                {/* Theme mode */}
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-xs text-neutral-500">Theme</span>
+                  <div className="flex gap-1.5">
+                    {THEME_MODES.map(({ id, label, icon }) => (
+                      <button
+                        key={id}
+                        onClick={() => setTheme({ mode: id })}
+                        className={`flex-1 flex flex-col items-center gap-0.5 py-2 rounded-lg border text-xs transition ${
+                          theme.mode === id
+                            ? "border-accent/60 bg-accent/10 text-accent"
+                            : "border-surface-border text-neutral-500 hover:text-white hover:border-neutral-500"
+                        }`}
+                      >
+                        <span className="text-base">{icon}</span>
+                        <span>{label}</span>
+                      </button>
+                    ))}
                   </div>
-                ))}
+                </div>
+
+                {/* Bull color */}
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-col">
+                    <span className="text-xs text-neutral-400">Bull / Calls</span>
+                    <span className="text-xs font-mono text-neutral-600">{theme.bull}</span>
+                  </div>
+                  <input
+                    type="color"
+                    value={theme.bull}
+                    onChange={(e) => setTheme({ bull: e.target.value })}
+                    className="w-8 h-8 rounded-lg cursor-pointer border border-surface-border bg-transparent"
+                  />
+                </div>
+
+                {/* Bear color */}
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-col">
+                    <span className="text-xs text-neutral-400">Bear / Puts</span>
+                    <span className="text-xs font-mono text-neutral-600">{theme.bear}</span>
+                  </div>
+                  <input
+                    type="color"
+                    value={theme.bear}
+                    onChange={(e) => setTheme({ bear: e.target.value })}
+                    className="w-8 h-8 rounded-lg cursor-pointer border border-surface-border bg-transparent"
+                  />
+                </div>
+
                 <button
                   onClick={() => setTheme(DEFAULT_THEME)}
-                  className="mt-1 w-full py-1.5 text-xs text-neutral-500 hover:text-white border border-surface-border rounded-lg transition"
-                >Reset to defaults</button>
+                  className="w-full py-1.5 text-xs text-neutral-500 hover:text-white border border-surface-border rounded-lg transition"
+                >
+                  Reset
+                </button>
               </div>
             </div>
           )}

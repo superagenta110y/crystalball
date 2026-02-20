@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useMemo, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import GridLayout, { type Layout } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
@@ -22,6 +22,29 @@ import { MarketReportWidget }  from "@/components/widgets/MarketReportWidget";
 
 import { useDashboardStore, type WidgetInstance, type WidgetType } from "@/lib/store/dashboardStore";
 import useWindowSize from "@/lib/hooks/useWindowSize";
+
+// ─── Hex → "r, g, b" for CSS rgba() ──────────────────────────
+function hexToRgbTriple(hex: string): string {
+  const clean = hex.replace("#", "");
+  const r = parseInt(clean.slice(0, 2), 16);
+  const g = parseInt(clean.slice(2, 4), 16);
+  const b = parseInt(clean.slice(4, 6), 16);
+  return `${r}, ${g}, ${b}`;
+}
+
+function applyTheme(mode: string, bull: string, bear: string) {
+  const html = document.documentElement;
+  // Resolve "auto" via system preference
+  const effective = mode === "auto"
+    ? (window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark")
+    : mode;
+  html.setAttribute("data-theme", effective);
+  // Inject dynamic bull/bear
+  html.style.setProperty("--bull",     bull);
+  html.style.setProperty("--bull-rgb", hexToRgbTriple(bull));
+  html.style.setProperty("--bear",     bear);
+  html.style.setProperty("--bear-rgb", hexToRgbTriple(bear));
+}
 
 // ─── Widget renderer ─────────────────────────────────────────────────────────
 
@@ -123,6 +146,17 @@ export default function Dashboard() {
   const widgets  = tab?.widgets ?? [];
   const isMobile = (width ?? 0) < 768;
 
+  // Apply theme to <html> element whenever it changes
+  useEffect(() => {
+    applyTheme(theme.mode, theme.bull, theme.bear);
+    // Also listen for system preference changes when in auto mode
+    if (theme.mode !== "auto") return;
+    const mq = window.matchMedia("(prefers-color-scheme: light)");
+    const handler = () => applyTheme("auto", theme.bull, theme.bear);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, [theme.mode, theme.bull, theme.bear]);
+
   const handleLayoutChange = useCallback(
     (newLayout: Layout[]) => updateLayout(activeTabId, newLayout),
     [activeTabId, updateLayout]
@@ -144,14 +178,8 @@ export default function Dashboard() {
 
   const gridWidth = Math.max(width ?? 1200, 400);
 
-  const themeVars = {
-    background: theme.background,
-    "--bull": theme.bull, "--bear": theme.bear, "--accent": theme.accent,
-    "--surface-raised": theme.surface, "--surface-border": theme.border,
-  } as React.CSSProperties;
-
   return (
-    <div className="flex flex-col h-screen overflow-hidden" style={{ ...themeVars, background: theme.background }}>
+    <div className="flex flex-col h-screen overflow-hidden bg-surface">
       <Topbar />
       <TabBar />
 

@@ -2,20 +2,47 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ─── Base ─────────────────────────────────────────────────── */
+/* ─── Dark theme (default) ─────────────────────────────────── */
 :root {
-  --surface: #0d0d0d;
-  --surface-raised: #141414;
-  --surface-overlay: #1a1a1a;
-  --surface-border: #2a2a2a;
-  --accent: #00d4aa;
-  --bull: #00d4aa;
-  --bear: #ff4d6d;
-  --neutral: #8b8fa8;
+  --surface:          #0d0d0d;
+  --surface-raised:   #141414;
+  --surface-overlay:  #1a1a1a;
+  --surface-border:   #2a2a2a;
+  --accent:           #00d4aa;
+  --accent-muted:     rgba(0, 212, 170, 0.2);
+
+  /* Bull/Bear — also as space-separated RGB triples for Tailwind opacity modifiers */
+  --bull:     #00d4aa;
+  --bull-rgb: 0, 212, 170;
+  --bear:     #ff4d6d;
+  --bear-rgb: 255, 77, 109;
+
   --text-primary: #e8e8e8;
-  --text-muted: #666;
+  --text-muted:   #666;
+  color-scheme: dark;
 }
 
+/* ─── Light theme ───────────────────────────────────────────── */
+html[data-theme="light"] {
+  --surface:         #f3f4f6;
+  --surface-raised:  #ffffff;
+  --surface-overlay: #e9eaec;
+  --surface-border:  #d1d5db;
+  --accent:          #00b894;
+  --accent-muted:    rgba(0, 184, 148, 0.15);
+  --text-primary:    #111827;
+  --text-muted:      #6b7280;
+  color-scheme: light;
+}
+
+/* Neutral text classes still follow theme */
+html[data-theme="light"] .text-neutral-400 { color: #6b7280; }
+html[data-theme="light"] .text-neutral-500 { color: #9ca3af; }
+html[data-theme="light"] .text-neutral-600 { color: #4b5563; }
+html[data-theme="light"] .text-neutral-700 { color: #374151; }
+html[data-theme="light"] .text-white       { color: #111827; }
+
+/* ─── Base ─────────────────────────────────────────────────── */
 html, body {
   background: var(--surface);
   color: var(--text-primary);
@@ -36,7 +63,7 @@ html, body {
 
 .widget-header {
   @apply flex items-center justify-between px-4 py-2 border-b border-surface-border text-xs font-semibold uppercase tracking-wider;
-  color: var(--neutral);
+  color: var(--text-muted);
 }
 
 /* ─── React Grid Layout ─────────────────────────────────────── */

@@ -72,9 +72,12 @@ export function ChartWidget({
         width:  containerRef.current.clientWidth,
         height: containerRef.current.clientHeight,
       });
+      // Read bull/bear from CSS variables so theme changes apply
+      const bull = getComputedStyle(document.documentElement).getPropertyValue("--bull").trim() || "#00d4aa";
+      const bear = getComputedStyle(document.documentElement).getPropertyValue("--bear").trim() || "#ff4d6d";
       const series = chart.addCandlestickSeries({
-        upColor: "#00d4aa", downColor: "#ff4d6d",
-        borderVisible: false, wickUpColor: "#00d4aa", wickDownColor: "#ff4d6d",
+        upColor: bull, downColor: bear,
+        borderVisible: false, wickUpColor: bull, wickDownColor: bear,
       });
       chartRef.current = chart;
       seriesRef.current = series;
