@@ -26,11 +26,13 @@ async def generate_daily_bias_report(symbol: str, provider: "BaseProvider") -> s
     closes = [b["close"] for b in bars]
     spot = float(quote.get("last_price") or closes[-1])
 
-    # Simple indicators
-    sma5 = sum(closes[-5:]) / 5
-    sma20 = sum(closes[-20:]) / len(closes)
+    # Simple indicators — use actual available bar count for denominators
+    n5  = min(5,  len(closes))
+    n20 = min(20, len(closes))
+    sma5  = sum(closes[-n5:])  / n5  if n5  else spot
+    sma20 = sum(closes[-n20:]) / n20 if n20 else spot
     pct_change = ((closes[-1] - closes[-2]) / closes[-2] * 100) if len(closes) >= 2 else 0
-    above_sma5 = spot > sma5
+    above_sma5  = spot > sma5
     above_sma20 = spot > sma20
 
     trend = "🟢 Bullish" if above_sma5 and above_sma20 else (

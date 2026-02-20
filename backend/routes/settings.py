@@ -1,7 +1,7 @@
-"""Settings API — configure providers from the UI."""
+"""Settings API — configure providers from the UI (legacy shim routes)."""
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from db import get_provider_config, set_provider_config, get_active_provider, set_active_provider, get_all_settings
+from db import get_provider_config, set_provider_config, get_active_provider, set_active_provider
 from routes.deps import invalidate_provider_cache
 
 router = APIRouter(prefix="/settings", tags=["settings"])

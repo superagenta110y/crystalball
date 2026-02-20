@@ -7,14 +7,21 @@ from config import get_settings
 
 
 class AlpacaProvider(BaseProvider):
-    def __init__(self):
+    def __init__(self, config: dict | None = None):
         s = get_settings()
+        cfg = config or {}
+        api_key    = cfg.get("api_key")    or s.alpaca_api_key
+        secret_key = cfg.get("secret_key") or s.alpaca_secret_key
+        paper      = cfg.get("paper",      s.alpaca_paper)
+        data_url   = cfg.get("data_url")   or s.alpaca_data_url
+        trade_base = "https://paper-api.alpaca.markets" if paper else "https://api.alpaca.markets"
+
         self._headers = {
-            "APCA-API-KEY-ID": s.alpaca_api_key,
-            "APCA-API-SECRET-KEY": s.alpaca_secret_key,
+            "APCA-API-KEY-ID":     api_key,
+            "APCA-API-SECRET-KEY": secret_key,
         }
-        self._trade_url = s.alpaca_base_url
-        self._data_url = s.alpaca_data_url
+        self._trade_url = cfg.get("trade_url") or trade_base
+        self._data_url  = data_url
 
     async def get_quote(self, symbol: str) -> dict[str, Any]:
         async with httpx.AsyncClient() as c:
@@ -40,7 +47,7 @@ class AlpacaProvider(BaseProvider):
                 params={"timeframe": timeframe, "limit": limit, "adjustment": "raw"},
             )
             r.raise_for_status()
-            bars = r.json().get("bars", [])
+            bars = r.json().get("bars") or []
             return [
                 {"timestamp": b["t"], "open": b["o"], "high": b["h"],
                  "low": b["l"], "close": b["c"], "volume": b["v"]}

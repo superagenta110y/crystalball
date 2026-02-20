@@ -11,10 +11,13 @@ from config import get_settings
 
 
 class HoodwinkProvider(BaseProvider):
-    def __init__(self):
+    def __init__(self, config: dict | None = None):
         s = get_settings()
-        self._base = s.hoodwink_url.rstrip("/") + "/api/v1"
-        self._headers = {"X-API-Key": s.hoodwink_api_key}
+        cfg = config or {}
+        url     = cfg.get("url")     or s.hoodwink_url
+        api_key = cfg.get("api_key") or s.hoodwink_api_key
+        self._base    = url.rstrip("/") + "/api/v1"
+        self._headers = {"X-API-Key": api_key}
 
     async def _get(self, path: str, **params) -> Any:
         async with httpx.AsyncClient(timeout=15.0) as c:

@@ -50,6 +50,7 @@ export function ChartWidget({
   const seriesRef    = useRef<any>(null);
   const cacheRef     = useRef<Map<number, Bar>>(new Map());
   const pollRef      = useRef<ReturnType<typeof setInterval> | null>(null);
+  const wsRef        = useRef<WebSocket | null>(null);
 
   // Subscribe to theme — update chart colours whenever bull/bear/mode changes
   const theme = useDashboardStore(s => s.theme);
@@ -204,6 +205,63 @@ export function ChartWidget({
       if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
     };
   }, [symbol, timeframe, loadFull, pollUpdate]);
+
+  // WebSocket — live price overlay (updates lastPrice + last bar close in real time)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const wsBase = API.replace(/^http/, "ws");
+    let ws: WebSocket;
+    let closed = false;
+
+    const connect = () => {
+      if (closed) return;
+      ws = new WebSocket(`${wsBase}/ws/quotes/${symbol}`);
+      wsRef.current = ws;
+
+      ws.onmessage = (ev) => {
+        try {
+          const data = JSON.parse(ev.data);
+          if (data.ping || !data.price) return;
+          const price = parseFloat(data.price);
+          if (!isFinite(price)) return;
+
+          setLastPrice(price);
+          setIsLive(true);
+
+          // Update the most recent bar's close (and high/low if needed)
+          if (seriesRef.current && cacheRef.current.size > 0) {
+            const times = Array.from(cacheRef.current.keys()).sort((a, b) => a - b);
+            const lastTime = times[times.length - 1];
+            const lastBar = cacheRef.current.get(lastTime)!;
+            const updated: Bar = {
+              ...lastBar,
+              close: price,
+              high:  Math.max(lastBar.high, price),
+              low:   Math.min(lastBar.low,  price),
+            };
+            cacheRef.current.set(lastTime, updated);
+            seriesRef.current.update(updated);
+          }
+        } catch { /* ignore parse errors */ }
+      };
+
+      ws.onclose = () => {
+        wsRef.current = null;
+        // Reconnect after 3s unless component unmounted
+        if (!closed) setTimeout(connect, 3000);
+      };
+
+      ws.onerror = () => ws.close();
+    };
+
+    connect();
+
+    return () => {
+      closed = true;
+      wsRef.current?.close();
+      wsRef.current = null;
+    };
+  }, [symbol]);
 
   const submitSymbol = (e: React.FormEvent) => {
     e.preventDefault();

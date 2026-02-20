@@ -1,7 +1,6 @@
-"""FastAPI dependency — resolves the active provider from DB (falls back to config)."""
+"""FastAPI dependency — resolves the active provider from DB."""
 from __future__ import annotations
 from providers.base import BaseProvider
-from config import get_settings
 
 _provider_instance: BaseProvider | None = None
 
@@ -12,30 +11,21 @@ def invalidate_provider_cache():
 
 
 async def _build_provider() -> BaseProvider:
-    from db import get_active_provider, get_provider_config
+    from db import get_active_provider_config
+    from config import get_settings
+
+    provider_type, config = await get_active_provider_config("data")
     settings = get_settings()
 
-    active = await get_active_provider() or settings.provider
+    if not provider_type:
+        provider_type = settings.provider
 
-    if active == "hoodwink":
+    if provider_type == "hoodwink":
         from providers.hoodwink import HoodwinkProvider
-        cfg = await get_provider_config("hoodwink")
-        if cfg:
-            import os
-            os.environ["HOODWINK_URL"] = cfg.get("url", settings.hoodwink_url)
-            os.environ["HOODWINK_API_KEY"] = cfg.get("api_key", settings.hoodwink_api_key)
-            get_settings.cache_clear()
-        return HoodwinkProvider()
+        return HoodwinkProvider(config or {})
 
     from providers.alpaca import AlpacaProvider
-    cfg = await get_provider_config("alpaca")
-    if cfg:
-        import os
-        os.environ["ALPACA_API_KEY"] = cfg.get("api_key", settings.alpaca_api_key)
-        os.environ["ALPACA_SECRET_KEY"] = cfg.get("secret_key", settings.alpaca_secret_key)
-        os.environ["ALPACA_PAPER"] = "true" if cfg.get("paper", settings.alpaca_paper) else "false"
-        get_settings.cache_clear()
-    return AlpacaProvider()
+    return AlpacaProvider(config or {})
 
 
 async def get_provider() -> BaseProvider:
