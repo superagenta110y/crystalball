@@ -62,7 +62,7 @@ export function Topbar() {
       {/* Logo + Name */}
       <Link href="/" className="flex items-center gap-2 shrink-0">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.svg" alt="CrystalBall" className="w-6 h-6" />
+        <img src="/logo.svg" alt="CrystalBall" className="logo-img w-6 h-6" />
         <span className="font-bold text-white text-sm tracking-wide hidden sm:block">CrystalBall</span>
       </Link>
 
@@ -93,7 +93,7 @@ export function Topbar() {
         <div ref={addRef} className="relative">
           <button
             onClick={() => { setShowAddWidget((v) => !v); setShowStyle(false); }}
-            className="flex items-center gap-1.5 px-2.5 py-1 bg-surface-overlay hover:bg-surface-border border border-surface-border rounded-md text-xs text-neutral-300 hover:text-white transition"
+            className="topbar-btn flex items-center gap-1.5 px-2 py-1.5 sm:px-2.5 sm:py-1 sm:bg-surface-overlay sm:hover:bg-surface-border sm:border sm:border-surface-border rounded-md text-xs text-neutral-500 sm:text-neutral-300 hover:text-white transition"
           >
             <Plus size={13} />
             <span className="hidden sm:inline">Add Widget</span>
@@ -122,7 +122,7 @@ export function Topbar() {
         <div ref={styleRef} className="relative">
           <button
             onClick={() => { setShowStyle((v) => !v); setShowAddWidget(false); }}
-            className="flex items-center gap-1.5 px-2.5 py-1 bg-surface-overlay hover:bg-surface-border border border-surface-border rounded-md text-xs text-neutral-300 hover:text-white transition"
+            className="topbar-btn flex items-center gap-1.5 px-2 py-1.5 sm:px-2.5 sm:py-1 sm:bg-surface-overlay sm:hover:bg-surface-border sm:border sm:border-surface-border rounded-md text-xs text-neutral-500 sm:text-neutral-300 hover:text-white transition"
           >
             <Palette size={13} />
             <span className="hidden sm:inline">Style</span>
@@ -238,7 +238,7 @@ function MarketStatus() {
   const cfg = SESSION_CONFIG[session];
 
   return (
-    <div className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-full border ${cfg.ring} ${cfg.text}`}>
+    <div className={`flex items-center gap-1.5 text-xs sm:px-2 sm:py-1 sm:rounded-full sm:border ${cfg.ring} ${cfg.text}`}>
       <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.dot}`} />
       <span className="hidden sm:inline">{cfg.label}</span>
     </div>

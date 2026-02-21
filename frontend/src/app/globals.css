@@ -19,6 +19,11 @@
 
   --text-primary: #e8e8e8;
   --text-muted:   #666;
+
+  /* Chart */
+  --grid-line:  #1a1a1a;
+  --chart-text: #6b7280;
+
   color-scheme: dark;
 }
 
@@ -26,12 +31,17 @@
 html[data-theme="light"] {
   --surface:         #f3f4f6;
   --surface-raised:  #ffffff;
-  --surface-overlay: #e9eaec;
-  --surface-border:  #d1d5db;
+  --surface-overlay: #f0f1f3;
+  --surface-border:  #e2e4e9;
   --accent:          #00b894;
   --accent-muted:    rgba(0, 184, 148, 0.15);
   --text-primary:    #111827;
   --text-muted:      #6b7280;
+
+  /* Chart — lighter grid so it doesn't overpower white bg */
+  --grid-line:  #f0f0f0;
+  --chart-text: #9ca3af;
+
   color-scheme: light;
 }
 
@@ -91,4 +101,46 @@ html, body {
 
 .react-grid-item:hover .react-resizable-handle {
   opacity: 0.5;
+}
+
+/* ─── TradingView / lightweight-charts watermark ────────────── */
+/* Hide the TradingView logo that appears in the bottom-right of charts */
+a[href*="tradingview"],
+[class*="tv-watermark"],
+[class*="tv-logo"] {
+  display: none !important;
+}
+/* Lightweight-charts v4 watermark element */
+.tv-lightweight-charts__watermark { display: none !important; }
+
+/* ─── Topbar logo: black in light mode ───────────────────────── */
+html[data-theme="light"] .logo-img {
+  filter: brightness(0);
+}
+
+/* ─── Light mode: subtle topbar button backgrounds ───────────── */
+html[data-theme="light"] .topbar-btn {
+  background: transparent;
+  border-color: transparent;
+  color: #6b7280;
+}
+html[data-theme="light"] .topbar-btn:hover {
+  background: rgba(0,0,0,0.06);
+  border-color: #d1d5db;
+  color: #111827;
+}
+
+/* ─── Light mode: AI widget input + chips ────────────────────── */
+html[data-theme="light"] .ai-input {
+  background: #ffffff !important;
+  border-color: #d1d5db !important;
+}
+html[data-theme="light"] .ai-chip {
+  background: #ffffff !important;
+  border-color: #d1d5db !important;
+  color: #374151 !important;
+}
+html[data-theme="light"] .ai-chip:hover {
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
 }

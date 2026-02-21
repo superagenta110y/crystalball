@@ -123,7 +123,7 @@ export function AIAssistantWidget({ symbol = "SPY" }: AIAssistantWidgetProps) {
             key={p}
             onClick={() => send(p)}
             disabled={loading}
-            className="text-xs px-2 py-1 rounded-full bg-surface-overlay border border-surface-border text-neutral-500 hover:text-white hover:border-accent/40 transition"
+            className="ai-chip text-xs px-2 py-1 rounded-full bg-surface-overlay border border-surface-border text-neutral-500 hover:text-white hover:border-accent/40 transition"
           >
             {p}
           </button>
@@ -140,7 +140,7 @@ export function AIAssistantWidget({ symbol = "SPY" }: AIAssistantWidgetProps) {
           onChange={(e) => setInput(e.target.value)}
           placeholder="Ask the market..."
           disabled={loading}
-          className="flex-1 bg-surface-overlay border border-surface-border rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-accent/60 transition placeholder:text-neutral-600"
+          className="ai-input flex-1 bg-surface-overlay border border-surface-border rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-accent/60 transition placeholder:text-neutral-600"
         />
         <button
           type="submit"

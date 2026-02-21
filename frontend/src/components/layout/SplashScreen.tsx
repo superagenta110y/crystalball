@@ -45,11 +45,11 @@ export function SplashScreen() {
         />
 
         {/* Wordmark */}
-        <div className="flex flex-col items-center gap-1">
-          <span className="text-white text-lg font-semibold tracking-widest uppercase">
+        <div className="flex flex-col items-center gap-1.5">
+          <span className="text-white text-2xl font-bold tracking-widest uppercase">
             CrystalBall
           </span>
-          <span className="text-neutral-600 text-xs tracking-widest uppercase">
+          <span className="text-xs tracking-widest uppercase" style={{ color: "#2a2a2a" }}>
             Quantitative Trading
           </span>
         </div>
