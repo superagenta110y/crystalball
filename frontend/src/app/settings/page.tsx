@@ -242,11 +242,11 @@ function ProvidersTab() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-neutral-500">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <p className="text-xs text-neutral-500 max-w-md leading-relaxed">
           Configure market data providers. The active provider is used for all market data.
         </p>
-        <Btn variant="primary" onClick={() => setModal({ open: true })}>
+        <Btn variant="primary" onClick={() => setModal({ open: true })} className="self-start sm:self-auto">
           <Plus size={13} /> Add Provider
         </Btn>
       </div>
@@ -263,13 +263,13 @@ function ProvidersTab() {
           const isActive = state.active.data === p.id;
           return (
             <div key={p.id}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition ${
+              className={`flex flex-col sm:flex-row sm:items-center gap-3 px-4 py-3 rounded-xl border transition ${
                 isActive
                   ? "border-[#00d4aa]/40 bg-[#00d4aa]/5"
                   : "border-[#2a2a2a] bg-[#141414] hover:border-neutral-600"
               }`}>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
+              <div className="flex-1 min-w-0 w-full">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-medium text-white truncate">{p.name}</span>
                   <span className="text-[11px] px-1.5 py-0.5 rounded bg-[#1e1e1e] text-neutral-500 border border-[#2a2a2a] capitalize">
                     {p.type}
@@ -280,23 +280,23 @@ function ProvidersTab() {
                     </span>
                   )}
                 </div>
-                <p className="text-[11px] text-neutral-600 mt-0.5 font-mono truncate">
+                <p className="text-[11px] text-neutral-600 mt-1 font-mono truncate">
                   {p.api_key ? `key: ${p.api_key}` : p.url ? `url: ${p.url}` : ""}
                 </p>
               </div>
 
-              <div className="flex items-center gap-1.5 shrink-0">
+              <div className="flex items-center gap-1.5 w-full sm:w-auto sm:justify-end shrink-0">
                 {!isActive && (
                   <Btn variant="primary" onClick={() => activate(p.id)}
-                    disabled={activating === p.id}>
+                    disabled={activating === p.id} className="h-8 px-2.5">
                     <Zap size={12} />
-                    {activating === p.id ? "…" : "Activate"}
+                    <span className="hidden sm:inline">{activating === p.id ? "…" : "Activate"}</span>
                   </Btn>
                 )}
-                <Btn onClick={() => setModal({ open: true, editing: p })}>
-                  <Edit3 size={12} /> Edit
+                <Btn onClick={() => setModal({ open: true, editing: p })} className="h-8 px-2.5">
+                  <Edit3 size={12} /> <span className="hidden sm:inline">Edit</span>
                 </Btn>
-                <Btn variant="danger" onClick={() => remove(p.id)} disabled={deleting === p.id}>
+                <Btn variant="danger" onClick={() => remove(p.id)} disabled={deleting === p.id} className="h-8 px-2.5">
                   <Trash2 size={12} />
                 </Btn>
               </div>
@@ -371,7 +371,7 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-[#0d0d0d] text-neutral-200 flex flex-col">
       {/* Top bar */}
-      <div className="flex items-center gap-3 px-6 py-4 border-b border-[#1e1e1e] shrink-0">
+      <div className="flex items-center gap-3 px-4 md:px-6 py-3 md:py-4 border-b border-[#1e1e1e] shrink-0">
         <Link href="/" className="flex items-center gap-1.5 text-neutral-500 hover:text-white transition text-sm">
           <ArrowLeft size={15} /> Dashboard
         </Link>
@@ -379,12 +379,12 @@ export default function SettingsPage() {
         <h1 className="text-sm font-semibold text-white">Settings</h1>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left sidebar */}
-        <nav className="w-48 shrink-0 border-r border-[#1e1e1e] flex flex-col py-4 px-2 gap-1">
+      <div className="flex flex-1 overflow-hidden flex-col md:flex-row">
+        {/* Tabs */}
+        <nav className="w-full md:w-48 shrink-0 border-b md:border-b-0 md:border-r border-[#1e1e1e] flex md:flex-col py-2 md:py-4 px-2 gap-1 overflow-x-auto">
           {TABS.map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition text-left ${
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition text-left whitespace-nowrap ${
                 activeTab === tab.id
                   ? "bg-[#1e1e1e] text-white"
                   : "text-neutral-500 hover:text-neutral-300 hover:bg-[#161616]"
@@ -396,9 +396,9 @@ export default function SettingsPage() {
         </nav>
 
         {/* Content */}
-        <main className="flex-1 overflow-y-auto p-8">
+        <main className="flex-1 overflow-y-auto p-4 md:p-8">
           <div className="max-w-2xl">
-            <h2 className="text-base font-semibold text-white mb-6">
+            <h2 className="text-base font-semibold text-white mb-4 md:mb-6">
               {TABS.find(t => t.id === activeTab)?.label}
             </h2>
             {activeTab === "general"   && <GeneralTab />}
