@@ -16,7 +16,14 @@ app = FastAPI(
 # CORS: allow localhost, 127.x, and all RFC-1918 LAN addresses
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+)(:\d+)?",
+    allow_origin_regex=(
+        r"https?://(localhost|127\.0\.0\.1"
+        r"|10\.\d+\.\d+\.\d+"
+        r"|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+"
+        r"|192\.168\.\d+\.\d+"
+        r"|[a-z0-9-]+\.trycloudflare\.com"   # Cloudflare quick tunnels
+        r")(:\d+)?"
+    ),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
