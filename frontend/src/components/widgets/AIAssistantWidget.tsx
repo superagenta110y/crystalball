@@ -11,6 +11,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import Link from "next/link";
 import { Send, Bot, User, Loader2 } from "lucide-react";
 
 interface Message {
@@ -39,11 +40,19 @@ export function AIAssistantWidget({ symbol = "SPY" }: AIAssistantWidgetProps) {
   const [messages, setMessages] = useState<Message[]>([WELCOME]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [aiConfigured, setAiConfigured] = useState<boolean | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    fetch("/api/ai/status")
+      .then(r => r.json())
+      .then(d => setAiConfigured(!!d?.configured))
+      .catch(() => setAiConfigured(false));
+  }, []);
 
   const send = async (text: string) => {
     if (!text.trim() || loading) return;
@@ -79,6 +88,17 @@ export function AIAssistantWidget({ symbol = "SPY" }: AIAssistantWidgetProps) {
       setLoading(false);
     }
   };
+
+  if (aiConfigured === false) {
+    return (
+      <div className="h-full flex items-center justify-center p-4 text-xs text-neutral-400 text-center">
+        <div>
+          To use this feature, configure an AI Provider in your{" "}
+          <Link href="/settings" className="text-accent underline">settings</Link>.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col">

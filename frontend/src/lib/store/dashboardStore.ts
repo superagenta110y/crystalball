@@ -174,9 +174,13 @@ export const useDashboardStore = create<DashboardState>()(
             if (t.id !== tabId) return t;
             return {
               ...t,
-              widgets: t.widgets.map((w) =>
-                w.id === widgetId ? { ...w, config: { ...w.config, ...config } } : w
-              ),
+              widgets: t.widgets.map((w) => {
+                if (w.id !== widgetId) return w;
+                const cleaned = Object.fromEntries(
+                  Object.entries(config).filter(([, v]) => typeof v === "string")
+                ) as Record<string, string>;
+                return { ...w, config: { ...w.config, ...cleaned } };
+              }),
             };
           }),
         })),

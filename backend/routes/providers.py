@@ -11,12 +11,12 @@ from routes.deps import invalidate_provider_cache
 
 router = APIRouter(prefix="/providers", tags=["providers"])
 
-SUPPORTED_TYPES = {"alpaca", "hoodwink"}
+SUPPORTED_TYPES = {"alpaca", "hoodwink", "openai", "gemini", "claude"}
 
 
 class ProviderBody(BaseModel):
     type: str
-    name: str
+    name: str | None = None
     config: dict[str, Any] = {}
 
 
@@ -38,9 +38,10 @@ def _mask(provider: dict) -> dict:
 async def list_providers():
     providers = await get_all_providers()
     active_data = await get_active_provider_id("data")
+    active_ai = await get_active_provider_id("ai")
     return {
         "providers": [_mask(p) for p in providers],
-        "active": {"data": active_data},
+        "active": {"data": active_data, "ai": active_ai},
     }
 
 
@@ -48,7 +49,8 @@ async def list_providers():
 async def create_provider(body: ProviderBody):
     if body.type not in SUPPORTED_TYPES:
         raise HTTPException(400, f"Unsupported type. Supported: {sorted(SUPPORTED_TYPES)}")
-    pid = await save_provider(None, body.type, body.name, body.config)
+    name = body.name or body.type.capitalize()
+    pid = await save_provider(None, body.type, name, body.config)
     invalidate_provider_cache()
     return {"id": pid, "ok": True}
 
@@ -70,10 +72,11 @@ async def update_provider(provider_id: str, body: ProviderBody):
     # Don't overwrite masked secrets
     config = dict(body.config)
     for secret_field in ("secret_key", "api_key"):
-        if config.get(secret_field, "").startswith("••••"):
+        if str(config.get(secret_field, "")).startswith("••••"):
             config[secret_field] = existing.get(secret_field, "")
 
-    await save_provider(provider_id, body.type, body.name, config)
+    name = body.name or existing.get("name") or body.type.capitalize()
+    await save_provider(provider_id, body.type, name, config)
     invalidate_provider_cache()
     return {"ok": True}
 

@@ -2,7 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from config import get_settings
-from routes import market, analytics, orders, account, reports, ws, settings as settings_router, news, providers as providers_router
+from routes import market, analytics, orders, account, reports, ws, settings as settings_router, news, providers as providers_router, ai
 from db import init_db
 
 settings = get_settings()
@@ -42,6 +42,7 @@ app.include_router(reports.router, prefix="/api")
 app.include_router(settings_router.router, prefix="/api")
 app.include_router(providers_router.router, prefix="/api")
 app.include_router(news.router, prefix="/api")
+app.include_router(ai.router, prefix="/api")
 
 # WebSocket
 app.include_router(ws.router)

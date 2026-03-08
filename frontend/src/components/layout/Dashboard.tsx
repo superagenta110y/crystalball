@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import GridLayout, { type Layout } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
@@ -148,6 +148,7 @@ export default function Dashboard() {
   const layout   = tab?.layout ?? [];
   const widgets  = tab?.widgets ?? [];
   const isMobile = (width ?? 0) < 768;
+  const [zoomedWidgetId, setZoomedWidgetId] = useState<string | null>(null);
 
   // Apply theme to <html> element whenever it changes
   useEffect(() => {
@@ -179,6 +180,12 @@ export default function Dashboard() {
     [height, layout]
   );
 
+  useEffect(() => {
+    if (zoomedWidgetId && !widgets.some(w => w.id === zoomedWidgetId)) {
+      setZoomedWidgetId(null);
+    }
+  }, [zoomedWidgetId, widgets]);
+
   const gridWidth = Math.max(width ?? 1200, 400);
 
   return (
@@ -200,32 +207,59 @@ export default function Dashboard() {
         />
       ) : (
         <main className="flex-1 overflow-hidden">
-          <GridLayout
-            className="layout"
-            layout={layout}
-            cols={12}
-            rowHeight={rowHeight}
-            width={gridWidth}
-            onLayoutChange={handleLayoutChange}
-            draggableHandle=".widget-drag-handle"
-            margin={[MARGIN, MARGIN]}
-            containerPadding={[PADDING, PADDING]}
-            isDraggable
-            isResizable
-          >
-            {widgets.map(instance => (
-              <div key={instance.id} className="widget">
-                <WidgetWrapper instance={instance} onRemove={() => removeWidget(activeTabId, instance.id)}>
-                  {renderWidget({
-                    instance,
-                    resolvedSymbol: resolvedSymbols[instance.id] ?? "SPY",
-                    isGlobalOverride,
-                    onConfigChange: (patch) => updateWidgetConfig(activeTabId, instance.id, patch),
-                  })}
-                </WidgetWrapper>
-              </div>
-            ))}
-          </GridLayout>
+          {zoomedWidgetId ? (
+            <div className="h-full p-2">
+              {widgets.filter(w => w.id === zoomedWidgetId).map(instance => (
+                <div key={instance.id} className="h-full rounded-xl border border-surface-border bg-surface-raised overflow-hidden">
+                  <WidgetWrapper
+                    instance={instance}
+                    onRemove={() => removeWidget(activeTabId, instance.id)}
+                    onToggleZoom={() => setZoomedWidgetId(null)}
+                    isZoomed
+                  >
+                    {renderWidget({
+                      instance,
+                      resolvedSymbol: resolvedSymbols[instance.id] ?? "SPY",
+                      isGlobalOverride,
+                      onConfigChange: (patch) => updateWidgetConfig(activeTabId, instance.id, patch),
+                    })}
+                  </WidgetWrapper>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <GridLayout
+              className="layout"
+              layout={layout}
+              cols={12}
+              rowHeight={rowHeight}
+              width={gridWidth}
+              onLayoutChange={handleLayoutChange}
+              draggableHandle=".widget-drag-handle"
+              margin={[MARGIN, MARGIN]}
+              containerPadding={[PADDING, PADDING]}
+              isDraggable
+              isResizable
+            >
+              {widgets.map(instance => (
+                <div key={instance.id} className="widget">
+                  <WidgetWrapper
+                    instance={instance}
+                    onRemove={() => removeWidget(activeTabId, instance.id)}
+                    onToggleZoom={() => setZoomedWidgetId(instance.id)}
+                    isZoomed={false}
+                  >
+                    {renderWidget({
+                      instance,
+                      resolvedSymbol: resolvedSymbols[instance.id] ?? "SPY",
+                      isGlobalOverride,
+                      onConfigChange: (patch) => updateWidgetConfig(activeTabId, instance.id, patch),
+                    })}
+                  </WidgetWrapper>
+                </div>
+              ))}
+            </GridLayout>
+          )}
         </main>
       )}
     </div>
