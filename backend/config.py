@@ -35,6 +35,7 @@ class Settings(BaseSettings):
         )
 
     alpaca_data_url: str = "https://data.alpaca.markets"
+    alpaca_feed: str = "iex"  # iex (free) | sip
 
     # ── Hoodwink ──────────────────────────────────────────────────────────────
     hoodwink_url: str = "http://127.0.0.1:7878"

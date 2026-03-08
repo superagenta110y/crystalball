@@ -1,6 +1,7 @@
 """Alpaca Markets provider (paper + live trading, market data)."""
 from __future__ import annotations
 from typing import Any
+from datetime import datetime, timedelta, timezone
 import httpx
 from .base import BaseProvider
 from config import get_settings
@@ -22,6 +23,7 @@ class AlpacaProvider(BaseProvider):
         }
         self._trade_url = cfg.get("trade_url") or trade_base
         self._data_url  = data_url
+        self._feed      = cfg.get("feed") or s.alpaca_feed
 
     async def get_quote(self, symbol: str) -> dict[str, Any]:
         async with httpx.AsyncClient() as c:
@@ -40,11 +42,40 @@ class AlpacaProvider(BaseProvider):
             }
 
     async def get_history(self, symbol: str, timeframe: str = "1Day", limit: int = 252) -> list[dict[str, Any]]:
+        # Alpaca can return empty bars when only limit is provided (e.g., weekends/after-hours).
+        # Provide an explicit time window so historical candles always resolve.
+        tf = (timeframe or "1Day").strip()
+        tf_to_minutes = {
+            "1Min": 1,
+            "5Min": 5,
+            "15Min": 15,
+            "30Min": 30,
+            "1Hour": 60,
+            "1Day": 390,
+            "1Week": 5 * 390,
+        }
+        minutes = tf_to_minutes.get(tf, 390)
+        # Add generous padding to survive weekends/holidays and sparse feeds.
+        # For intraday, always look back at least 7 days.
+        lookback_minutes = max(max(limit, 1) * minutes * 12, 7 * 24 * 60)
+
+        end_dt = datetime.now(timezone.utc)
+        start_dt = end_dt - timedelta(minutes=lookback_minutes)
+
+        params = {
+            "timeframe": tf,
+            "limit": limit,
+            "adjustment": "raw",
+            "start": start_dt.isoformat().replace("+00:00", "Z"),
+            "end": end_dt.isoformat().replace("+00:00", "Z"),
+            "feed": self._feed,
+        }
+
         async with httpx.AsyncClient() as c:
             r = await c.get(
                 f"{self._data_url}/v2/stocks/{symbol}/bars",
                 headers=self._headers,
-                params={"timeframe": timeframe, "limit": limit, "adjustment": "raw"},
+                params=params,
             )
             r.raise_for_status()
             bars = r.json().get("bars") or []
