@@ -35,6 +35,19 @@ const toRgba = (hex: string, alpha: number) => {
   return `rgba(${r},${g},${b},${alpha})`;
 };
 
+function HelpTip({ text }: { text: string }) {
+  return (
+    <span className="group relative inline-flex items-center">
+      <button type="button" className="text-neutral-500 hover:text-white">
+        <CircleHelp size={12} />
+      </button>
+      <span className="pointer-events-none absolute right-0 top-5 z-50 hidden w-48 rounded border border-surface-border bg-surface-overlay px-2 py-1 text-[10px] text-neutral-300 group-hover:block group-focus-within:block">
+        {text}
+      </span>
+    </span>
+  );
+}
+
 interface ChartWidgetProps {
   symbol?: string;
   timeframe?: string;
@@ -62,9 +75,24 @@ export function ChartWidget({
   const [indLevels, setIndLevels] = useState(false);
   const [indVP, setIndVP] = useState(false);
   const [smaPeriod, setSmaPeriod] = useState(20);
+  const [smaColor, setSmaColor] = useState("#60a5fa");
+  const [smaWidth, setSmaWidth] = useState(1);
   const [emaPeriod, setEmaPeriod] = useState(20);
+  const [emaColor, setEmaColor] = useState("#f59e0b");
+  const [emaWidth, setEmaWidth] = useState(1);
+  const [vwapColor, setVwapColor] = useState("#a78bfa");
+  const [vwapWidth, setVwapWidth] = useState(1);
   const [bbPeriod, setBbPeriod] = useState(20);
   const [bbStd, setBbStd] = useState(2);
+  const [bbColor, setBbColor] = useState("#22d3ee");
+  const [bbWidth, setBbWidth] = useState(1);
+  const [levelColor, setLevelColor] = useState("#94a3b8");
+  const [levelWidth, setLevelWidth] = useState(1);
+  const [showPrevClose, setShowPrevClose] = useState(true);
+  const [showDayHighLow, setShowDayHighLow] = useState(true);
+  const [showPremarketHighLow, setShowPremarketHighLow] = useState(false);
+  const [vpColor, setVpColor] = useState("#e879f9");
+  const [vpWidth, setVpWidth] = useState(2);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef      = useRef<any>(null);
@@ -216,12 +244,12 @@ export function ChartWidget({
       s.setData(data); indicatorSeriesRef.current.push(s);
     };
 
-    if (indSMA) addLine(computeSMA(bars, Math.max(2, smaPeriod)), '#60a5fa');
-    if (indEMA) addLine(computeEMA(bars, Math.max(2, emaPeriod)), '#f59e0b');
+    if (indSMA) addLine(computeSMA(bars, Math.max(2, smaPeriod)), smaColor, Math.max(1, smaWidth));
+    if (indEMA) addLine(computeEMA(bars, Math.max(2, emaPeriod)), emaColor, Math.max(1, emaWidth));
     if (indVWAP) {
       let pv = 0, vv = 0;
       const d = bars.map(b => { pv += ((b.high+b.low+b.close)/3)*(b.volume||0); vv += (b.volume||0); return { time:b.time, value: vv? pv/vv : b.close }; });
-      addLine(d, '#a78bfa');
+      addLine(d, vwapColor, Math.max(1, vwapWidth));
     }
     if (indBB) {
       const p = Math.max(2, bbPeriod); const s = Math.max(0.5, bbStd);
@@ -234,25 +262,39 @@ export function ChartWidget({
         const sd = Math.sqrt(seg.reduce((x,y)=>x+Math.pow(y.close-m,2),0)/p);
         upper.push({ time:b.time, value:m + s*sd }); lower.push({ time:b.time, value:m - s*sd });
       });
-      addLine(mid, '#22d3ee'); addLine(upper, '#22d3ee', 1, true); addLine(lower, '#22d3ee', 1, true);
+      addLine(mid, bbColor, Math.max(1, bbWidth)); addLine(upper, bbColor, Math.max(1, bbWidth), true); addLine(lower, bbColor, Math.max(1, bbWidth), true);
     }
     if (indLevels && bars.length) {
       const prevClose = bars[Math.max(0, bars.length - 2)]?.close ?? bars[bars.length - 1].close;
       const dayHigh = Math.max(...bars.map(b=>b.high));
       const dayLow = Math.min(...bars.map(b=>b.low));
-      [prevClose, dayHigh, dayLow].forEach((v, i) => {
-        const s = chartRef.current.addLineSeries({ color: i===0 ? '#94a3b8' : '#64748b', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false });
+      const pre = bars.filter(b => {
+        const d = new Date(b.time * 1000).toLocaleString("en-US", { timeZone: "America/New_York" });
+        const dt = new Date(d);
+        const min = dt.getHours() * 60 + dt.getMinutes();
+        return min >= 240 && min < 570;
+      });
+      const preHigh = pre.length ? Math.max(...pre.map(b=>b.high)) : null;
+      const preLow = pre.length ? Math.min(...pre.map(b=>b.low)) : null;
+
+      const values: number[] = [];
+      if (showPrevClose) values.push(prevClose);
+      if (showDayHighLow) values.push(dayHigh, dayLow);
+      if (showPremarketHighLow && preHigh != null && preLow != null) values.push(preHigh, preLow);
+
+      values.forEach((v) => {
+        const s = chartRef.current.addLineSeries({ color: levelColor, lineWidth: Math.max(1, levelWidth), lineStyle: 2, priceLineVisible: false, lastValueVisible: false });
         s.setData([{ time: bars[0].time, value: v }, { time: bars[bars.length - 1].time, value: v }]);
         levelLinesRef.current.push(s);
       });
     }
     if (indVP && bars.length) {
       const poc = bars.reduce((best, b) => (b.volume||0) > (best.volume||0) ? b : best, bars[0]).close;
-      const s = chartRef.current.addLineSeries({ color: '#e879f9', lineWidth: 2, lineStyle: 2, priceLineVisible: false, lastValueVisible: false });
+      const s = chartRef.current.addLineSeries({ color: vpColor, lineWidth: Math.max(1, vpWidth), lineStyle: 2, priceLineVisible: false, lastValueVisible: false });
       s.setData([{ time: bars[0].time, value: poc }, { time: bars[bars.length - 1].time, value: poc }]);
       levelLinesRef.current.push(s);
     }
-  }, [clearIndicators, indSMA, indEMA, indVWAP, indBB, indLevels, indVP, smaPeriod, emaPeriod, bbPeriod, bbStd]);
+  }, [clearIndicators, indSMA, indEMA, indVWAP, indBB, indLevels, indVP, smaPeriod, smaColor, smaWidth, emaPeriod, emaColor, emaWidth, vwapColor, vwapWidth, bbPeriod, bbStd, bbColor, bbWidth, levelColor, levelWidth, showPrevClose, showDayHighLow, showPremarketHighLow, vpColor, vpWidth]);
 
   useEffect(() => {
     const bars = Array.from(cacheRef.current.values()).sort((a,b)=>a.time-b.time);
@@ -528,20 +570,48 @@ export function ChartWidget({
             </div>
 
             {indicatorModal === "sma" && (
-              <label className="flex items-center justify-between gap-2">Period <span className="text-neutral-500 inline-flex items-center gap-1"><CircleHelp size={12} />Bars used for SMA</span><input type="number" value={smaPeriod} onChange={e=>setSmaPeriod(Number(e.target.value)||20)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
+              <div className="space-y-2">
+                <label className="flex items-center justify-between gap-2">Period <HelpTip text="Bars used to compute the simple moving average." /><input type="number" value={smaPeriod} onChange={e=>setSmaPeriod(Number(e.target.value)||20)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
+                <label className="flex items-center justify-between gap-2">Line Color <HelpTip text="Display color for SMA line." /><input type="color" value={smaColor} onChange={e=>setSmaColor(e.target.value)} className="w-10 h-7 bg-transparent" /></label>
+                <label className="flex items-center justify-between gap-2">Line Thickness <HelpTip text="Pixel width of SMA line." /><input type="number" min={1} max={6} value={smaWidth} onChange={e=>setSmaWidth(Number(e.target.value)||1)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
+              </div>
             )}
             {indicatorModal === "ema" && (
-              <label className="flex items-center justify-between gap-2">Period <span className="text-neutral-500 inline-flex items-center gap-1"><CircleHelp size={12} />Bars used for EMA</span><input type="number" value={emaPeriod} onChange={e=>setEmaPeriod(Number(e.target.value)||20)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
+              <div className="space-y-2">
+                <label className="flex items-center justify-between gap-2">Period <HelpTip text="Bars used to compute exponential moving average." /><input type="number" value={emaPeriod} onChange={e=>setEmaPeriod(Number(e.target.value)||20)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
+                <label className="flex items-center justify-between gap-2">Line Color <HelpTip text="Display color for EMA line." /><input type="color" value={emaColor} onChange={e=>setEmaColor(e.target.value)} className="w-10 h-7 bg-transparent" /></label>
+                <label className="flex items-center justify-between gap-2">Line Thickness <HelpTip text="Pixel width of EMA line." /><input type="number" min={1} max={6} value={emaWidth} onChange={e=>setEmaWidth(Number(e.target.value)||1)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
+              </div>
             )}
             {indicatorModal === "bb" && (
               <div className="space-y-2">
-                <label className="flex items-center justify-between">Period <span className="text-neutral-500 inline-flex items-center gap-1"><CircleHelp size={12} />Window length</span><input type="number" value={bbPeriod} onChange={e=>setBbPeriod(Number(e.target.value)||20)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
-                <label className="flex items-center justify-between">Std Dev <span className="text-neutral-500 inline-flex items-center gap-1"><CircleHelp size={12} />Band distance</span><input type="number" step="0.1" value={bbStd} onChange={e=>setBbStd(Number(e.target.value)||2)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
+                <label className="flex items-center justify-between">Period <HelpTip text="Window length for Bollinger calculations." /><input type="number" value={bbPeriod} onChange={e=>setBbPeriod(Number(e.target.value)||20)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
+                <label className="flex items-center justify-between">Std Dev <HelpTip text="Standard deviation multiplier for upper/lower bands." /><input type="number" step="0.1" value={bbStd} onChange={e=>setBbStd(Number(e.target.value)||2)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
+                <label className="flex items-center justify-between">Line Color <HelpTip text="Display color for BB lines." /><input type="color" value={bbColor} onChange={e=>setBbColor(e.target.value)} className="w-10 h-7 bg-transparent" /></label>
+                <label className="flex items-center justify-between">Line Thickness <HelpTip text="Pixel width for BB lines." /><input type="number" min={1} max={6} value={bbWidth} onChange={e=>setBbWidth(Number(e.target.value)||1)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
               </div>
             )}
-            {indicatorModal === "levels" && <div className="text-neutral-400 inline-flex items-center gap-1"><CircleHelp size={12} />Shows previous close and session high/low.</div>}
-            {indicatorModal === "vwap" && <div className="text-neutral-400 inline-flex items-center gap-1"><CircleHelp size={12} />Volume-weighted average price for loaded bars.</div>}
-            {indicatorModal === "vp" && <div className="text-neutral-400 inline-flex items-center gap-1"><CircleHelp size={12} />Volume profile v1 uses POC line.</div>}
+            {indicatorModal === "levels" && (
+              <div className="space-y-2">
+                <label className="flex items-center justify-between">Show Previous Close <HelpTip text="Adds yesterday close level." /><input type="checkbox" checked={showPrevClose} onChange={e=>setShowPrevClose(e.target.checked)} /></label>
+                <label className="flex items-center justify-between">Show Day High/Low <HelpTip text="Adds current session high and low." /><input type="checkbox" checked={showDayHighLow} onChange={e=>setShowDayHighLow(e.target.checked)} /></label>
+                <label className="flex items-center justify-between">Show Premarket H/L <HelpTip text="Adds premarket high and low (4:00–9:30 ET)." /><input type="checkbox" checked={showPremarketHighLow} onChange={e=>setShowPremarketHighLow(e.target.checked)} /></label>
+                <label className="flex items-center justify-between">Line Color <HelpTip text="Display color for all price levels." /><input type="color" value={levelColor} onChange={e=>setLevelColor(e.target.value)} className="w-10 h-7 bg-transparent" /></label>
+                <label className="flex items-center justify-between">Line Thickness <HelpTip text="Pixel width for level lines." /><input type="number" min={1} max={6} value={levelWidth} onChange={e=>setLevelWidth(Number(e.target.value)||1)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
+              </div>
+            )}
+            {indicatorModal === "vwap" && (
+              <div className="space-y-2">
+                <label className="flex items-center justify-between">Line Color <HelpTip text="Display color for VWAP line." /><input type="color" value={vwapColor} onChange={e=>setVwapColor(e.target.value)} className="w-10 h-7 bg-transparent" /></label>
+                <label className="flex items-center justify-between">Line Thickness <HelpTip text="Pixel width for VWAP line." /><input type="number" min={1} max={6} value={vwapWidth} onChange={e=>setVwapWidth(Number(e.target.value)||1)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
+              </div>
+            )}
+            {indicatorModal === "vp" && (
+              <div className="space-y-2">
+                <label className="flex items-center justify-between">Line Color <HelpTip text="Display color for POC line." /><input type="color" value={vpColor} onChange={e=>setVpColor(e.target.value)} className="w-10 h-7 bg-transparent" /></label>
+                <label className="flex items-center justify-between">Line Thickness <HelpTip text="Pixel width for POC line." /><input type="number" min={1} max={6} value={vpWidth} onChange={e=>setVpWidth(Number(e.target.value)||2)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
+              </div>
+            )}
 
             <div className="flex justify-end"><button onClick={() => setIndicatorModal(null)} className="px-2 py-1 rounded border border-surface-border">Done</button></div>
           </div>
