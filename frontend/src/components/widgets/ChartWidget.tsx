@@ -73,6 +73,8 @@ export function ChartWidget({
   const cacheRef      = useRef<Map<number, Bar>>(new Map());
   const indicatorSeriesRef = useRef<any[]>([]);
   const levelLinesRef = useRef<any[]>([]);
+  const historyLimitRef = useRef<number>(0);
+  const loadingMoreRef = useRef<boolean>(false);
   const pollRef      = useRef<ReturnType<typeof setInterval> | null>(null);
   const wsRef        = useRef<WebSocket | null>(null);
 
@@ -258,9 +260,10 @@ export function ChartWidget({
   }, [drawIndicators]);
 
   // Full load — clears & repopulates everything
-  const loadFull = useCallback(async (sym: string, tf: Timeframe) => {
+  const loadFull = useCallback(async (sym: string, tf: Timeframe, forcedLimit?: number, fit = true) => {
     const alpacaTF = TF_MAP[tf] || "5Min";
-    const limit    = BAR_LIMIT[alpacaTF] || 200;
+    const limit    = forcedLimit ?? (BAR_LIMIT[alpacaTF] || 200);
+    historyLimitRef.current = limit;
 
     // Wait for chart to be ready (first mount race)
     let waited = 0;
@@ -289,7 +292,7 @@ export function ChartWidget({
         }))
       );
       drawIndicators(bars);
-      chartRef.current?.timeScale().fitContent();
+      if (fit) chartRef.current?.timeScale().fitContent();
       setLastPrice(bars[bars.length - 1].close);
       setStatus("ok");
     } catch {
@@ -326,6 +329,27 @@ export function ChartWidget({
       setIsLive(true);
     } catch { /* silent — don't flicker status on transient errors */ }
   }, [theme.bull, theme.bear, drawIndicators]);
+
+  // Auto-backfill older candles when panning to the left edge
+  useEffect(() => {
+    if (!chartRef.current) return;
+    const ts = chartRef.current.timeScale();
+
+    const onRange = (range: any) => {
+      if (!range || loadingMoreRef.current) return;
+      if (range.from > 20) return;
+
+      const nextLimit = Math.min(1000, (historyLimitRef.current || 0) + 200);
+      if (nextLimit <= (historyLimitRef.current || 0)) return;
+
+      loadingMoreRef.current = true;
+      loadFull(symbol, timeframe, nextLimit, false)
+        .finally(() => { loadingMoreRef.current = false; });
+    };
+
+    ts.subscribeVisibleLogicalRangeChange(onRange);
+    return () => ts.unsubscribeVisibleLogicalRangeChange(onRange);
+  }, [symbol, timeframe, loadFull]);
 
   // Main effect: full load then polling
   useEffect(() => {
