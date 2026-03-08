@@ -35,20 +35,46 @@ async def _chain_and_spot(symbol: str, expiration_date: str | None, provider: Ba
 async def gex(
     symbol: str,
     expiration_date: str | None = Query(None),
+    expiration_dates: str | None = Query(None, description="comma-separated expiration dates"),
     provider: BaseProvider = Depends(get_provider),
 ):
-    chain, spot = await _chain_and_spot(symbol.upper(), expiration_date, provider)
-    return {"symbol": symbol, "spot": spot, "data": compute_gex(chain, spot)}
+    sym = symbol.upper()
+    requested_exps = _parse_expirations(expiration_date, expiration_dates)
+    quote = await provider.get_quote(sym)
+    spot = float(quote.get("last_price") or 0)
+
+    if not requested_exps:
+        chain = await provider.get_options_chain(sym)
+        return {"symbol": sym, "spot": spot, "expirations": [], "data": compute_gex(chain, spot)}
+
+    chain: list[dict] = []
+    for exp in requested_exps:
+        part = await provider.get_options_chain(sym, expiration_date=exp)
+        chain.extend(part)
+    return {"symbol": sym, "spot": spot, "expirations": requested_exps, "data": compute_gex(chain, spot)}
 
 
 @router.get("/dex/{symbol}")
 async def dex(
     symbol: str,
     expiration_date: str | None = Query(None),
+    expiration_dates: str | None = Query(None, description="comma-separated expiration dates"),
     provider: BaseProvider = Depends(get_provider),
 ):
-    chain, spot = await _chain_and_spot(symbol.upper(), expiration_date, provider)
-    return {"symbol": symbol, "spot": spot, "data": compute_dex(chain, spot)}
+    sym = symbol.upper()
+    requested_exps = _parse_expirations(expiration_date, expiration_dates)
+    quote = await provider.get_quote(sym)
+    spot = float(quote.get("last_price") or 0)
+
+    if not requested_exps:
+        chain = await provider.get_options_chain(sym)
+        return {"symbol": sym, "spot": spot, "expirations": [], "data": compute_dex(chain, spot)}
+
+    chain: list[dict] = []
+    for exp in requested_exps:
+        part = await provider.get_options_chain(sym, expiration_date=exp)
+        chain.extend(part)
+    return {"symbol": sym, "spot": spot, "expirations": requested_exps, "data": compute_dex(chain, spot)}
 
 
 @router.get("/oi/{symbol}")

@@ -60,8 +60,8 @@ function renderWidget({ instance, resolvedSymbol, isGlobalOverride, onConfigChan
     case "orderflow":    return <OrderFlowWidget symbol={resolvedSymbol} isGlobalOverride={isGlobalOverride} onConfigChange={onConfigChange} />;
     case "openinterest": return <OpenInterestWidget symbol={resolvedSymbol} isGlobalOverride={isGlobalOverride} config={config} onConfigChange={onConfigChange} />;
     case "openinterest3d":return <OpenInterest3DWidget symbol={resolvedSymbol} />;
-    case "gex":          return <GEXWidget symbol={resolvedSymbol} isGlobalOverride={isGlobalOverride} onConfigChange={onConfigChange} />;
-    case "dex":          return <DEXWidget symbol={resolvedSymbol} isGlobalOverride={isGlobalOverride} onConfigChange={onConfigChange} />;
+    case "gex":          return <GEXWidget symbol={resolvedSymbol} isGlobalOverride={isGlobalOverride} config={config} onConfigChange={onConfigChange} />;
+    case "dex":          return <DEXWidget symbol={resolvedSymbol} isGlobalOverride={isGlobalOverride} config={config} onConfigChange={onConfigChange} />;
     case "newsfeed":     return <NewsFeedWidget globalSymbol={resolvedSymbol} />;
     case "bloomberg":    return <BloombergTVWidget />;
     case "ai":           return <AIAssistantWidget symbol={resolvedSymbol} />;
