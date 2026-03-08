@@ -23,7 +23,7 @@ const POLL_MS: Record<string, number> = {
   "1Hour":120000,"4Hour":300000,"1Day":300000,"1Week":300000,
 };
 
-type Bar = { time: number; open: number; high: number; low: number; close: number };
+type Bar = { time: number; open: number; high: number; low: number; close: number; volume?: number };
 
 interface ChartWidgetProps {
   symbol?: string;
@@ -46,9 +46,10 @@ export function ChartWidget({
   const [isLive, setIsLive] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const chartRef     = useRef<any>(null);
-  const seriesRef    = useRef<any>(null);
-  const cacheRef     = useRef<Map<number, Bar>>(new Map());
+  const chartRef      = useRef<any>(null);
+  const seriesRef     = useRef<any>(null);
+  const volumeRef     = useRef<any>(null);
+  const cacheRef      = useRef<Map<number, Bar>>(new Map());
   const pollRef      = useRef<ReturnType<typeof setInterval> | null>(null);
   const wsRef        = useRef<WebSocket | null>(null);
 
@@ -99,8 +100,14 @@ export function ChartWidget({
         upColor: bull, downColor: bear,
         borderVisible: false, wickUpColor: bull, wickDownColor: bear,
       });
+      const volumeSeries = chart.addHistogramSeries({
+        priceFormat: { type: "volume" },
+        priceScaleId: "",
+      });
+      volumeSeries.priceScale().applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
       chartRef.current = chart;
       seriesRef.current = series;
+      volumeRef.current = volumeSeries;
 
       const ro = new ResizeObserver(() => {
         if (containerRef.current && chartRef.current) {
@@ -118,6 +125,7 @@ export function ChartWidget({
       chartRef.current?.remove();
       chartRef.current = null;
       seriesRef.current = null;
+      volumeRef.current = null;
     };
   }, []);
 
@@ -128,6 +136,7 @@ export function ChartWidget({
       .map(b => ({
         time:  Math.floor(new Date(b.timestamp).getTime() / 1000),
         open:  b.open, high: b.high, low: b.low, close: b.close,
+        volume: Number(b.volume || 0),
       }))
       .sort((a, b) => a.time - b.time);
 
@@ -153,6 +162,13 @@ export function ChartWidget({
 
       cacheRef.current = new Map(bars.map(b => [b.time, b]));
       seriesRef.current.setData(bars);
+      volumeRef.current?.setData(
+        bars.map(b => ({
+          time: b.time,
+          value: b.volume || 0,
+          color: b.close >= b.open ? "rgba(0,212,170,0.5)" : "rgba(255,77,109,0.5)",
+        }))
+      );
       chartRef.current?.timeScale().fitContent();
       setLastPrice(bars[bars.length - 1].close);
       setStatus("ok");
@@ -176,6 +192,11 @@ export function ChartWidget({
         if (!cached || cached.close !== bar.close || cached.high !== bar.high || cached.low !== bar.low) {
           cacheRef.current.set(bar.time, bar);
           seriesRef.current.update(bar);   // lightweight-charts upserts by time
+          volumeRef.current?.update({
+            time: bar.time,
+            value: bar.volume || 0,
+            color: bar.close >= bar.open ? "rgba(0,212,170,0.5)" : "rgba(255,77,109,0.5)",
+          });
         }
       }
       setLastPrice(bars[bars.length - 1].close);
@@ -241,6 +262,11 @@ export function ChartWidget({
             };
             cacheRef.current.set(lastTime, updated);
             seriesRef.current.update(updated);
+            volumeRef.current?.update({
+              time: updated.time,
+              value: updated.volume || 0,
+              color: updated.close >= updated.open ? "rgba(0,212,170,0.5)" : "rgba(255,77,109,0.5)",
+            });
           }
         } catch { /* ignore parse errors */ }
       };
@@ -289,7 +315,7 @@ export function ChartWidget({
             title={isGlobalOverride ? "Controlled by global override" : "Symbol — press Enter"}
             className={`border rounded px-2 py-0.5 text-xs font-mono w-16 focus:outline-none text-white transition
               ${isGlobalOverride
-                ? "bg-transparent border-surface-border text-neutral-500 cursor-not-allowed"
+                ? "bg-surface-overlay border-accent/70 text-accent cursor-not-allowed shadow-[0_0_0_1px_rgba(0,212,170,0.25)]"
                 : "bg-surface-overlay border-surface-border focus:border-accent/60"}`}
           />
           {isGlobalOverride && <span className="text-neutral-700 text-xs">⬡</span>}

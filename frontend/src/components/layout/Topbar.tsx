@@ -1,9 +1,11 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Plus, Palette, ChevronDown, Settings, Moon, Sun, Monitor } from "lucide-react";
+import { Plus, Palette, ChevronDown, Settings, Moon, Sun, Monitor, X } from "lucide-react";
 import Link from "next/link";
 import { useDashboardStore, type WidgetType, type ThemeMode, DEFAULT_THEME } from "@/lib/store/dashboardStore";
+
+const API = process.env.NEXT_PUBLIC_API_URL || "";
 
 const WIDGET_LIST: { id: WidgetType; label: string }[] = [
   { id: "chart",          label: "Chart" },
@@ -30,66 +32,124 @@ export function Topbar() {
 
   const [showAddWidget, setShowAddWidget] = useState(false);
   const [showStyle, setShowStyle] = useState(false);
-  const [symbolInput, setSymbolInput] = useState("");
+
+  const [draft, setDraft] = useState("");
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
   const addRef = useRef<HTMLDivElement>(null);
   const styleRef = useRef<HTMLDivElement>(null);
+  const overrideRef = useRef<HTMLDivElement>(null);
 
-  // Sync local input with tab's globalSymbols when switching tabs
+  const globalSymbols = tab?.globalSymbols ?? [];
+  const hasOverride = globalSymbols.length > 0;
+
   useEffect(() => {
-    setSymbolInput((tab?.globalSymbols ?? []).join(", "));
+    setDraft("");
+    setSuggestions([]);
+    setShowSuggestions(false);
   }, [activeTabId]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (addRef.current && !addRef.current.contains(e.target as Node)) setShowAddWidget(false);
       if (styleRef.current && !styleRef.current.contains(e.target as Node)) setShowStyle(false);
+      if (overrideRef.current && !overrideRef.current.contains(e.target as Node)) setShowSuggestions(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const handleSymbolChange = (raw: string) => {
-    setSymbolInput(raw);
-    const symbols = raw
-      .split(/[,\s]+/)
-      .map((s) => s.trim().toUpperCase())
-      .filter(Boolean);
-    setGlobalSymbols(activeTabId, symbols);
+  useEffect(() => {
+    const q = draft.trim().toUpperCase();
+    if (!q) {
+      setSuggestions([]);
+      return;
+    }
+    const t = setTimeout(() => {
+      fetch(`${API}/api/market/symbols?q=${encodeURIComponent(q)}&limit=12`)
+        .then(r => r.json())
+        .then(d => {
+          const syms = (d?.symbols || []) as string[];
+          setSuggestions(syms.filter(s => !globalSymbols.includes(s)));
+        })
+        .catch(() => setSuggestions([]));
+    }, 120);
+    return () => clearTimeout(t);
+  }, [draft, activeTabId, globalSymbols.join(",")]);
+
+  const addSymbol = (sym: string) => {
+    const s = sym.trim().toUpperCase();
+    if (!s) return;
+    if (globalSymbols.includes(s)) return;
+    setGlobalSymbols(activeTabId, [...globalSymbols, s]);
+    setDraft("");
+    setShowSuggestions(false);
+  };
+
+  const removeSymbol = (sym: string) => {
+    setGlobalSymbols(activeTabId, globalSymbols.filter(x => x !== sym));
   };
 
   return (
     <header className="flex items-center gap-3 px-4 py-2 bg-surface-raised border-b border-surface-border shrink-0 h-12">
-      {/* Logo + Name */}
       <Link href="/" className="flex items-center gap-2 shrink-0">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo.svg" alt="CrystalBall" className="logo-img w-6 h-6" />
         <span className="font-bold text-white text-sm tracking-wide hidden sm:block">CrystalBall</span>
       </Link>
 
       <div className="w-px h-5 bg-surface-border hidden sm:block" />
 
-      {/* Global symbol override input */}
-      <div className="flex items-center gap-1.5">
-        <input
-          value={symbolInput}
-          onChange={(e) => handleSymbolChange(e.target.value)}
-          placeholder="SPY, QQQ…"
-          title="Global symbol override — comma-separated. Widgets use position order."
-          className="bg-surface-overlay border border-surface-border rounded-md px-2.5 py-1 text-xs font-mono w-36 focus:outline-none focus:border-accent/60 text-white placeholder-neutral-700 transition"
-        />
-        {(tab?.globalSymbols?.length ?? 0) > 0 && (
-          <button
-            onClick={() => { setSymbolInput(""); setGlobalSymbols(activeTabId, []); }}
-            className="text-neutral-600 hover:text-white text-xs transition"
-            title="Clear global override"
-          >✕</button>
+      {/* Global symbol override chips + autocomplete */}
+      <div ref={overrideRef} className="relative min-w-[230px] max-w-[420px] w-[34vw]">
+        <div
+          className={`min-h-[28px] flex items-center gap-1 flex-wrap px-2 py-1 rounded-md border bg-surface-overlay transition ${
+            hasOverride
+              ? "border-accent/70 shadow-[0_0_0_1px_rgba(0,212,170,0.25)]"
+              : "border-surface-border"
+          }`}
+        >
+          {globalSymbols.map(sym => (
+            <span key={sym} className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-mono ${hasOverride ? "bg-accent/15 text-accent border border-accent/30" : "bg-surface-border text-neutral-300"}`}>
+              {sym}
+              <button onClick={() => removeSymbol(sym)} className="opacity-70 hover:opacity-100"><X size={10} /></button>
+            </span>
+          ))}
+          <input
+            value={draft}
+            onChange={(e) => { setDraft(e.target.value.toUpperCase()); setShowSuggestions(true); }}
+            onFocus={() => setShowSuggestions(true)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                if (suggestions.length) addSymbol(suggestions[0]);
+                else if (draft.trim()) addSymbol(draft);
+              }
+              if (e.key === "Backspace" && !draft && globalSymbols.length) {
+                removeSymbol(globalSymbols[globalSymbols.length - 1]);
+              }
+            }}
+            placeholder={globalSymbols.length ? "Add symbol…" : "SPY, QQQ…"}
+            className="flex-1 min-w-[90px] bg-transparent outline-none text-xs font-mono text-white placeholder-neutral-700"
+          />
+          {hasOverride && (
+            <button onClick={() => setGlobalSymbols(activeTabId, [])} className="text-neutral-500 hover:text-white text-xs" title="Clear all overrides">✕</button>
+          )}
+        </div>
+        {showSuggestions && suggestions.length > 0 && (
+          <div className="absolute z-50 mt-1 w-full bg-surface-raised border border-surface-border rounded-md shadow-xl max-h-56 overflow-y-auto">
+            {suggestions.map(s => (
+              <button key={s} onClick={() => addSymbol(s)} className="w-full text-left px-2.5 py-1.5 text-xs font-mono text-neutral-300 hover:text-white hover:bg-surface-overlay">
+                {s}
+              </button>
+            ))}
+          </div>
         )}
       </div>
 
       <div className="ml-auto flex items-center gap-2">
         <MarketStatus />
 
-        {/* Add Widget */}
         <div ref={addRef} className="relative">
           <button
             onClick={() => { setShowAddWidget((v) => !v); setShowStyle(false); }}
@@ -104,13 +164,8 @@ export function Topbar() {
               <div className="px-3 py-2 text-xs text-neutral-500 uppercase tracking-widest border-b border-surface-border">Add Widget</div>
               <div className="py-1 max-h-80 overflow-y-auto">
                 {WIDGET_LIST.map(({ id, label }) => (
-                  <button
-                    key={`${id}-add`}
-                    onClick={() => { addWidget(activeTabId, id); setShowAddWidget(false); }}
-                    className="w-full flex items-center justify-between px-3 py-2 text-sm text-neutral-300 hover:text-white hover:bg-surface-overlay transition"
-                  >
-                    <span>{label}</span>
-                    <Plus size={13} className="text-neutral-600" />
+                  <button key={`${id}-add`} onClick={() => { addWidget(activeTabId, id); setShowAddWidget(false); }} className="w-full flex items-center justify-between px-3 py-2 text-sm text-neutral-300 hover:text-white hover:bg-surface-overlay transition">
+                    <span>{label}</span><Plus size={13} className="text-neutral-600" />
                   </button>
                 ))}
               </div>
@@ -118,7 +173,6 @@ export function Topbar() {
           )}
         </div>
 
-        {/* Style */}
         <div ref={styleRef} className="relative">
           <button
             onClick={() => { setShowStyle((v) => !v); setShowAddWidget(false); }}
@@ -131,80 +185,33 @@ export function Topbar() {
             <div className="absolute right-0 top-full mt-1 w-56 bg-surface-raised border border-surface-border rounded-xl shadow-2xl z-50 overflow-hidden">
               <div className="px-3 py-2 text-xs text-neutral-500 uppercase tracking-widest border-b border-surface-border">Style</div>
               <div className="py-3 px-3 flex flex-col gap-4">
-
-                {/* Theme mode */}
                 <div className="flex flex-col gap-1.5">
                   <span className="text-xs text-neutral-500">Theme</span>
                   <div className="flex gap-1.5">
                     {THEME_MODES.map(({ id, label, Icon }) => (
-                      <button
-                        key={id}
-                        onClick={() => setTheme({ mode: id })}
-                        className={`flex-1 flex flex-col items-center gap-1 py-2.5 rounded-lg border text-xs transition ${
-                          theme.mode === id
-                            ? "border-accent/60 bg-accent/10 text-accent"
-                            : "border-surface-border text-neutral-500 hover:text-white hover:border-neutral-500"
-                        }`}
-                      >
-                        <Icon size={14} />
-                        <span>{label}</span>
+                      <button key={id} onClick={() => setTheme({ mode: id })} className={`flex-1 flex flex-col items-center gap-1 py-2.5 rounded-lg border text-xs transition ${theme.mode === id ? "border-accent/60 bg-accent/10 text-accent" : "border-surface-border text-neutral-500 hover:text-white hover:border-neutral-500"}`}>
+                        <Icon size={14} /><span>{label}</span>
                       </button>
                     ))}
                   </div>
                 </div>
 
-                {/* Bull color */}
                 <div className="flex items-center justify-between">
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-xs text-neutral-400">Bull / Calls</span>
-                    <span className="text-xs font-mono text-neutral-600">{theme.bull}</span>
-                  </div>
-                  <label className="relative cursor-pointer">
-                    <span
-                      className="block w-8 h-8 rounded-full border-2 border-surface-border shadow-inner cursor-pointer"
-                      style={{ background: theme.bull }}
-                    />
-                    <input
-                      type="color"
-                      value={theme.bull}
-                      onChange={e => setTheme({ bull: e.target.value })}
-                      className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-                    />
-                  </label>
+                  <div className="flex flex-col gap-0.5"><span className="text-xs text-neutral-400">Bull / Calls</span><span className="text-xs font-mono text-neutral-600">{theme.bull}</span></div>
+                  <label className="relative cursor-pointer"><span className="block w-8 h-8 rounded-full border-2 border-surface-border shadow-inner" style={{ background: theme.bull }} /><input type="color" value={theme.bull} onChange={e => setTheme({ bull: e.target.value })} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" /></label>
                 </div>
 
-                {/* Bear color */}
                 <div className="flex items-center justify-between">
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-xs text-neutral-400">Bear / Puts</span>
-                    <span className="text-xs font-mono text-neutral-600">{theme.bear}</span>
-                  </div>
-                  <label className="relative cursor-pointer">
-                    <span
-                      className="block w-8 h-8 rounded-full border-2 border-surface-border shadow-inner cursor-pointer"
-                      style={{ background: theme.bear }}
-                    />
-                    <input
-                      type="color"
-                      value={theme.bear}
-                      onChange={e => setTheme({ bear: e.target.value })}
-                      className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-                    />
-                  </label>
+                  <div className="flex flex-col gap-0.5"><span className="text-xs text-neutral-400">Bear / Puts</span><span className="text-xs font-mono text-neutral-600">{theme.bear}</span></div>
+                  <label className="relative cursor-pointer"><span className="block w-8 h-8 rounded-full border-2 border-surface-border shadow-inner" style={{ background: theme.bear }} /><input type="color" value={theme.bear} onChange={e => setTheme({ bear: e.target.value })} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" /></label>
                 </div>
 
-                <button
-                  onClick={() => setTheme(DEFAULT_THEME)}
-                  className="w-full py-1.5 text-xs text-neutral-500 hover:text-white border border-surface-border rounded-lg transition"
-                >
-                  Reset
-                </button>
+                <button onClick={() => setTheme(DEFAULT_THEME)} className="w-full py-1.5 text-xs text-neutral-500 hover:text-white border border-surface-border rounded-lg transition">Reset</button>
               </div>
             </div>
           )}
         </div>
 
-        {/* Settings */}
         <Link href="/settings" className="p-1.5 rounded-md hover:bg-surface-overlay text-neutral-500 hover:text-white transition" title="Settings">
           <Settings size={15} />
         </Link>
@@ -214,33 +221,26 @@ export function Topbar() {
 }
 
 type MarketSession = "premarket" | "open" | "postmarket" | "closed";
-
 function getMarketSession(): MarketSession {
   const et = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }));
   const day = et.getDay();
   const min = et.getHours() * 60 + et.getMinutes();
-  if (day < 1 || day > 5) return "closed";           // weekend
-  if (min >= 240  && min < 570)  return "premarket";  // 4:00–9:30 AM ET
-  if (min >= 570  && min < 960)  return "open";       // 9:30 AM–4:00 PM ET
-  if (min >= 960  && min < 1200) return "postmarket"; // 4:00–8:00 PM ET
+  if (day < 1 || day > 5) return "closed";
+  if (min >= 240 && min < 570) return "premarket";
+  if (min >= 570 && min < 960) return "open";
+  if (min >= 960 && min < 1200) return "postmarket";
   return "closed";
 }
 
 const SESSION_CONFIG: Record<MarketSession, { label: string; dot: string; ring: string; text: string }> = {
-  open:       { label: "Open",       dot: "bg-bull animate-pulse",   ring: "border-bull/30 bg-bull/10",           text: "text-bull"           },
-  premarket:  { label: "Pre-market", dot: "bg-blue-400 animate-pulse", ring: "border-blue-400/30 bg-blue-400/10", text: "text-blue-400"       },
-  postmarket: { label: "Post-market",dot: "bg-blue-400 animate-pulse", ring: "border-blue-400/30 bg-blue-400/10", text: "text-blue-400"       },
-  closed:     { label: "Closed",     dot: "bg-neutral-600",           ring: "border-surface-border",               text: "text-neutral-500"   },
+  open:       { label: "Open",       dot: "bg-bull animate-pulse", ring: "border-bull/30 bg-bull/10", text: "text-bull" },
+  premarket:  { label: "Pre-market", dot: "bg-blue-400 animate-pulse", ring: "border-blue-400/30 bg-blue-400/10", text: "text-blue-400" },
+  postmarket: { label: "Post-market",dot: "bg-blue-400 animate-pulse", ring: "border-blue-400/30 bg-blue-400/10", text: "text-blue-400" },
+  closed:     { label: "Closed",     dot: "bg-neutral-600", ring: "border-surface-border", text: "text-neutral-500" },
 };
 
 function MarketStatus() {
   const session = getMarketSession();
   const cfg = SESSION_CONFIG[session];
-
-  return (
-    <div className={`flex items-center gap-1.5 text-xs sm:px-2 sm:py-1 sm:rounded-full sm:border ${cfg.ring} ${cfg.text}`}>
-      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.dot}`} />
-      <span className="hidden sm:inline">{cfg.label}</span>
-    </div>
-  );
+  return <div className={`flex items-center gap-1.5 text-xs sm:px-2 sm:py-1 sm:rounded-full sm:border ${cfg.ring} ${cfg.text}`}><span className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.dot}`} /><span className="hidden sm:inline">{cfg.label}</span></div>;
 }

@@ -35,7 +35,7 @@ export function SymbolBar({ symbol, isGlobalOverride, onSymbolChange, extra }: S
           title={isGlobalOverride ? "Controlled by global override in the header" : "Enter symbol and press Enter"}
           className={`border rounded px-2 py-0.5 text-xs font-mono w-16 focus:outline-none text-white transition
             ${isGlobalOverride
-              ? "bg-transparent border-surface-border text-neutral-500 cursor-not-allowed"
+              ? "bg-surface-overlay border-accent/70 text-accent cursor-not-allowed shadow-[0_0_0_1px_rgba(0,212,170,0.25)]"
               : "bg-surface-overlay border-surface-border focus:border-accent/60"
             }`}
         />

@@ -64,8 +64,8 @@ function renderWidget({ instance, resolvedSymbol, isGlobalOverride, onConfigChan
     case "dex":          return <DEXWidget symbol={resolvedSymbol} isGlobalOverride={isGlobalOverride} onConfigChange={onConfigChange} />;
     case "newsfeed":     return <NewsFeedWidget globalSymbol={resolvedSymbol} />;
     case "bloomberg":    return <BloombergTVWidget />;
-    case "ai":           return <AIAssistantWidget symbol={config.symbol || "SPY"} />;
-    case "report":       return <MarketReportWidget symbol={config.symbol || "SPY"} />;
+    case "ai":           return <AIAssistantWidget symbol={resolvedSymbol} />;
+    case "report":       return <MarketReportWidget symbol={resolvedSymbol} />;
     default:             return <div className="p-4 text-xs text-neutral-600">Unknown: {type}</div>;
   }
 }

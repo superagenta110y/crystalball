@@ -201,11 +201,9 @@ export const useDashboardStore = create<DashboardState>()(
         const widget = tab.widgets.find((w) => w.id === widgetId);
         const globalSymbols = tab.globalSymbols ?? [];
 
-        if (globalSymbols.length > 0 && widget && SYMBOL_WIDGET_TYPES.includes(widget.type)) {
-          // Position among symbol-aware widgets (in layout order if possible)
-          const symbolWidgets = tab.widgets.filter((w) => SYMBOL_WIDGET_TYPES.includes(w.type));
-          const pos = symbolWidgets.findIndex((w) => w.id === widgetId);
-          // If 1 global symbol, use it for all; otherwise use positional
+        if (globalSymbols.length > 0 && widget) {
+          // Apply override across all widgets by position
+          const pos = tab.widgets.findIndex((w) => w.id === widgetId);
           const sym = globalSymbols.length === 1 ? globalSymbols[0] : (globalSymbols[pos] ?? globalSymbols[0]);
           if (sym) return sym.toUpperCase();
         }
