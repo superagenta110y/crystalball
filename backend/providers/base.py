@@ -95,6 +95,12 @@ class BaseProvider(ABC):
         """Return recent news articles. Providers may override; default returns []."""
         return []
 
+    async def get_option_expirations(self, symbol: str) -> list[str]:
+        """Return available option expiration dates (YYYY-MM-DD)."""
+        chain = await self.get_options_chain(symbol)
+        exps = sorted({str(c.get("expiration_date")) for c in chain if c.get("expiration_date")})
+        return exps
+
     # ── Account ───────────────────────────────────────────────────────────────
 
     @abstractmethod

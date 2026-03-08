@@ -1,7 +1,7 @@
 """Alpaca Markets provider (paper + live trading, market data)."""
 from __future__ import annotations
 from typing import Any
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 import httpx
 from .base import BaseProvider
 from config import get_settings
@@ -86,7 +86,6 @@ class AlpacaProvider(BaseProvider):
             ]
 
     async def get_options_chain(self, symbol: str, expiration_date: str | None = None, option_type: str | None = None) -> list[dict[str, Any]]:
-        from datetime import date, timedelta
         from services.bs import bs_greeks, iv_from_price
 
         today = date.today()
@@ -245,6 +244,38 @@ class AlpacaProvider(BaseProvider):
                 }
                 for item in items
             ]
+
+    async def get_option_expirations(self, symbol: str) -> list[str]:
+        params: dict[str, Any] = {
+            "underlying_symbols": symbol,
+            "expiration_date_gte": date.today().isoformat(),
+            "limit": 1000,
+        }
+        expirations: set[str] = set()
+        page_token: str | None = None
+
+        async with httpx.AsyncClient(timeout=20.0) as c:
+            for _ in range(10):
+                p = dict(params)
+                if page_token:
+                    p["page_token"] = page_token
+                r = await c.get(
+                    f"{self._trade_url}/v2/options/contracts",
+                    headers=self._headers,
+                    params=p,
+                )
+                if r.status_code != 200:
+                    break
+                body = r.json() if r.content else {}
+                for con in body.get("option_contracts", []):
+                    exp = con.get("expiration_date")
+                    if exp:
+                        expirations.add(str(exp))
+                page_token = body.get("next_page_token")
+                if not page_token:
+                    break
+
+        return sorted(expirations)
 
     async def get_account(self) -> dict[str, Any]:
         async with httpx.AsyncClient() as c:

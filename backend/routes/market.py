@@ -37,3 +37,12 @@ async def options_chain(
     provider: BaseProvider = Depends(get_provider),
 ):
     return await provider.get_options_chain(symbol.upper(), expiration_date=expiration_date, option_type=option_type)
+
+
+@router.get("/expirations/{symbol}")
+async def option_expirations(
+    symbol: str,
+    provider: BaseProvider = Depends(get_provider),
+):
+    expirations = await provider.get_option_expirations(symbol.upper())
+    return {"symbol": symbol.upper(), "expirations": expirations}

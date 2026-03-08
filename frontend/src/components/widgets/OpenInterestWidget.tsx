@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from "recharts";
 import { SymbolBar } from "./SymbolBar";
 import { useDashboardStore } from "@/lib/store/dashboardStore";
@@ -8,26 +8,63 @@ import { useDashboardStore } from "@/lib/store/dashboardStore";
 interface OpenInterestWidgetProps {
   symbol?: string;
   isGlobalOverride?: boolean;
+  config?: Record<string, string>;
   onConfigChange?: (patch: Record<string, string>) => void;
 }
 
-// Today's date as YYYY-MM-DD (default expiry = today, i.e. 0DTE)
-function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+function parseCsv(v?: string): string[] {
+  if (!v) return [];
+  return v.split(",").map(s => s.trim()).filter(Boolean);
 }
 
-export function OpenInterestWidget({ symbol = "SPY", isGlobalOverride, onConfigChange }: OpenInterestWidgetProps) {
+export function OpenInterestWidget({ symbol = "SPY", isGlobalOverride, config, onConfigChange }: OpenInterestWidgetProps) {
   const [rawData, setRawData] = useState<{ strike: number; callOI: number; putOI: number }[]>([]);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [expDate, setExpDate] = useState(todayStr());
+  const [expLoading, setExpLoading] = useState(true);
+  const [availableExpirations, setAvailableExpirations] = useState<string[]>([]);
+  const [selectedExpirations, setSelectedExpirations] = useState<string[]>(parseCsv(config?.expDates));
   const { bull, bear } = useDashboardStore(s => s.theme);
   const API = process.env.NEXT_PUBLIC_API_URL || "";
 
   useEffect(() => {
+    setSelectedExpirations(parseCsv(config?.expDates));
+  }, [config?.expDates]);
+
+  useEffect(() => {
+    setExpLoading(true);
+    fetch(`${API}/api/market/expirations/${symbol}`)
+      .then(r => r.json())
+      .then(d => {
+        const exps = Array.isArray(d?.expirations) ? d.expirations : [];
+        setAvailableExpirations(exps);
+
+        // If current selection is empty or stale, default to nearest expiration
+        setSelectedExpirations(prev => {
+          const valid = prev.filter(x => exps.includes(x));
+          if (valid.length > 0) return valid;
+          return exps.length ? [exps[0]] : [];
+        });
+
+        setExpLoading(false);
+      })
+      .catch(() => {
+        setAvailableExpirations([]);
+        setSelectedExpirations([]);
+        setExpLoading(false);
+      });
+  }, [symbol]);
+
+  useEffect(() => {
+    if (expLoading) return;
+
+    const params = new URLSearchParams();
+    if (selectedExpirations.length) {
+      params.set("expiration_dates", selectedExpirations.join(","));
+    }
+
     setLoading(true);
-    const url = `${API}/api/analytics/oi/${symbol}?expiration_date=${expDate}`;
-    fetch(url)
+    fetch(`${API}/api/analytics/oi/${symbol}?${params.toString()}`)
       .then(r => r.json())
       .then(d => {
         setRawData((d.data || []).map((x: any) => ({ strike: x.strike, callOI: x.oi_call, putOI: x.oi_put })));
@@ -35,7 +72,7 @@ export function OpenInterestWidget({ symbol = "SPY", isGlobalOverride, onConfigC
         setLoading(false);
       })
       .catch(() => { setError(true); setLoading(false); });
-  }, [symbol, expDate]);
+  }, [symbol, selectedExpirations, expLoading]);
 
   const atm = rawData.length
     ? rawData.reduce((best, d) => (d.callOI + d.putOI > best.callOI + best.putOI ? d : best), rawData[0])?.strike
@@ -44,39 +81,81 @@ export function OpenInterestWidget({ symbol = "SPY", isGlobalOverride, onConfigC
     ? rawData.filter(d => d.strike >= atm * 0.95 && d.strike <= atm * 1.05)
     : rawData.slice(0, 40);
 
+  const allSelected = availableExpirations.length > 0 && selectedExpirations.length === availableExpirations.length;
+
+  const expLabel = useMemo(() => {
+    if (!availableExpirations.length) return "No expirations";
+    if (allSelected) return "All";
+    if (selectedExpirations.length === 0) return "None";
+    if (selectedExpirations.length === 1) return selectedExpirations[0];
+    return `${selectedExpirations.length} selected`;
+  }, [availableExpirations.length, allSelected, selectedExpirations]);
+
+  const toggleExpiration = (exp: string, checked: boolean) => {
+    setSelectedExpirations(prev => {
+      const next = checked ? Array.from(new Set([...prev, exp])) : prev.filter(x => x !== exp);
+      onConfigChange?.({ expDates: next.join(",") });
+      return next;
+    });
+  };
+
+  const toggleAll = (checked: boolean) => {
+    const next = checked ? [...availableExpirations] : [];
+    setSelectedExpirations(next);
+    onConfigChange?.({ expDates: next.join(",") });
+  };
+
   return (
     <div className="h-full w-full flex flex-col">
-      {/* Symbol + expiry date controls */}
       <SymbolBar
         symbol={symbol}
         isGlobalOverride={isGlobalOverride}
         onSymbolChange={(s) => onConfigChange?.({ symbol: s })}
         extra={
-          <div className="flex items-center gap-1">
-            <span className="text-xs text-neutral-600">Exp</span>
-            <input
-              type="date"
-              value={expDate}
-              onChange={e => setExpDate(e.target.value)}
-              className="bg-surface-overlay border border-surface-border rounded px-1.5 py-0.5 text-xs font-mono text-white focus:outline-none focus:border-accent/60 transition"
-            />
-          </div>
+          <details className="relative">
+            <summary className="list-none cursor-pointer text-xs border border-surface-border bg-surface-overlay rounded px-2 py-1 text-neutral-200">
+              Exp: <span className="font-mono">{expLabel}</span>
+            </summary>
+            <div className="absolute right-0 mt-1 z-20 w-52 max-h-64 overflow-auto rounded border border-surface-border bg-surface p-2 shadow-xl">
+              <label className="flex items-center gap-2 text-xs py-1 border-b border-surface-border mb-1">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={(e) => toggleAll(e.target.checked)}
+                />
+                <span>All</span>
+              </label>
+              {availableExpirations.map((exp) => (
+                <label key={exp} className="flex items-center gap-2 text-xs py-1">
+                  <input
+                    type="checkbox"
+                    checked={selectedExpirations.includes(exp)}
+                    onChange={(e) => toggleExpiration(exp, e.target.checked)}
+                  />
+                  <span className="font-mono">{exp}</span>
+                </label>
+              ))}
+              {!availableExpirations.length && (
+                <div className="text-xs text-neutral-500 py-1">No expirations available</div>
+              )}
+            </div>
+          </details>
         }
       />
 
       <div className="flex-1 min-h-0 p-2">
-        {loading && (
+        {(loading || expLoading) && (
           <div className="flex items-center justify-center h-full text-xs text-neutral-600 animate-pulse">Loading…</div>
         )}
-        {error && !loading && (
+        {error && !loading && !expLoading && (
           <div className="flex items-center justify-center h-full text-xs text-neutral-600">Backend offline</div>
         )}
-        {!loading && !error && data.length === 0 && (
+        {!loading && !expLoading && !error && data.length === 0 && (
           <div className="flex items-center justify-center h-full text-xs text-neutral-600">
-            No OI data for {expDate}
+            No OI data for {allSelected ? "all expirations" : (selectedExpirations.join(", ") || "selection")}
           </div>
         )}
-        {!loading && !error && data.length > 0 && (
+        {!loading && !expLoading && !error && data.length > 0 && (
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data} margin={{ top: 4, right: 8, bottom: 4, left: -10 }}>
               <XAxis
