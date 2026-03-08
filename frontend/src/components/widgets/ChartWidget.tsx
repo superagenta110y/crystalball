@@ -25,6 +25,15 @@ const POLL_MS: Record<string, number> = {
 
 type Bar = { time: number; open: number; high: number; low: number; close: number; volume?: number };
 
+const toRgba = (hex: string, alpha: number) => {
+  const h = (hex || "").trim().replace("#", "");
+  if (h.length !== 6) return `rgba(255,255,255,${alpha})`;
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+};
+
 interface ChartWidgetProps {
   symbol?: string;
   timeframe?: string;
@@ -64,7 +73,23 @@ export function ChartWidget({
     seriesRef.current.applyOptions({
       upColor: bull, downColor: bear,
       wickUpColor: bull, wickDownColor: bear,
+      priceLineVisible: false,
+      lastValueVisible: false,
     });
+    if (volumeRef.current) {
+      volumeRef.current.applyOptions({
+        priceLineVisible: false,
+        lastValueVisible: false,
+      });
+      const bars = Array.from(cacheRef.current.values()).sort((a, b) => a.time - b.time);
+      volumeRef.current.setData(
+        bars.map(b => ({
+          time: b.time,
+          value: b.volume || 0,
+          color: b.close >= b.open ? toRgba(bull, 0.5) : toRgba(bear, 0.5),
+        }))
+      );
+    }
     chartRef.current.applyOptions({
       grid: { vertLines: { color: gridLine }, horzLines: { color: gridLine } },
       layout: { textColor: axisText },
@@ -99,10 +124,14 @@ export function ChartWidget({
       const series = chart.addCandlestickSeries({
         upColor: bull, downColor: bear,
         borderVisible: false, wickUpColor: bull, wickDownColor: bear,
+        priceLineVisible: false,
+        lastValueVisible: false,
       });
       const volumeSeries = chart.addHistogramSeries({
         priceFormat: { type: "volume" },
         priceScaleId: "",
+        priceLineVisible: false,
+        lastValueVisible: false,
       });
       volumeSeries.priceScale().applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
       chartRef.current = chart;
@@ -162,11 +191,13 @@ export function ChartWidget({
 
       cacheRef.current = new Map(bars.map(b => [b.time, b]));
       seriesRef.current.setData(bars);
+      const bull = getComputedStyle(document.documentElement).getPropertyValue("--bull").trim() || theme.bull;
+      const bear = getComputedStyle(document.documentElement).getPropertyValue("--bear").trim() || theme.bear;
       volumeRef.current?.setData(
         bars.map(b => ({
           time: b.time,
           value: b.volume || 0,
-          color: b.close >= b.open ? "rgba(0,212,170,0.5)" : "rgba(255,77,109,0.5)",
+          color: b.close >= b.open ? toRgba(bull, 0.5) : toRgba(bear, 0.5),
         }))
       );
       chartRef.current?.timeScale().fitContent();
@@ -175,7 +206,7 @@ export function ChartWidget({
     } catch {
       setStatus("error");
     }
-  }, []);
+  }, [theme.bull, theme.bear]);
 
   // Incremental update — fetches last 3 bars and upserts changes
   const pollUpdate = useCallback(async (sym: string, tf: Timeframe) => {
@@ -192,17 +223,19 @@ export function ChartWidget({
         if (!cached || cached.close !== bar.close || cached.high !== bar.high || cached.low !== bar.low) {
           cacheRef.current.set(bar.time, bar);
           seriesRef.current.update(bar);   // lightweight-charts upserts by time
+          const bull = getComputedStyle(document.documentElement).getPropertyValue("--bull").trim() || theme.bull;
+          const bear = getComputedStyle(document.documentElement).getPropertyValue("--bear").trim() || theme.bear;
           volumeRef.current?.update({
             time: bar.time,
             value: bar.volume || 0,
-            color: bar.close >= bar.open ? "rgba(0,212,170,0.5)" : "rgba(255,77,109,0.5)",
+            color: bar.close >= bar.open ? toRgba(bull, 0.5) : toRgba(bear, 0.5),
           });
         }
       }
       setLastPrice(bars[bars.length - 1].close);
       setIsLive(true);
     } catch { /* silent — don't flicker status on transient errors */ }
-  }, []);
+  }, [theme.bull, theme.bear]);
 
   // Main effect: full load then polling
   useEffect(() => {
@@ -262,10 +295,12 @@ export function ChartWidget({
             };
             cacheRef.current.set(lastTime, updated);
             seriesRef.current.update(updated);
+            const bull = getComputedStyle(document.documentElement).getPropertyValue("--bull").trim() || theme.bull;
+            const bear = getComputedStyle(document.documentElement).getPropertyValue("--bear").trim() || theme.bear;
             volumeRef.current?.update({
               time: updated.time,
               value: updated.volume || 0,
-              color: updated.close >= updated.open ? "rgba(0,212,170,0.5)" : "rgba(255,77,109,0.5)",
+              color: updated.close >= updated.open ? toRgba(bull, 0.5) : toRgba(bear, 0.5),
             });
           }
         } catch { /* ignore parse errors */ }
@@ -287,7 +322,7 @@ export function ChartWidget({
       wsRef.current?.close();
       wsRef.current = null;
     };
-  }, [symbol]);
+  }, [symbol, theme.bull, theme.bear]);
 
   const submitSymbol = (e: React.FormEvent) => {
     e.preventDefault();
