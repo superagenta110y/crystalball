@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { SlidersHorizontal, Settings2, CircleHelp, X } from "lucide-react";
+import { SlidersHorizontal, Settings2, CircleHelp, X, Check } from "lucide-react";
 import { useDashboardStore } from "@/lib/store/dashboardStore";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "";
@@ -41,10 +41,52 @@ function HelpTip({ text }: { text: string }) {
       <button type="button" className="text-neutral-500 hover:text-white">
         <CircleHelp size={12} />
       </button>
-      <span className="pointer-events-none absolute right-0 top-5 z-50 hidden w-48 rounded border border-surface-border bg-surface-overlay px-2 py-1 text-[10px] text-neutral-300 group-hover:block group-focus-within:block">
+      <span className="pointer-events-none absolute left-0 top-5 z-50 hidden w-48 rounded border border-surface-border bg-surface-overlay px-2 py-1 text-[10px] text-neutral-300 group-hover:block group-focus-within:block">
         {text}
       </span>
     </span>
+  );
+}
+
+function LabelWithHelp({ label, help }: { label: string; help: string }) {
+  return <span className="inline-flex items-center gap-1 text-left">{label} <HelpTip text={help} /></span>;
+}
+
+function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${checked ? "bg-accent" : "bg-surface-border"}`}
+      aria-pressed={checked}
+    >
+      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${checked ? "translate-x-4" : "translate-x-0.5"}`} />
+    </button>
+  );
+}
+
+const PRESET_COLORS = ["#60a5fa","#f59e0b","#22d3ee","#a78bfa","#e879f9","#ef4444","#10b981","#3b82f6","#f97316","#14b8a6","#84cc16","#f43f5e","#8b5cf6","#64748b","#ffffff"];
+
+function ColorPicker16({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const isCustom = !PRESET_COLORS.includes((value || "").toLowerCase()) && !PRESET_COLORS.includes(value);
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="grid grid-cols-8 gap-1">
+        {PRESET_COLORS.map((c) => (
+          <button
+            key={c}
+            type="button"
+            onClick={() => onChange(c)}
+            className={`w-4 h-4 rounded border ${value.toLowerCase() === c.toLowerCase() ? "border-white" : "border-surface-border"}`}
+            style={{ background: c }}
+            title={c}
+          />
+        ))}
+      </div>
+      <label className={`w-5 h-5 rounded border overflow-hidden inline-flex items-center justify-center ${isCustom ? "border-white" : "border-surface-border"}`} title="Custom color">
+        <input type="color" value={value} onChange={(e) => onChange(e.target.value)} className="w-6 h-6 p-0 border-0 bg-transparent cursor-pointer" />
+      </label>
+    </div>
   );
 }
 
@@ -531,7 +573,7 @@ export function ChartWidget({
         <details className="relative">
           <summary className="list-none cursor-pointer px-1.5 py-0.5 rounded text-xs text-neutral-500 hover:text-white border border-surface-border relative">
             <SlidersHorizontal size={13} />
-            {enabledCount > 0 && <span className="absolute -top-1 -right-1 text-[9px] leading-none px-1 py-0.5 rounded-full bg-accent/20 text-accent border border-accent/40">{enabledCount}</span>}
+            {enabledCount > 0 && <span className="absolute -top-1 -right-2 text-[9px] leading-none px-1 py-0.5 rounded-full bg-accent text-white border border-accent">{enabledCount}</span>}
           </summary>
           <div className="absolute z-20 mt-1 w-64 rounded border border-surface-border bg-surface p-2 shadow-xl text-xs space-y-1">
             {[
@@ -543,7 +585,7 @@ export function ChartWidget({
               { key: 'vp', label: 'Volume Profile', enabled: indVP, set: setIndVP },
             ].map((it:any) => (
               <div key={it.key} className="flex items-center justify-between gap-2 py-1">
-                <label className="flex items-center gap-2"><input type="checkbox" checked={it.enabled} onChange={e=>it.set(e.target.checked)} /><span>{it.label}</span></label>
+                <label className="flex items-center gap-2"><Toggle checked={it.enabled} onChange={it.set} /><span>{it.label}</span></label>
                 {it.enabled && <button onClick={() => setIndicatorModal(it.key)} className="p-0.5 rounded border border-surface-border hover:border-accent/50"><Settings2 size={12} /></button>}
               </div>
             ))}
@@ -569,51 +611,53 @@ export function ChartWidget({
               <button onClick={() => setIndicatorModal(null)}><X size={14} /></button>
             </div>
 
-            {indicatorModal === "sma" && (
-              <div className="space-y-2">
-                <label className="flex items-center justify-between gap-2">Period <HelpTip text="Bars used to compute the simple moving average." /><input type="number" value={smaPeriod} onChange={e=>setSmaPeriod(Number(e.target.value)||20)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
-                <label className="flex items-center justify-between gap-2">Line Color <HelpTip text="Display color for SMA line." /><input type="color" value={smaColor} onChange={e=>setSmaColor(e.target.value)} className="w-10 h-7 bg-transparent" /></label>
-                <label className="flex items-center justify-between gap-2">Line Thickness <HelpTip text="Pixel width of SMA line." /><input type="number" min={1} max={6} value={smaWidth} onChange={e=>setSmaWidth(Number(e.target.value)||1)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
-              </div>
-            )}
-            {indicatorModal === "ema" && (
-              <div className="space-y-2">
-                <label className="flex items-center justify-between gap-2">Period <HelpTip text="Bars used to compute exponential moving average." /><input type="number" value={emaPeriod} onChange={e=>setEmaPeriod(Number(e.target.value)||20)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
-                <label className="flex items-center justify-between gap-2">Line Color <HelpTip text="Display color for EMA line." /><input type="color" value={emaColor} onChange={e=>setEmaColor(e.target.value)} className="w-10 h-7 bg-transparent" /></label>
-                <label className="flex items-center justify-between gap-2">Line Thickness <HelpTip text="Pixel width of EMA line." /><input type="number" min={1} max={6} value={emaWidth} onChange={e=>setEmaWidth(Number(e.target.value)||1)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
-              </div>
-            )}
-            {indicatorModal === "bb" && (
-              <div className="space-y-2">
-                <label className="flex items-center justify-between">Period <HelpTip text="Window length for Bollinger calculations." /><input type="number" value={bbPeriod} onChange={e=>setBbPeriod(Number(e.target.value)||20)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
-                <label className="flex items-center justify-between">Std Dev <HelpTip text="Standard deviation multiplier for upper/lower bands." /><input type="number" step="0.1" value={bbStd} onChange={e=>setBbStd(Number(e.target.value)||2)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
-                <label className="flex items-center justify-between">Line Color <HelpTip text="Display color for BB lines." /><input type="color" value={bbColor} onChange={e=>setBbColor(e.target.value)} className="w-10 h-7 bg-transparent" /></label>
-                <label className="flex items-center justify-between">Line Thickness <HelpTip text="Pixel width for BB lines." /><input type="number" min={1} max={6} value={bbWidth} onChange={e=>setBbWidth(Number(e.target.value)||1)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
-              </div>
-            )}
-            {indicatorModal === "levels" && (
-              <div className="space-y-2">
-                <label className="flex items-center justify-between">Show Previous Close <HelpTip text="Adds yesterday close level." /><input type="checkbox" checked={showPrevClose} onChange={e=>setShowPrevClose(e.target.checked)} /></label>
-                <label className="flex items-center justify-between">Show Day High/Low <HelpTip text="Adds current session high and low." /><input type="checkbox" checked={showDayHighLow} onChange={e=>setShowDayHighLow(e.target.checked)} /></label>
-                <label className="flex items-center justify-between">Show Premarket H/L <HelpTip text="Adds premarket high and low (4:00–9:30 ET)." /><input type="checkbox" checked={showPremarketHighLow} onChange={e=>setShowPremarketHighLow(e.target.checked)} /></label>
-                <label className="flex items-center justify-between">Line Color <HelpTip text="Display color for all price levels." /><input type="color" value={levelColor} onChange={e=>setLevelColor(e.target.value)} className="w-10 h-7 bg-transparent" /></label>
-                <label className="flex items-center justify-between">Line Thickness <HelpTip text="Pixel width for level lines." /><input type="number" min={1} max={6} value={levelWidth} onChange={e=>setLevelWidth(Number(e.target.value)||1)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
-              </div>
-            )}
-            {indicatorModal === "vwap" && (
-              <div className="space-y-2">
-                <label className="flex items-center justify-between">Line Color <HelpTip text="Display color for VWAP line." /><input type="color" value={vwapColor} onChange={e=>setVwapColor(e.target.value)} className="w-10 h-7 bg-transparent" /></label>
-                <label className="flex items-center justify-between">Line Thickness <HelpTip text="Pixel width for VWAP line." /><input type="number" min={1} max={6} value={vwapWidth} onChange={e=>setVwapWidth(Number(e.target.value)||1)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
-              </div>
-            )}
-            {indicatorModal === "vp" && (
-              <div className="space-y-2">
-                <label className="flex items-center justify-between">Line Color <HelpTip text="Display color for POC line." /><input type="color" value={vpColor} onChange={e=>setVpColor(e.target.value)} className="w-10 h-7 bg-transparent" /></label>
-                <label className="flex items-center justify-between">Line Thickness <HelpTip text="Pixel width for POC line." /><input type="number" min={1} max={6} value={vpWidth} onChange={e=>setVpWidth(Number(e.target.value)||2)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
-              </div>
-            )}
+            <div className="pt-2">
+              {indicatorModal === "sma" && (
+                <div className="space-y-2">
+                  <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Period" help="Bars used to compute the simple moving average." /><input type="number" value={smaPeriod} onChange={e=>setSmaPeriod(Number(e.target.value)||20)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
+                  <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Line Color" help="Display color for SMA line." /><ColorPicker16 value={smaColor} onChange={setSmaColor} /></label>
+                  <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Line Thickness" help="Pixel width of SMA line." /><input type="number" min={1} max={6} value={smaWidth} onChange={e=>setSmaWidth(Number(e.target.value)||1)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
+                </div>
+              )}
+              {indicatorModal === "ema" && (
+                <div className="space-y-2">
+                  <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Period" help="Bars used to compute exponential moving average." /><input type="number" value={emaPeriod} onChange={e=>setEmaPeriod(Number(e.target.value)||20)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
+                  <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Line Color" help="Display color for EMA line." /><ColorPicker16 value={emaColor} onChange={setEmaColor} /></label>
+                  <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Line Thickness" help="Pixel width of EMA line." /><input type="number" min={1} max={6} value={emaWidth} onChange={e=>setEmaWidth(Number(e.target.value)||1)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
+                </div>
+              )}
+              {indicatorModal === "bb" && (
+                <div className="space-y-2">
+                  <label className="flex items-center justify-between"><LabelWithHelp label="Period" help="Window length for Bollinger calculations." /><input type="number" value={bbPeriod} onChange={e=>setBbPeriod(Number(e.target.value)||20)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
+                  <label className="flex items-center justify-between"><LabelWithHelp label="Std Dev" help="Standard deviation multiplier for upper/lower bands." /><input type="number" step="0.1" value={bbStd} onChange={e=>setBbStd(Number(e.target.value)||2)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
+                  <label className="flex items-center justify-between"><LabelWithHelp label="Line Color" help="Display color for BB lines." /><ColorPicker16 value={bbColor} onChange={setBbColor} /></label>
+                  <label className="flex items-center justify-between"><LabelWithHelp label="Line Thickness" help="Pixel width for BB lines." /><input type="number" min={1} max={6} value={bbWidth} onChange={e=>setBbWidth(Number(e.target.value)||1)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
+                </div>
+              )}
+              {indicatorModal === "levels" && (
+                <div className="space-y-2">
+                  <label className="flex items-center justify-between"><LabelWithHelp label="Show Previous Close" help="Adds yesterday close level." /><Toggle checked={showPrevClose} onChange={setShowPrevClose} /></label>
+                  <label className="flex items-center justify-between"><LabelWithHelp label="Show Day High/Low" help="Adds current session high and low." /><Toggle checked={showDayHighLow} onChange={setShowDayHighLow} /></label>
+                  <label className="flex items-center justify-between"><LabelWithHelp label="Show Premarket H/L" help="Adds premarket high and low (4:00–9:30 ET)." /><Toggle checked={showPremarketHighLow} onChange={setShowPremarketHighLow} /></label>
+                  <label className="flex items-center justify-between"><LabelWithHelp label="Line Color" help="Display color for all price levels." /><ColorPicker16 value={levelColor} onChange={setLevelColor} /></label>
+                  <label className="flex items-center justify-between"><LabelWithHelp label="Line Thickness" help="Pixel width for level lines." /><input type="number" min={1} max={6} value={levelWidth} onChange={e=>setLevelWidth(Number(e.target.value)||1)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
+                </div>
+              )}
+              {indicatorModal === "vwap" && (
+                <div className="space-y-2">
+                  <label className="flex items-center justify-between"><LabelWithHelp label="Line Color" help="Display color for VWAP line." /><ColorPicker16 value={vwapColor} onChange={setVwapColor} /></label>
+                  <label className="flex items-center justify-between"><LabelWithHelp label="Line Thickness" help="Pixel width for VWAP line." /><input type="number" min={1} max={6} value={vwapWidth} onChange={e=>setVwapWidth(Number(e.target.value)||1)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
+                </div>
+              )}
+              {indicatorModal === "vp" && (
+                <div className="space-y-2">
+                  <label className="flex items-center justify-between"><LabelWithHelp label="Line Color" help="Display color for POC line." /><ColorPicker16 value={vpColor} onChange={setVpColor} /></label>
+                  <label className="flex items-center justify-between"><LabelWithHelp label="Line Thickness" help="Pixel width for POC line." /><input type="number" min={1} max={6} value={vpWidth} onChange={e=>setVpWidth(Number(e.target.value)||2)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
+                </div>
+              )}
+            </div>
 
-            <div className="flex justify-end"><button onClick={() => setIndicatorModal(null)} className="px-2 py-1 rounded border border-surface-border">Done</button></div>
+            <div className="flex justify-end"><button onClick={() => setIndicatorModal(null)} className="p-1.5 rounded border border-surface-border hover:border-accent/50 text-accent"><Check size={14} /></button></div>
           </div>
         </div>
       )}
