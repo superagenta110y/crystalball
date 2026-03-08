@@ -102,8 +102,8 @@ function makeMainTab(): DashboardTab {
     makeWidget("openinterest"),
     makeWidget("dex"),
     makeWidget("newsfeed"),
-    makeWidget("ai"),
     makeWidget("report"),
+    makeWidget("screener"),
   ];
   return { id: uuid(), name: "Main", layout: makeDefaultLayout(widgets), widgets, globalSymbols: [] };
 }

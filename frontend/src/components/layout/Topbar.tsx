@@ -16,7 +16,6 @@ const WIDGET_LIST: { id: WidgetType; label: string }[] = [
   { id: "dex",            label: "DEX" },
   { id: "newsfeed",       label: "News Feed" },
   { id: "bloomberg",      label: "Bloomberg TV" },
-  { id: "ai",             label: "AI Assistant" },
   { id: "report",         label: "Market Report" },
   { id: "screener",       label: "Screener" },
 ];

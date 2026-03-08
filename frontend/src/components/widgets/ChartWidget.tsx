@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { SlidersHorizontal, Settings2, CircleHelp, X } from "lucide-react";
 import { useDashboardStore } from "@/lib/store/dashboardStore";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "";
@@ -53,7 +54,7 @@ export function ChartWidget({
   const [status, setStatus] = useState<"loading"|"ok"|"error">("loading");
   const [lastPrice, setLastPrice] = useState<number|null>(null);
   const [isLive, setIsLive] = useState(false);
-  const [showIndicators, setShowIndicators] = useState(false);
+  const [indicatorModal, setIndicatorModal] = useState<null | "sma" | "ema" | "bb" | "levels" | "vp" | "vwap">(null);
   const [indSMA, setIndSMA] = useState(false);
   const [indEMA, setIndEMA] = useState(false);
   const [indVWAP, setIndVWAP] = useState(false);
@@ -427,8 +428,10 @@ export function ChartWidget({
     onConfigChange?.({ timeframe: tf });
   };
 
+  const enabledCount = useMemo(() => [indSMA, indEMA, indVWAP, indBB, indLevels, indVP].filter(Boolean).length, [indSMA, indEMA, indVWAP, indBB, indLevels, indVP]);
+
   return (
-    <div className="flex flex-col h-full w-full">
+    <div className="relative flex flex-col h-full w-full">
       {/* Toolbar */}
       <div className="flex items-center gap-2 px-2 py-1.5 border-b border-surface-border shrink-0 flex-wrap">
         {/* Symbol */}
@@ -460,17 +463,24 @@ export function ChartWidget({
         </div>
 
         <details className="relative">
-          <summary className="list-none cursor-pointer px-1.5 py-0.5 rounded text-xs text-neutral-500 hover:text-white border border-surface-border">Indicators</summary>
-          <div className="absolute z-20 mt-1 w-64 rounded border border-surface-border bg-surface p-2 shadow-xl text-xs space-y-2">
-            <label className="flex items-center justify-between"><span>SMA</span><input type="checkbox" checked={indSMA} onChange={e=>setIndSMA(e.target.checked)} /></label>
-            {indSMA && <input type="number" value={smaPeriod} onChange={e=>setSmaPeriod(Number(e.target.value)||20)} className="w-full bg-surface-overlay border border-surface-border rounded px-2 py-1" placeholder="SMA period" />}
-            <label className="flex items-center justify-between"><span>EMA</span><input type="checkbox" checked={indEMA} onChange={e=>setIndEMA(e.target.checked)} /></label>
-            {indEMA && <input type="number" value={emaPeriod} onChange={e=>setEmaPeriod(Number(e.target.value)||20)} className="w-full bg-surface-overlay border border-surface-border rounded px-2 py-1" placeholder="EMA period" />}
-            <label className="flex items-center justify-between"><span>VWAP</span><input type="checkbox" checked={indVWAP} onChange={e=>setIndVWAP(e.target.checked)} /></label>
-            <label className="flex items-center justify-between"><span>Bollinger Bands</span><input type="checkbox" checked={indBB} onChange={e=>setIndBB(e.target.checked)} /></label>
-            {indBB && <div className="grid grid-cols-2 gap-1"><input type="number" value={bbPeriod} onChange={e=>setBbPeriod(Number(e.target.value)||20)} className="bg-surface-overlay border border-surface-border rounded px-2 py-1" placeholder="Period" /><input type="number" step="0.1" value={bbStd} onChange={e=>setBbStd(Number(e.target.value)||2)} className="bg-surface-overlay border border-surface-border rounded px-2 py-1" placeholder="StdDev" /></div>}
-            <label className="flex items-center justify-between"><span>Price Levels (H/L, Prev Close)</span><input type="checkbox" checked={indLevels} onChange={e=>setIndLevels(e.target.checked)} /></label>
-            <label className="flex items-center justify-between"><span>Volume Profile (POC)</span><input type="checkbox" checked={indVP} onChange={e=>setIndVP(e.target.checked)} /></label>
+          <summary className="list-none cursor-pointer px-1.5 py-0.5 rounded text-xs text-neutral-500 hover:text-white border border-surface-border relative">
+            <SlidersHorizontal size={13} />
+            {enabledCount > 0 && <span className="absolute -top-1 -right-1 text-[9px] leading-none px-1 py-0.5 rounded-full bg-accent/20 text-accent border border-accent/40">{enabledCount}</span>}
+          </summary>
+          <div className="absolute z-20 mt-1 w-64 rounded border border-surface-border bg-surface p-2 shadow-xl text-xs space-y-1">
+            {[
+              { key: 'sma', label: 'SMA', enabled: indSMA, set: setIndSMA },
+              { key: 'ema', label: 'EMA', enabled: indEMA, set: setIndEMA },
+              { key: 'vwap', label: 'VWAP', enabled: indVWAP, set: setIndVWAP },
+              { key: 'bb', label: 'Bollinger Bands', enabled: indBB, set: setIndBB },
+              { key: 'levels', label: 'Price Levels', enabled: indLevels, set: setIndLevels },
+              { key: 'vp', label: 'Volume Profile', enabled: indVP, set: setIndVP },
+            ].map((it:any) => (
+              <div key={it.key} className="flex items-center justify-between gap-2 py-1">
+                <label className="flex items-center gap-2"><input type="checkbox" checked={it.enabled} onChange={e=>it.set(e.target.checked)} /><span>{it.label}</span></label>
+                {it.enabled && <button onClick={() => setIndicatorModal(it.key)} className="p-0.5 rounded border border-surface-border hover:border-accent/50"><Settings2 size={12} /></button>}
+              </div>
+            ))}
           </div>
         </details>
 
@@ -484,6 +494,35 @@ export function ChartWidget({
       </div>
 
       <div ref={containerRef} className="flex-1 w-full min-h-0" />
+
+      {indicatorModal && (
+        <div className="absolute inset-0 z-30 bg-black/50 flex items-center justify-center p-3">
+          <div className="w-full max-w-sm rounded-xl border border-surface-border bg-surface-raised p-3 text-xs space-y-3">
+            <div className="flex items-center justify-between text-sm text-white">
+              <span className="capitalize">{indicatorModal} settings</span>
+              <button onClick={() => setIndicatorModal(null)}><X size={14} /></button>
+            </div>
+
+            {indicatorModal === "sma" && (
+              <label className="flex items-center justify-between gap-2">Period <span className="text-neutral-500 inline-flex items-center gap-1"><CircleHelp size={12} />Bars used for SMA</span><input type="number" value={smaPeriod} onChange={e=>setSmaPeriod(Number(e.target.value)||20)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
+            )}
+            {indicatorModal === "ema" && (
+              <label className="flex items-center justify-between gap-2">Period <span className="text-neutral-500 inline-flex items-center gap-1"><CircleHelp size={12} />Bars used for EMA</span><input type="number" value={emaPeriod} onChange={e=>setEmaPeriod(Number(e.target.value)||20)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
+            )}
+            {indicatorModal === "bb" && (
+              <div className="space-y-2">
+                <label className="flex items-center justify-between">Period <span className="text-neutral-500 inline-flex items-center gap-1"><CircleHelp size={12} />Window length</span><input type="number" value={bbPeriod} onChange={e=>setBbPeriod(Number(e.target.value)||20)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
+                <label className="flex items-center justify-between">Std Dev <span className="text-neutral-500 inline-flex items-center gap-1"><CircleHelp size={12} />Band distance</span><input type="number" step="0.1" value={bbStd} onChange={e=>setBbStd(Number(e.target.value)||2)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
+              </div>
+            )}
+            {indicatorModal === "levels" && <div className="text-neutral-400 inline-flex items-center gap-1"><CircleHelp size={12} />Shows previous close and session high/low.</div>}
+            {indicatorModal === "vwap" && <div className="text-neutral-400 inline-flex items-center gap-1"><CircleHelp size={12} />Volume-weighted average price for loaded bars.</div>}
+            {indicatorModal === "vp" && <div className="text-neutral-400 inline-flex items-center gap-1"><CircleHelp size={12} />Volume profile v1 uses POC line.</div>}
+
+            <div className="flex justify-end"><button onClick={() => setIndicatorModal(null)} className="px-2 py-1 rounded border border-surface-border">Done</button></div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

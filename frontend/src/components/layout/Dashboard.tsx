@@ -8,6 +8,7 @@ import "react-resizable/css/styles.css";
 import { Topbar } from "./Topbar";
 import { WidgetWrapper } from "./WidgetWrapper";
 import { TabBar } from "./TabBar";
+import { AssistantFab } from "./AssistantFab";
 
 import { OrderFlowWidget }     from "@/components/widgets/OrderFlowWidget";
 import { OpenInterestWidget }  from "@/components/widgets/OpenInterestWidget";
@@ -17,7 +18,7 @@ import { DEXWidget }           from "@/components/widgets/DEXWidget";
 import { ChartWidget }         from "@/components/widgets/ChartWidget";
 import { NewsFeedWidget }      from "@/components/widgets/NewsFeedWidget";
 import { BloombergTVWidget }   from "@/components/widgets/BloombergTVWidget";
-import { AIAssistantWidget }   from "@/components/widgets/AIAssistantWidget";
+
 import { MarketReportWidget }  from "@/components/widgets/MarketReportWidget";
 import { ScreenerWidget }      from "@/components/widgets/ScreenerWidget";
 
@@ -67,7 +68,7 @@ function renderWidget({ instance, resolvedSymbol, isGlobalOverride, onConfigChan
     case "dex":          return <DEXWidget symbol={resolvedSymbol} isGlobalOverride={isGlobalOverride} config={config} onConfigChange={onConfigChange} />;
     case "newsfeed":     return <NewsFeedWidget globalSymbol={resolvedSymbol} />;
     case "bloomberg":    return <BloombergTVWidget />;
-    case "ai":           return <AIAssistantWidget symbol={resolvedSymbol} />;
+    case "ai":           return <div className="p-3 text-xs text-neutral-500">AI Assistant moved to the bottom-right assistant button.</div>;
     case "report":       return <MarketReportWidget symbol={resolvedSymbol} />;
     case "screener":     return <ScreenerWidget />;
     default:             return <div className="p-4 text-xs text-neutral-600">Unknown: {type}</div>;
@@ -76,7 +77,7 @@ function renderWidget({ instance, resolvedSymbol, isGlobalOverride, onConfigChan
 
 // Mobile widget type groups
 const MAIN_TYPES: WidgetType[] = ["chart"];
-const SUB_TYPES:  WidgetType[] = ["gex","dex","openinterest","openinterest3d","orderflow","newsfeed","bloomberg","ai","report","screener"];
+const SUB_TYPES:  WidgetType[] = ["gex","dex","openinterest","openinterest3d","orderflow","newsfeed","bloomberg","report","screener"];
 
 // ─── Mobile swipe layout ─────────────────────────────────────────────────────
 
@@ -266,6 +267,7 @@ export default function Dashboard() {
           )}
         </main>
       )}
+      <AssistantFab />
     </div>
   );
 }
