@@ -6,7 +6,7 @@ import type { Layout } from "react-grid-layout";
 
 export type WidgetType =
   | "chart" | "orderflow" | "openinterest" | "openinterest3d"
-  | "gex" | "dex" | "newsfeed" | "bloomberg" | "ai" | "report";
+  | "gex" | "dex" | "newsfeed" | "bloomberg" | "ai" | "report" | "screener";
 
 // Widget types that accept a per-widget symbol override (and global)
 export const SYMBOL_WIDGET_TYPES: WidgetType[] = [
@@ -24,6 +24,7 @@ export type ThemeMode = "dark" | "light" | "auto";
 
 export interface ThemeColors {
   mode: ThemeMode;
+  accent: string;
   bull: string;
   bear: string;
 }
@@ -62,6 +63,7 @@ export interface DashboardState {
 
 export const DEFAULT_THEME: ThemeColors = {
   mode: "dark",
+  accent: "#00d4aa",
   bull: "#00d4aa",
   bear: "#ff4d6d",
 };
@@ -221,6 +223,7 @@ export const useDashboardStore = create<DashboardState>()(
         const rawTheme = persisted.theme ?? {};
         const theme: ThemeColors = {
           mode: rawTheme.mode ?? "dark",
+          accent: rawTheme.accent ?? DEFAULT_THEME.accent,
           bull: rawTheme.bull ?? DEFAULT_THEME.bull,
           bear: rawTheme.bear ?? DEFAULT_THEME.bear,
         };

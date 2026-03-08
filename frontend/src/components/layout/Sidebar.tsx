@@ -3,7 +3,7 @@
 import React from "react";
 import {
   BarChart2, Activity, Layers, TrendingUp, TrendingDown,
-  CandlestickChart, Newspaper, Tv, Bot, FileText
+  CandlestickChart, Newspaper, Tv, Bot, FileText, ScanSearch
 } from "lucide-react";
 
 const WIDGETS = [
@@ -17,6 +17,7 @@ const WIDGETS = [
   { id: "bloomberg",    label: "Bloomberg TV",    icon: Tv,               desc: "Live stream embed" },
   { id: "ai",           label: "AI Assistant",    icon: Bot,              desc: "GPT-4 / Claude chat" },
   { id: "report",       label: "Market Report",   icon: FileText,         desc: "Daily SPY/QQQ bias" },
+  { id: "screener",     label: "Screener",        icon: ScanSearch,       desc: "Realtime filtered ticker table" },
 ];
 
 interface SidebarProps {

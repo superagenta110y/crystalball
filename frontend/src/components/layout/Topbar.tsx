@@ -18,6 +18,7 @@ const WIDGET_LIST: { id: WidgetType; label: string }[] = [
   { id: "bloomberg",      label: "Bloomberg TV" },
   { id: "ai",             label: "AI Assistant" },
   { id: "report",         label: "Market Report" },
+  { id: "screener",       label: "Screener" },
 ];
 
 const THEME_MODES: { id: ThemeMode; label: string; Icon: React.ElementType }[] = [
@@ -194,6 +195,11 @@ export function Topbar() {
                       </button>
                     ))}
                   </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-col gap-0.5"><span className="text-xs text-neutral-400">Accent</span><span className="text-xs font-mono text-neutral-600">{theme.accent}</span></div>
+                  <label className="relative cursor-pointer"><span className="block w-8 h-8 rounded-full border-2 border-surface-border shadow-inner" style={{ background: theme.accent }} /><input type="color" value={theme.accent} onChange={e => setTheme({ accent: e.target.value })} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" /></label>
                 </div>
 
                 <div className="flex items-center justify-between">

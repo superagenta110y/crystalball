@@ -5,7 +5,7 @@ export const metadata: Metadata = {
   title: "CrystalBall — Quant Trading Dashboard",
   description:
     "Free, open-source quantitative trading platform. Self-hosted. Bring your own data.",
-  icons: { icon: "/favicon.ico" },
+  icons: { icon: "/logo.svg" },
 };
 
 export default function RootLayout({

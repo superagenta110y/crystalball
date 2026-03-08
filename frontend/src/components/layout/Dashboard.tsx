@@ -19,6 +19,7 @@ import { NewsFeedWidget }      from "@/components/widgets/NewsFeedWidget";
 import { BloombergTVWidget }   from "@/components/widgets/BloombergTVWidget";
 import { AIAssistantWidget }   from "@/components/widgets/AIAssistantWidget";
 import { MarketReportWidget }  from "@/components/widgets/MarketReportWidget";
+import { ScreenerWidget }      from "@/components/widgets/ScreenerWidget";
 
 import { useDashboardStore, type WidgetInstance, type WidgetType } from "@/lib/store/dashboardStore";
 import useWindowSize from "@/lib/hooks/useWindowSize";
@@ -32,19 +33,21 @@ function hexToRgbTriple(hex: string): string {
   return `${r}, ${g}, ${b}`;
 }
 
-function applyTheme(mode: string, bull: string, bear: string) {
+function applyTheme(mode: string, accent: string, bull: string, bear: string) {
   const html = document.documentElement;
   const effective = mode === "auto"
     ? (window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark")
     : mode;
   html.setAttribute("data-theme", effective);
+  html.style.setProperty("--accent", accent);
+  html.style.setProperty("--accent-muted", `rgba(${hexToRgbTriple(accent)}, 0.2)`);
   // Dynamic bull/bear + RGB triples for opacity variants
   html.style.setProperty("--bull",      bull);
   html.style.setProperty("--bull-rgb",  hexToRgbTriple(bull));
   html.style.setProperty("--bear",      bear);
   html.style.setProperty("--bear-rgb",  hexToRgbTriple(bear));
-  // Grid line colour for charts (dark: near-black, light: light grey)
-  html.style.setProperty("--grid-line", effective === "light" ? "#e5e7eb" : "#1e1e1e");
+  // Remove chart grid lines in both themes
+  html.style.setProperty("--grid-line", "transparent");
   // Text colours for charts
   html.style.setProperty("--chart-text", effective === "light" ? "#6b7280" : "#8b8fa8");
 }
@@ -59,20 +62,21 @@ function renderWidget({ instance, resolvedSymbol, isGlobalOverride, onConfigChan
     case "chart":        return <ChartWidget symbol={resolvedSymbol} timeframe={config.timeframe} isGlobalOverride={isGlobalOverride} onConfigChange={onConfigChange} />;
     case "orderflow":    return <OrderFlowWidget symbol={resolvedSymbol} isGlobalOverride={isGlobalOverride} onConfigChange={onConfigChange} />;
     case "openinterest": return <OpenInterestWidget symbol={resolvedSymbol} isGlobalOverride={isGlobalOverride} config={config} onConfigChange={onConfigChange} />;
-    case "openinterest3d":return <OpenInterest3DWidget symbol={resolvedSymbol} />;
+    case "openinterest3d":return <OpenInterest3DWidget symbol={resolvedSymbol} isGlobalOverride={isGlobalOverride} config={config} onConfigChange={onConfigChange} />;
     case "gex":          return <GEXWidget symbol={resolvedSymbol} isGlobalOverride={isGlobalOverride} config={config} onConfigChange={onConfigChange} />;
     case "dex":          return <DEXWidget symbol={resolvedSymbol} isGlobalOverride={isGlobalOverride} config={config} onConfigChange={onConfigChange} />;
     case "newsfeed":     return <NewsFeedWidget globalSymbol={resolvedSymbol} />;
     case "bloomberg":    return <BloombergTVWidget />;
     case "ai":           return <AIAssistantWidget symbol={resolvedSymbol} />;
     case "report":       return <MarketReportWidget symbol={resolvedSymbol} />;
+    case "screener":     return <ScreenerWidget />;
     default:             return <div className="p-4 text-xs text-neutral-600">Unknown: {type}</div>;
   }
 }
 
 // Mobile widget type groups
 const MAIN_TYPES: WidgetType[] = ["chart"];
-const SUB_TYPES:  WidgetType[] = ["gex","dex","openinterest","openinterest3d","orderflow","newsfeed","bloomberg","ai","report"];
+const SUB_TYPES:  WidgetType[] = ["gex","dex","openinterest","openinterest3d","orderflow","newsfeed","bloomberg","ai","report","screener"];
 
 // ─── Mobile swipe layout ─────────────────────────────────────────────────────
 
@@ -152,14 +156,14 @@ export default function Dashboard() {
 
   // Apply theme to <html> element whenever it changes
   useEffect(() => {
-    applyTheme(theme.mode, theme.bull, theme.bear);
+    applyTheme(theme.mode, theme.accent, theme.bull, theme.bear);
     // Also listen for system preference changes when in auto mode
     if (theme.mode !== "auto") return;
     const mq = window.matchMedia("(prefers-color-scheme: light)");
-    const handler = () => applyTheme("auto", theme.bull, theme.bear);
+    const handler = () => applyTheme("auto", theme.accent, theme.bull, theme.bear);
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);
-  }, [theme.mode, theme.bull, theme.bear]);
+  }, [theme.mode, theme.accent, theme.bull, theme.bear]);
 
   const handleLayoutChange = useCallback(
     (newLayout: Layout[]) => updateLayout(activeTabId, newLayout),

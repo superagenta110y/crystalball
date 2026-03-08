@@ -14,6 +14,7 @@ const WIDGET_LABELS: Record<string, string> = {
   bloomberg:      "Bloomberg TV",
   ai:             "AI Assistant",
   report:         "Market Report",
+  screener:       "Screener",
 };
 
 interface WidgetWrapperProps {

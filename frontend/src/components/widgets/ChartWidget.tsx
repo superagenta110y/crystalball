@@ -53,12 +53,25 @@ export function ChartWidget({
   const [status, setStatus] = useState<"loading"|"ok"|"error">("loading");
   const [lastPrice, setLastPrice] = useState<number|null>(null);
   const [isLive, setIsLive] = useState(false);
+  const [showIndicators, setShowIndicators] = useState(false);
+  const [indSMA, setIndSMA] = useState(false);
+  const [indEMA, setIndEMA] = useState(false);
+  const [indVWAP, setIndVWAP] = useState(false);
+  const [indBB, setIndBB] = useState(false);
+  const [indLevels, setIndLevels] = useState(false);
+  const [indVP, setIndVP] = useState(false);
+  const [smaPeriod, setSmaPeriod] = useState(20);
+  const [emaPeriod, setEmaPeriod] = useState(20);
+  const [bbPeriod, setBbPeriod] = useState(20);
+  const [bbStd, setBbStd] = useState(2);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef      = useRef<any>(null);
   const seriesRef     = useRef<any>(null);
   const volumeRef     = useRef<any>(null);
   const cacheRef      = useRef<Map<number, Bar>>(new Map());
+  const indicatorSeriesRef = useRef<any[]>([]);
+  const levelLinesRef = useRef<any[]>([]);
   const pollRef      = useRef<ReturnType<typeof setInterval> | null>(null);
   const wsRef        = useRef<WebSocket | null>(null);
 
@@ -111,7 +124,7 @@ export function ChartWidget({
       if (!containerRef.current || chartRef.current) return;
       const chart = createChart(containerRef.current, {
         layout: { background: { color: "transparent" }, textColor: "#8b8fa8" },
-        grid:   { vertLines: { color: "#1a1a1a" }, horzLines: { color: "#1a1a1a" } },
+        grid:   { vertLines: { color: "transparent" }, horzLines: { color: "transparent" } },
         crosshair: { mode: CrosshairMode.Normal },
         rightPriceScale: { borderColor: "#2a2a2a" },
         timeScale: { borderColor: "#2a2a2a", timeVisible: true, secondsVisible: false },
@@ -155,6 +168,8 @@ export function ChartWidget({
       chartRef.current = null;
       seriesRef.current = null;
       volumeRef.current = null;
+      indicatorSeriesRef.current = [];
+      levelLinesRef.current = [];
     };
   }, []);
 
@@ -168,6 +183,78 @@ export function ChartWidget({
         volume: Number(b.volume || 0),
       }))
       .sort((a, b) => a.time - b.time);
+
+  const clearIndicators = useCallback(() => {
+    if (!chartRef.current) return;
+    indicatorSeriesRef.current.forEach((s: any) => { try { chartRef.current.removeSeries(s); } catch {} });
+    levelLinesRef.current.forEach((l: any) => { try { chartRef.current.removeSeries(l); } catch {} });
+    indicatorSeriesRef.current = [];
+    levelLinesRef.current = [];
+  }, []);
+
+  const computeSMA = (bars: Bar[], period: number) => bars.map((b, i) => {
+    if (i < period - 1) return null;
+    const seg = bars.slice(i - period + 1, i + 1);
+    const v = seg.reduce((s, x) => s + x.close, 0) / period;
+    return { time: b.time, value: v };
+  }).filter(Boolean) as any[];
+
+  const computeEMA = (bars: Bar[], period: number) => {
+    const k = 2 / (period + 1); let ema = 0; const out: any[] = [];
+    bars.forEach((b, i) => { ema = i === 0 ? b.close : (b.close * k + ema * (1 - k)); out.push({ time: b.time, value: ema }); });
+    return out;
+  };
+
+  const drawIndicators = useCallback((bars: Bar[]) => {
+    if (!chartRef.current) return;
+    clearIndicators();
+    const addLine = (data:any[], color:string, width=1, dashed=false) => {
+      const s = chartRef.current.addLineSeries({ color, lineWidth: width, lineStyle: dashed ? 2 : 0, priceLineVisible: false, lastValueVisible: false });
+      s.setData(data); indicatorSeriesRef.current.push(s);
+    };
+
+    if (indSMA) addLine(computeSMA(bars, Math.max(2, smaPeriod)), '#60a5fa');
+    if (indEMA) addLine(computeEMA(bars, Math.max(2, emaPeriod)), '#f59e0b');
+    if (indVWAP) {
+      let pv = 0, vv = 0;
+      const d = bars.map(b => { pv += ((b.high+b.low+b.close)/3)*(b.volume||0); vv += (b.volume||0); return { time:b.time, value: vv? pv/vv : b.close }; });
+      addLine(d, '#a78bfa');
+    }
+    if (indBB) {
+      const p = Math.max(2, bbPeriod); const s = Math.max(0.5, bbStd);
+      const mid = computeSMA(bars, p);
+      const upper:any[] = []; const lower:any[] = [];
+      bars.forEach((b, i) => {
+        if (i < p - 1) return;
+        const seg = bars.slice(i - p + 1, i + 1);
+        const m = seg.reduce((x,y)=>x+y.close,0)/p;
+        const sd = Math.sqrt(seg.reduce((x,y)=>x+Math.pow(y.close-m,2),0)/p);
+        upper.push({ time:b.time, value:m + s*sd }); lower.push({ time:b.time, value:m - s*sd });
+      });
+      addLine(mid, '#22d3ee'); addLine(upper, '#22d3ee', 1, true); addLine(lower, '#22d3ee', 1, true);
+    }
+    if (indLevels && bars.length) {
+      const prevClose = bars[Math.max(0, bars.length - 2)]?.close ?? bars[bars.length - 1].close;
+      const dayHigh = Math.max(...bars.map(b=>b.high));
+      const dayLow = Math.min(...bars.map(b=>b.low));
+      [prevClose, dayHigh, dayLow].forEach((v, i) => {
+        const s = chartRef.current.addLineSeries({ color: i===0 ? '#94a3b8' : '#64748b', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false });
+        s.setData([{ time: bars[0].time, value: v }, { time: bars[bars.length - 1].time, value: v }]);
+        levelLinesRef.current.push(s);
+      });
+    }
+    if (indVP && bars.length) {
+      const poc = bars.reduce((best, b) => (b.volume||0) > (best.volume||0) ? b : best, bars[0]).close;
+      const s = chartRef.current.addLineSeries({ color: '#e879f9', lineWidth: 2, lineStyle: 2, priceLineVisible: false, lastValueVisible: false });
+      s.setData([{ time: bars[0].time, value: poc }, { time: bars[bars.length - 1].time, value: poc }]);
+      levelLinesRef.current.push(s);
+    }
+  }, [clearIndicators, indSMA, indEMA, indVWAP, indBB, indLevels, indVP, smaPeriod, emaPeriod, bbPeriod, bbStd]);
+
+  useEffect(() => {
+    const bars = Array.from(cacheRef.current.values()).sort((a,b)=>a.time-b.time);
+    if (bars.length) drawIndicators(bars);
+  }, [drawIndicators]);
 
   // Full load — clears & repopulates everything
   const loadFull = useCallback(async (sym: string, tf: Timeframe) => {
@@ -200,13 +287,14 @@ export function ChartWidget({
           color: b.close >= b.open ? toRgba(bull, 0.5) : toRgba(bear, 0.5),
         }))
       );
+      drawIndicators(bars);
       chartRef.current?.timeScale().fitContent();
       setLastPrice(bars[bars.length - 1].close);
       setStatus("ok");
     } catch {
       setStatus("error");
     }
-  }, [theme.bull, theme.bear]);
+  }, [theme.bull, theme.bear, drawIndicators]);
 
   // Incremental update — fetches last 3 bars and upserts changes
   const pollUpdate = useCallback(async (sym: string, tf: Timeframe) => {
@@ -232,10 +320,11 @@ export function ChartWidget({
           });
         }
       }
+      drawIndicators(Array.from(cacheRef.current.values()).sort((a,b)=>a.time-b.time));
       setLastPrice(bars[bars.length - 1].close);
       setIsLive(true);
     } catch { /* silent — don't flicker status on transient errors */ }
-  }, [theme.bull, theme.bear]);
+  }, [theme.bull, theme.bear, drawIndicators]);
 
   // Main effect: full load then polling
   useEffect(() => {
@@ -302,6 +391,7 @@ export function ChartWidget({
               value: updated.volume || 0,
               color: updated.close >= updated.open ? toRgba(bull, 0.5) : toRgba(bear, 0.5),
             });
+            drawIndicators(Array.from(cacheRef.current.values()).sort((a,b)=>a.time-b.time));
           }
         } catch { /* ignore parse errors */ }
       };
@@ -322,7 +412,7 @@ export function ChartWidget({
       wsRef.current?.close();
       wsRef.current = null;
     };
-  }, [symbol, theme.bull, theme.bear]);
+  }, [symbol, theme.bull, theme.bear, drawIndicators]);
 
   const submitSymbol = (e: React.FormEvent) => {
     e.preventDefault();
@@ -368,6 +458,21 @@ export function ChartWidget({
             </button>
           ))}
         </div>
+
+        <details className="relative">
+          <summary className="list-none cursor-pointer px-1.5 py-0.5 rounded text-xs text-neutral-500 hover:text-white border border-surface-border">Indicators</summary>
+          <div className="absolute z-20 mt-1 w-64 rounded border border-surface-border bg-surface p-2 shadow-xl text-xs space-y-2">
+            <label className="flex items-center justify-between"><span>SMA</span><input type="checkbox" checked={indSMA} onChange={e=>setIndSMA(e.target.checked)} /></label>
+            {indSMA && <input type="number" value={smaPeriod} onChange={e=>setSmaPeriod(Number(e.target.value)||20)} className="w-full bg-surface-overlay border border-surface-border rounded px-2 py-1" placeholder="SMA period" />}
+            <label className="flex items-center justify-between"><span>EMA</span><input type="checkbox" checked={indEMA} onChange={e=>setIndEMA(e.target.checked)} /></label>
+            {indEMA && <input type="number" value={emaPeriod} onChange={e=>setEmaPeriod(Number(e.target.value)||20)} className="w-full bg-surface-overlay border border-surface-border rounded px-2 py-1" placeholder="EMA period" />}
+            <label className="flex items-center justify-between"><span>VWAP</span><input type="checkbox" checked={indVWAP} onChange={e=>setIndVWAP(e.target.checked)} /></label>
+            <label className="flex items-center justify-between"><span>Bollinger Bands</span><input type="checkbox" checked={indBB} onChange={e=>setIndBB(e.target.checked)} /></label>
+            {indBB && <div className="grid grid-cols-2 gap-1"><input type="number" value={bbPeriod} onChange={e=>setBbPeriod(Number(e.target.value)||20)} className="bg-surface-overlay border border-surface-border rounded px-2 py-1" placeholder="Period" /><input type="number" step="0.1" value={bbStd} onChange={e=>setBbStd(Number(e.target.value)||2)} className="bg-surface-overlay border border-surface-border rounded px-2 py-1" placeholder="StdDev" /></div>}
+            <label className="flex items-center justify-between"><span>Price Levels (H/L, Prev Close)</span><input type="checkbox" checked={indLevels} onChange={e=>setIndLevels(e.target.checked)} /></label>
+            <label className="flex items-center justify-between"><span>Volume Profile (POC)</span><input type="checkbox" checked={indVP} onChange={e=>setIndVP(e.target.checked)} /></label>
+          </div>
+        </details>
 
         {/* Status */}
         <div className="ml-auto flex items-center gap-2">
