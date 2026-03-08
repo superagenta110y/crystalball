@@ -68,24 +68,58 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 const PRESET_COLORS = ["#60a5fa","#f59e0b","#22d3ee","#a78bfa","#e879f9","#ef4444","#10b981","#3b82f6","#f97316","#14b8a6","#84cc16","#f43f5e","#8b5cf6","#64748b","#ffffff"];
 
 function ColorPicker16({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const isCustom = !PRESET_COLORS.includes((value || "").toLowerCase()) && !PRESET_COLORS.includes(value);
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const customRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
   return (
-    <div className="flex items-center gap-1.5">
-      <div className="grid grid-cols-8 gap-1">
-        {PRESET_COLORS.map((c) => (
-          <button
-            key={c}
-            type="button"
-            onClick={() => onChange(c)}
-            className={`w-4 h-4 rounded border ${value.toLowerCase() === c.toLowerCase() ? "border-white" : "border-surface-border"}`}
-            style={{ background: c }}
-            title={c}
+    <div ref={wrapRef} className="relative inline-flex">
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="w-6 h-6 rounded-full border border-surface-border"
+        style={{ background: value }}
+        title="Pick color"
+      />
+
+      {open && (
+        <div className="absolute right-0 top-7 z-50 rounded border border-surface-border bg-surface-overlay p-2 shadow-xl">
+          <div className="grid grid-cols-4 gap-1.5">
+            {PRESET_COLORS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => { onChange(c); setOpen(false); }}
+                className={`w-5 h-5 rounded-full border ${value.toLowerCase() === c.toLowerCase() ? "border-white" : "border-surface-border"}`}
+                style={{ background: c }}
+                title={c}
+              />
+            ))}
+            <button
+              type="button"
+              onClick={() => customRef.current?.click()}
+              className="w-5 h-5 rounded-full border border-surface-border bg-gradient-to-br from-red-400 via-emerald-400 to-blue-500"
+              title="Custom color"
+            />
+          </div>
+          <input
+            ref={customRef}
+            type="color"
+            value={value}
+            onChange={(e) => { onChange(e.target.value); setOpen(false); }}
+            className="sr-only"
           />
-        ))}
-      </div>
-      <label className={`w-5 h-5 rounded border overflow-hidden inline-flex items-center justify-center ${isCustom ? "border-white" : "border-surface-border"}`} title="Custom color">
-        <input type="color" value={value} onChange={(e) => onChange(e.target.value)} className="w-6 h-6 p-0 border-0 bg-transparent cursor-pointer" />
-      </label>
+        </div>
+      )}
     </div>
   );
 }
