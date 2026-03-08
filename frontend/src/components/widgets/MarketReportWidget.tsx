@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { FileText, RefreshCw } from "lucide-react";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API = process.env.NEXT_PUBLIC_API_URL || "";
 
 export function MarketReportWidget({ symbol = "SPY" }: { symbol?: string }) {
   const [report, setReport] = useState<string>("");

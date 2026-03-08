@@ -19,7 +19,7 @@ export function GEXWidget({ symbol = "SPY", isGlobalOverride, onConfigChange }: 
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
   const { bull, bear } = useDashboardStore(s => s.theme);
-  const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const API = process.env.NEXT_PUBLIC_API_URL || "";
 
   useEffect(() => {
     setLoading(true);

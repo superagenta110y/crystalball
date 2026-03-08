@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { useDashboardStore } from "@/lib/store/dashboardStore";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API = process.env.NEXT_PUBLIC_API_URL || "";
 
 type Timeframe = "1s"|"5s"|"1m"|"5m"|"15m"|"30m"|"1h"|"4h"|"1d"|"1w";
 const TIMEFRAMES: Timeframe[] = ["1s","5s","1m","5m","15m","30m","1h","4h","1d","1w"];

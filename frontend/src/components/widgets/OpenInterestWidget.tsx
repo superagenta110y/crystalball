@@ -22,7 +22,7 @@ export function OpenInterestWidget({ symbol = "SPY", isGlobalOverride, onConfigC
   const [loading, setLoading] = useState(true);
   const [expDate, setExpDate] = useState(todayStr());
   const { bull, bear } = useDashboardStore(s => s.theme);
-  const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const API = process.env.NEXT_PUBLIC_API_URL || "";
 
   useEffect(() => {
     setLoading(true);

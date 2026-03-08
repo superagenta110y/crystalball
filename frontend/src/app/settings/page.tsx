@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Save, Check, AlertCircle, Plus, Trash2, Zap, Settings, Database, Edit3, X } from "lucide-react";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API = process.env.NEXT_PUBLIC_API_URL || "";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
