@@ -128,6 +128,7 @@ export function ChartWidget({
   const levelLinesRef = useRef<any[]>([]);
   const historyLimitRef = useRef<number>(0);
   const loadingMoreRef = useRef<boolean>(false);
+  const gapRefetchingRef = useRef<boolean>(false);
   const pollRef      = useRef<ReturnType<typeof setInterval> | null>(null);
   const wsRef        = useRef<WebSocket | null>(null);
 
@@ -367,6 +368,23 @@ export function ChartWidget({
       drawIndicators(bars);
       if (fit) chartRef.current?.timeScale().fitContent();
       setLastPrice(bars[bars.length - 1].close);
+
+      // If loaded history is stale, automatically expand history window to bridge gaps.
+      const tfSecMap: Record<string, number> = {
+        "1s": 1, "5s": 5, "1m": 60, "5m": 300, "15m": 900, "30m": 1800,
+        "1h": 3600, "4h": 14400, "1d": 86400, "1w": 604800,
+      };
+      const tfSec = tfSecMap[tf] || 60;
+      const newest = bars[bars.length - 1]?.time || 0;
+      const nowSec = Math.floor(Date.now() / 1000);
+      if (!gapRefetchingRef.current && nowSec - newest > tfSec * 20 && limit < 1000) {
+        gapRefetchingRef.current = true;
+        const nextLimit = Math.min(1000, Math.max(limit + 200, 600));
+        await loadFull(sym, tf, nextLimit, fit);
+        gapRefetchingRef.current = false;
+        return;
+      }
+
       setStatus("ok");
     } catch {
       setStatus("error");
@@ -400,8 +418,23 @@ export function ChartWidget({
       drawIndicators(Array.from(cacheRef.current.values()).sort((a,b)=>a.time-b.time));
       setLastPrice(bars[bars.length - 1].close);
       setIsLive(true);
+
+      // If there's a large hole between cached last bar and newest fetched bar, reload fuller history.
+      const tfSecMap: Record<string, number> = {
+        "1s": 1, "5s": 5, "1m": 60, "5m": 300, "15m": 900, "30m": 1800,
+        "1h": 3600, "4h": 14400, "1d": 86400, "1w": 604800,
+      };
+      const tfSec = tfSecMap[tf] || 60;
+      const times = Array.from(cacheRef.current.keys()).sort((a, b) => a - b);
+      const newest = times[times.length - 1] || 0;
+      const oldestRecent = bars[0]?.time || newest;
+      if (!gapRefetchingRef.current && newest - oldestRecent > tfSec * 20) {
+        gapRefetchingRef.current = true;
+        const nextLimit = Math.min(1000, Math.max(historyLimitRef.current || 0, 400) + 200);
+        loadFull(sym, tf, nextLimit, false).finally(() => { gapRefetchingRef.current = false; });
+      }
     } catch { /* silent — don't flicker status on transient errors */ }
-  }, [theme.bull, theme.bear, drawIndicators]);
+  }, [theme.bull, theme.bear, drawIndicators, loadFull]);
 
   // Auto-backfill older candles when panning to the left edge
   useEffect(() => {
@@ -437,7 +470,8 @@ export function ChartWidget({
 
     loadFull(symbol, timeframe).then(() => {
       if (!alive) return;
-      // Kick off polling
+      // Kick off polling and do an immediate incremental pass
+      pollUpdate(symbol, timeframe);
       pollRef.current = setInterval(() => pollUpdate(symbol, timeframe), pollMs);
     });
 
@@ -477,27 +511,14 @@ export function ChartWidget({
             const lastTime = times[times.length - 1];
             const lastBar = cacheRef.current.get(lastTime)!;
 
-            const tfSecMap: Record<string, number> = {
-              "1s": 1, "5s": 5, "1m": 60, "5m": 300, "15m": 900, "30m": 1800,
-              "1h": 3600, "4h": 14400, "1d": 86400, "1w": 604800,
-            };
-            const tfSec = tfSecMap[timeframe] || 60;
-            const nowSec = Math.floor(Date.now() / 1000);
-            const bucketTime = Math.floor(nowSec / tfSec) * tfSec;
-
-            const targetTime = bucketTime > lastTime ? bucketTime : lastTime;
-            const base = targetTime > lastTime
-              ? { time: targetTime, open: lastBar.close, high: Math.max(lastBar.close, price), low: Math.min(lastBar.close, price), close: price, volume: 0 }
-              : lastBar;
-
             const updated: Bar = {
-              ...base,
+              ...lastBar,
               close: price,
-              high: Math.max(base.high, price),
-              low: Math.min(base.low, price),
+              high: Math.max(lastBar.high, price),
+              low: Math.min(lastBar.low, price),
             };
 
-            cacheRef.current.set(targetTime, updated);
+            cacheRef.current.set(lastTime, updated);
             seriesRef.current.update(updated);
             const bull = getComputedStyle(document.documentElement).getPropertyValue("--bull").trim() || theme.bull;
             const bear = getComputedStyle(document.documentElement).getPropertyValue("--bear").trim() || theme.bear;
