@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { BarChart, Bar, XAxis, YAxis, Legend, ResponsiveContainer, ReferenceLine, ReferenceDot, Tooltip } from "recharts";
 import { SymbolBar } from "./SymbolBar";
 import { useDashboardStore } from "@/lib/store/dashboardStore";
+import { OptionsLightHistogram } from "./OptionsLightHistogram";
 
 interface OpenInterestWidgetProps {
   symbol?: string;
@@ -27,7 +27,6 @@ export function OpenInterestWidget({ symbol = "SPY", isGlobalOverride, config, o
   const [selectedExpirations, setSelectedExpirations] = useState<string[]>(parseCsv(config?.expDates));
   const [strikeRange, setStrikeRange] = useState<string>(config?.strikeRange || "5");
   const [spot, setSpot] = useState<number>(0);
-  const [hover, setHover] = useState<{ x:number; y:number; strike:number; call:number; put:number; w:number; h:number } | null>(null);
   const { bull, bear } = useDashboardStore(s => s.theme);
   const API = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -181,71 +180,19 @@ export function OpenInterestWidget({ symbol = "SPY", isGlobalOverride, config, o
           </div>
         )}
         {!loading && !expLoading && !error && data.length > 0 && (
-          <>
-          {hover && (
-            <>
-              <div className="absolute left-2 top-2 z-20 text-xs font-mono">
-                <span className="text-neutral-500">Strike </span><span className="text-white">{hover.strike}</span>
-                <span className="mx-2 text-neutral-500">|</span>
-                <span className="text-bull">C {Math.round(hover.call).toLocaleString()}</span>
-                <span className="mx-1 text-neutral-500">/</span>
-                <span className="text-bear">P {Math.round(hover.put).toLocaleString()}</span>
-              </div>
-              <div className="absolute z-10 border-l border-dashed border-neutral-400/60" style={{ left: hover.x, top: 4, height: Math.max(0, hover.h - 24) }} />
-              <div className="absolute z-10 border-t border-dashed border-neutral-400/60" style={{ top: hover.y, left: 2, width: Math.max(0, hover.w - 56) }} />
-              <div className="absolute z-20 px-1.5 py-0.5 text-[10px] rounded-[2px] bg-black !text-white" style={{ left: Math.max(4, Math.min(hover.w - 60, hover.x - 22)), bottom: 0, color: '#fff' }}>{hover.strike}</div>
-              <div className="absolute z-20 px-1.5 py-0.5 text-[10px] rounded-[2px] bg-black !text-white" style={{ right: 0, top: Math.max(4, Math.min(hover.h - 28, hover.y - 9)), color: '#fff' }}>{Math.round(Math.max(hover.call, hover.put) / 1000)}k</div>
-            </>
-          )}
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={data}
-              margin={{ top: 4, right: 4, bottom: 2, left: 2 }}
-              onMouseMove={(s:any) => {
-                if (!s?.isTooltipActive || !s?.activePayload?.length) { setHover(null); return; }
-                const row = s.activePayload[0]?.payload;
-                if (!row) return;
-                setHover({
-                  x: s.chartX,
-                  y: s.chartY,
-                  strike: Number(row.strike),
-                  call: Number(row.callOI),
-                  put: Number(row.putOI),
-                  w: Number(s.width || 0),
-                  h: Number(s.height || 0),
-                });
-              }}
-              onMouseLeave={() => setHover(null)}
-            >
-              <XAxis
-                dataKey="strike"
-                height={18}
-                tick={{ fontSize: 9, fill: "#8b8fa8" }}
-                tickLine={false} axisLine={false}
-                interval="preserveStartEnd"
-              />
-              <YAxis
-                orientation="right"
-                width={52}
-                tick={{ fontSize: 9, fill: "#8b8fa8" }}
-                tickLine={false} axisLine={false}
-                tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`}
-              />
-              <Tooltip content={() => null} cursor={false} wrapperStyle={{ display: "none" }} isAnimationActive={false} />
-              <ReferenceLine x={center} stroke="#ffffff22" strokeDasharray="4 2" />
-              <ReferenceDot x={center} y={0} r={0} shape={(p:any) => (
-                <g transform={`translate(${p.cx - 7},${p.cy + 4})`}>
-                  <rect x="0" y="0" width="14" height="14" rx="3" fill="#111827cc" />
-                  <path d="M7 2l2 4h4l-3 2.5 1 4-4-2-4 2 1-4L1 6h4z" fill="#fff" />
-                </g>
-              )} />
-              <Bar dataKey="callOI" fill={bull} fillOpacity={0.7} radius={[2,2,0,0]} name="Calls" />
-              <Bar dataKey="putOI"  fill={bear} fillOpacity={0.7} radius={[2,2,0,0]} name="Puts" />
-              <Legend wrapperStyle={{ fontSize: 10, paddingTop: 4 }}
-                formatter={(v) => <span style={{ color: "#8b8fa8" }}>{v}</span>} />
-            </BarChart>
-          </ResponsiveContainer>
-          </>
+          <OptionsLightHistogram
+            rows={data.map(r => ({
+              strike: r.strike,
+              value: r.callOI - r.putOI,
+              color: (r.callOI + r.putOI) === 0 ? '#cbd5e1' : (r.callOI >= r.putOI ? bull : bear),
+              meta: r,
+            }))}
+            valueFormat={(v) => `${(v / 1000).toFixed(1)}k`}
+            statusRender={(r) => {
+              const m = r.meta || {};
+              return `Strike ${r.strike} | C ${Math.round(m.callOI || 0).toLocaleString()} / P ${Math.round(m.putOI || 0).toLocaleString()}`;
+            }}
+          />
         )}
       </div>
     </div>

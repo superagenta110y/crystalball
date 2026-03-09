@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer, Cell } from "recharts";
 import { SymbolBar } from "./SymbolBar";
 import { useDashboardStore } from "@/lib/store/dashboardStore";
+import { OptionsLightHistogram } from "./OptionsLightHistogram";
 
 interface DEXWidgetProps {
   symbol?: string;
@@ -13,18 +13,6 @@ interface DEXWidgetProps {
 }
 
 interface DEXBar { strike: number; dex: number }
-
-function CrosshairCursor(props: any) {
-  const { points, width, height } = props || {};
-  const p = points?.[0];
-  if (!p) return null;
-  return (
-    <g>
-      <line x1={p.x} y1={0} x2={p.x} y2={height} stroke="#9ca3af66" strokeDasharray="3 3" />
-      <line x1={0} y1={p.y} x2={width} y2={p.y} stroke="#9ca3af66" strokeDasharray="3 3" />
-    </g>
-  );
-}
 
 const parseCsv = (v?: string) => (v ? v.split(",").map(s => s.trim()).filter(Boolean) : []);
 
@@ -152,21 +140,11 @@ export function DEXWidget({ symbol = "SPY", isGlobalOverride, config, onConfigCh
         {(loading || expLoading) && <div className="flex items-center justify-center h-full text-xs text-neutral-600 animate-pulse">Loading…</div>}
         {error && !loading && !expLoading && <div className="flex items-center justify-center h-full text-xs text-neutral-600">Backend offline</div>}
         {!loading && !error && !expLoading && (
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={filtered} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
-              <XAxis dataKey="strike" tick={{ fontSize: 9, fill: "#8b8fa8" }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-              <YAxis tick={{ fontSize: 9, fill: "#8b8fa8" }} tickLine={false} axisLine={false} tickFormatter={(v: number) => `${(v / 1e6).toFixed(0)}M`} />
-              <ReferenceLine y={0} stroke="#2a2a2a" />
-              <Tooltip cursor={<CrosshairCursor />} content={({ payload, label }) => {
-                if (!payload?.length) return null;
-                const dex = Number(payload[0]?.value);
-                return <div className="bg-surface-overlay border border-surface-border rounded-lg px-3 py-2 text-xs"><div className="text-neutral-400 font-mono">Strike ${label}</div><div className={dex >= 0 ? "text-bull" : "text-bear"}>DEX: {dex >= 0 ? "+" : ""}{(dex / 1e6).toFixed(2)}M Δ</div></div>;
-              }} />
-              <Bar dataKey="dex" radius={[2, 2, 0, 0]}>
-                {filtered.map((entry, i) => <Cell key={i} fill={entry.dex >= 0 ? bull : bear} fillOpacity={0.75} />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+          <OptionsLightHistogram
+            rows={filtered.map(r => ({ strike: r.strike, value: r.dex, color: r.dex >= 0 ? bull : bear }))}
+            valueFormat={(v) => `${(v / 1e6).toFixed(2)}M`}
+            statusRender={(r) => `Strike ${r.strike} | ${r.value >= 0 ? '+' : ''}${(r.value / 1e6).toFixed(2)}M Δ`}
+          />
         )}
       </div>
     </div>
