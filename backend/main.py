@@ -44,8 +44,9 @@ app.include_router(providers_router.router, prefix="/api")
 app.include_router(news.router, prefix="/api")
 app.include_router(ai.router, prefix="/api")
 
-# WebSocket
+# WebSocket (support both direct /ws and proxied /api/ws)
 app.include_router(ws.router)
+app.include_router(ws.router, prefix="/api")
 
 
 @app.get("/api/status")

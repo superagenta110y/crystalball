@@ -450,13 +450,15 @@ export function ChartWidget({
   // WebSocket — live price overlay (updates lastPrice + last bar close in real time)
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const wsBase = API.replace(/^http/, "ws");
+    const wsBase = (API && API.trim())
+      ? API.replace(/^http/, "ws")
+      : window.location.origin.replace(/^http/, "ws");
     let ws: WebSocket;
     let closed = false;
 
     const connect = () => {
       if (closed) return;
-      ws = new WebSocket(`${wsBase}/ws/quotes/${symbol}`);
+      ws = new WebSocket(`${wsBase}/api/ws/quotes/${symbol}`);
       wsRef.current = ws;
 
       ws.onmessage = (ev) => {
