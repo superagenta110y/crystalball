@@ -713,7 +713,7 @@ export function ChartWidget({
         <details className="relative">
           <summary className="list-none cursor-pointer px-1 py-0.5 text-xs text-neutral-500 hover:text-white relative">
             <SlidersHorizontal size={13} />
-            {enabledCount > 0 && <span className="absolute -top-1 -right-2 text-[9px] leading-none px-1 py-0.5 rounded-full bg-accent text-white border border-accent">{enabledCount}</span>}
+            {enabledCount > 0 && <span className="absolute -top-1 -right-2 text-[9px] leading-none px-1 py-0.5 rounded-full bg-accent !text-white border border-accent">{enabledCount}</span>}
           </summary>
           <div className="absolute z-20 mt-1 w-64 rounded border border-surface-border bg-surface p-2 shadow-xl text-xs space-y-1">
             {[

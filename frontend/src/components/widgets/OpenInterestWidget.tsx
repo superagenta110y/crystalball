@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Legend, ResponsiveContainer, ReferenceLine, ReferenceDot } from "recharts";
 import { SymbolBar } from "./SymbolBar";
 import { useDashboardStore } from "@/lib/store/dashboardStore";
 
@@ -12,17 +12,6 @@ interface OpenInterestWidgetProps {
   onConfigChange?: (patch: Record<string, string>) => void;
 }
 
-function CrosshairCursor(props: any) {
-  const { points, width, height } = props || {};
-  const p = points?.[0];
-  if (!p) return null;
-  return (
-    <g>
-      <line x1={p.x} y1={0} x2={p.x} y2={height} stroke="#9ca3af66" strokeDasharray="3 3" />
-      <line x1={0} y1={p.y} x2={width} y2={p.y} stroke="#9ca3af66" strokeDasharray="3 3" />
-    </g>
-  );
-}
 
 function parseCsv(v?: string): string[] {
   if (!v) return [];
@@ -38,6 +27,7 @@ export function OpenInterestWidget({ symbol = "SPY", isGlobalOverride, config, o
   const [selectedExpirations, setSelectedExpirations] = useState<string[]>(parseCsv(config?.expDates));
   const [strikeRange, setStrikeRange] = useState<string>(config?.strikeRange || "5");
   const [spot, setSpot] = useState<number>(0);
+  const [hover, setHover] = useState<{ x:number; y:number; strike:number; call:number; put:number } | null>(null);
   const { bull, bear } = useDashboardStore(s => s.theme);
   const API = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -134,7 +124,7 @@ export function OpenInterestWidget({ symbol = "SPY", isGlobalOverride, config, o
           <>
             <details className="relative">
               <summary className="list-none cursor-pointer text-xs text-neutral-300 relative">
-                <span className="relative inline-flex items-center">📅{expBadge > 0 && <span className="absolute -top-2 -right-2 text-[9px] w-4 h-4 inline-flex items-center justify-center rounded-full bg-[#7c3aed] text-white">{expBadge}</span>}</span>
+                <span className="relative inline-flex items-center">📅{expBadge > 0 && <span className="absolute -top-2 -right-2 text-[9px] w-4 h-4 inline-flex items-center justify-center rounded-full bg-[#7c3aed] !text-white">{expBadge}</span>}</span>
               </summary>
               <div className="absolute left-0 mt-1 z-20 w-52 max-h-64 overflow-auto rounded border border-surface-border bg-surface p-2 shadow-xl text-neutral-200">
                 <label className="flex items-center gap-2 text-xs py-1 border-b border-surface-border mb-1">
@@ -178,7 +168,7 @@ export function OpenInterestWidget({ symbol = "SPY", isGlobalOverride, config, o
         }
       />
 
-      <div className="flex-1 min-h-0 p-2">
+      <div className="flex-1 min-h-0 p-2 relative">
         {(loading || expLoading) && (
           <div className="flex items-center justify-center h-full text-xs text-neutral-600 animate-pulse">Loading…</div>
         )}
@@ -191,8 +181,34 @@ export function OpenInterestWidget({ symbol = "SPY", isGlobalOverride, config, o
           </div>
         )}
         {!loading && !expLoading && !error && data.length > 0 && (
+          <>
+          {hover && (
+            <>
+              <div className="absolute left-2 top-2 z-20 text-xs font-mono">
+                <span className="text-neutral-500">Strike </span><span className="text-white">{hover.strike}</span>
+                <span className="mx-2 text-neutral-500">|</span>
+                <span className="text-bull">C {Math.round(hover.call).toLocaleString()}</span>
+                <span className="mx-1 text-neutral-500">/</span>
+                <span className="text-bear">P {Math.round(hover.put).toLocaleString()}</span>
+              </div>
+              <div className="absolute inset-y-2 z-10 border-l border-dashed border-neutral-400/60" style={{ left: hover.x }} />
+              <div className="absolute inset-x-2 z-10 border-t border-dashed border-neutral-400/60" style={{ top: hover.y }} />
+              <div className="absolute z-20 px-1.5 py-0.5 text-[10px] rounded bg-black text-white dark:bg-white dark:text-black" style={{ left: Math.max(8, hover.x - 18), bottom: 2 }}>{hover.strike}</div>
+              <div className="absolute z-20 px-1.5 py-0.5 text-[10px] rounded bg-black text-white dark:bg-white dark:text-black" style={{ right: 2, top: Math.max(10, hover.y - 10) }}>{Math.round(Math.max(hover.call, hover.put)/1000)}k</div>
+            </>
+          )}
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ top: 4, right: 8, bottom: 4, left: -10 }}>
+            <BarChart
+              data={data}
+              margin={{ top: 4, right: 8, bottom: 4, left: -10 }}
+              onMouseMove={(s:any) => {
+                if (!s?.isTooltipActive || !s?.activePayload?.length) { setHover(null); return; }
+                const row = s.activePayload[0]?.payload;
+                if (!row) return;
+                setHover({ x: s.chartX, y: s.chartY, strike: Number(row.strike), call: Number(row.callOI), put: Number(row.putOI) });
+              }}
+              onMouseLeave={() => setHover(null)}
+            >
               <XAxis
                 dataKey="strike"
                 tick={{ fontSize: 9, fill: "#8b8fa8" }}
@@ -204,24 +220,20 @@ export function OpenInterestWidget({ symbol = "SPY", isGlobalOverride, config, o
                 tickLine={false} axisLine={false}
                 tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`}
               />
-              <Tooltip cursor={<CrosshairCursor />} content={({ payload, label }) => {
-                if (!payload?.length) return null;
-                return (
-                  <div className="bg-surface-overlay border border-surface-border rounded-lg px-3 py-2 text-xs space-y-1">
-                    <div className="text-neutral-400 font-mono">Strike ${label}</div>
-                    <div className="text-bull">Calls: {Number(payload[0]?.value).toLocaleString()}</div>
-                    <div className="text-bear">Puts: {Number(payload[1]?.value).toLocaleString()}</div>
-                  </div>
-                );
-              }} />
-              <ReferenceLine x={center} stroke="#ffffff22" strokeDasharray="4 2"
-                label={{ value: "ATM", fill: "#555", fontSize: 9 }} />
+              <ReferenceLine x={center} stroke="#ffffff22" strokeDasharray="4 2" />
+              <ReferenceDot x={center} y={0} r={0} shape={(p:any) => (
+                <g transform={`translate(${p.cx - 7},${p.cy + 4})`}>
+                  <rect x="0" y="0" width="14" height="14" rx="3" fill="#111827cc" />
+                  <path d="M7 2l2 4h4l-3 2.5 1 4-4-2-4 2 1-4L1 6h4z" fill="#fff" />
+                </g>
+              )} />
               <Bar dataKey="callOI" fill={bull} fillOpacity={0.7} radius={[2,2,0,0]} name="Calls" />
               <Bar dataKey="putOI"  fill={bear} fillOpacity={0.7} radius={[2,2,0,0]} name="Puts" />
               <Legend wrapperStyle={{ fontSize: 10, paddingTop: 4 }}
                 formatter={(v) => <span style={{ color: "#8b8fa8" }}>{v}</span>} />
             </BarChart>
           </ResponsiveContainer>
+          </>
         )}
       </div>
     </div>

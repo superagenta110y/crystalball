@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, ReferenceLine, ReferenceDot, ResponsiveContainer, Cell } from "recharts";
 import { SymbolBar } from "./SymbolBar";
 import { useDashboardStore } from "@/lib/store/dashboardStore";
 
@@ -14,17 +14,6 @@ interface GEXWidgetProps {
 
 interface GEXBar { strike: number; gex: number }
 
-function CrosshairCursor(props: any) {
-  const { points, width, height } = props || {};
-  const p = points?.[0];
-  if (!p) return null;
-  return (
-    <g>
-      <line x1={p.x} y1={0} x2={p.x} y2={height} stroke="#9ca3af66" strokeDasharray="3 3" />
-      <line x1={0} y1={p.y} x2={width} y2={p.y} stroke="#9ca3af66" strokeDasharray="3 3" />
-    </g>
-  );
-}
 
 const parseCsv = (v?: string) => (v ? v.split(",").map(s => s.trim()).filter(Boolean) : []);
 
@@ -37,6 +26,7 @@ export function GEXWidget({ symbol = "SPY", isGlobalOverride, config, onConfigCh
   const [availableExpirations, setAvailableExpirations] = useState<string[]>([]);
   const [selectedExpirations, setSelectedExpirations] = useState<string[]>(parseCsv(config?.expDates));
   const [strikeRange, setStrikeRange] = useState<string>(config?.strikeRange || "5");
+  const [hover, setHover] = useState<{ x:number; y:number; strike:number; gex:number } | null>(null);
   const { bull, bear } = useDashboardStore(s => s.theme);
   const API = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -114,7 +104,7 @@ export function GEXWidget({ symbol = "SPY", isGlobalOverride, config, onConfigCh
           <>
             <details className="relative">
               <summary className="list-none cursor-pointer text-xs text-neutral-300 relative">
-                <span className="relative inline-flex items-center">📅{expBadge > 0 && <span className="absolute -top-2 -right-2 text-[9px] w-4 h-4 inline-flex items-center justify-center rounded-full bg-[#7c3aed] text-white">{expBadge}</span>}</span>
+                <span className="relative inline-flex items-center">📅{expBadge > 0 && <span className="absolute -top-2 -right-2 text-[9px] w-4 h-4 inline-flex items-center justify-center rounded-full bg-[#7c3aed] !text-white">{expBadge}</span>}</span>
               </summary>
               <div className="absolute left-0 mt-1 z-20 w-52 max-h-64 overflow-auto rounded border border-surface-border bg-surface p-2 shadow-xl text-neutral-200">
                 <label className="flex items-center gap-2 text-xs py-1 border-b border-surface-border mb-1">
@@ -150,26 +140,54 @@ export function GEXWidget({ symbol = "SPY", isGlobalOverride, config, onConfigCh
           </>
         }
       />
-      <div className="flex-1 min-h-0 p-2">
+      <div className="flex-1 min-h-0 p-2 relative">
         {(loading || expLoading) && <div className="flex items-center justify-center h-full text-xs text-neutral-600 animate-pulse">Loading…</div>}
         {error && !loading && !expLoading && <div className="flex items-center justify-center h-full text-xs text-neutral-600">Backend offline</div>}
         {!loading && !error && !expLoading && (
+          <>
+          {hover && (
+            <>
+              <div className="absolute left-2 top-2 z-20 text-xs font-mono">
+                <span className="text-neutral-500">Strike </span><span className="text-white">{hover.strike}</span>
+                <span className="mx-2 text-neutral-500">|</span>
+                <span className={hover.gex >= 0 ? "text-bull" : "text-bear"}>GEX {hover.gex >= 0 ? "+" : ""}{(hover.gex/1e9).toFixed(2)}B</span>
+              </div>
+              <div className="absolute inset-y-2 z-10 border-l border-dashed border-neutral-400/60" style={{ left: hover.x }} />
+              <div className="absolute inset-x-2 z-10 border-t border-dashed border-neutral-400/60" style={{ top: hover.y }} />
+              <div className="absolute z-20 px-1.5 py-0.5 text-[10px] rounded bg-black text-white dark:bg-white dark:text-black" style={{ left: Math.max(8, hover.x - 18), bottom: 2 }}>{hover.strike}</div>
+              <div className="absolute z-20 px-1.5 py-0.5 text-[10px] rounded bg-black text-white dark:bg-white dark:text-black" style={{ right: 2, top: Math.max(10, hover.y - 10) }}>{(hover.gex/1e9).toFixed(2)}B</div>
+            </>
+          )}
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={filtered} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
+            <BarChart
+              data={filtered}
+              margin={{ top: 4, right: 8, bottom: 4, left: 0 }}
+              onMouseMove={(s:any) => {
+                if (!s?.isTooltipActive || !s?.activePayload?.length) { setHover(null); return; }
+                const row = s.activePayload[0]?.payload;
+                if (!row) return;
+                setHover({ x: s.chartX, y: s.chartY, strike: Number(row.strike), gex: Number(row.gex) });
+              }}
+              onMouseLeave={() => setHover(null)}
+            >
               <XAxis dataKey="strike" tick={{ fontSize: 9, fill: "#8b8fa8" }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
               <YAxis tick={{ fontSize: 9, fill: "#8b8fa8" }} tickLine={false} axisLine={false} tickFormatter={(v: number) => `${(v / 1e9).toFixed(1)}B`} />
               <ReferenceLine y={0} stroke="#2a2a2a" />
-              {flipStrike && <ReferenceLine x={flipStrike} stroke="#ffffff33" strokeDasharray="4 2" label={{ value: "Flip", fill: "#666", fontSize: 9 }} />}
-              <Tooltip cursor={<CrosshairCursor />} content={({ payload, label }) => {
-                if (!payload?.length) return null;
-                const gex = Number(payload[0]?.value);
-                return <div className="bg-surface-overlay border border-surface-border rounded-lg px-3 py-2 text-xs"><div className="text-neutral-400 font-mono">Strike ${label}</div><div className={gex >= 0 ? "text-bull" : "text-bear"}>GEX: {gex >= 0 ? "+" : ""}{(gex / 1e9).toFixed(2)}B</div></div>;
-              }} />
+              {flipStrike && <ReferenceLine x={flipStrike} stroke="#ffffff33" strokeDasharray="4 2" />}
+              {flipStrike && (
+                <ReferenceDot x={flipStrike} y={0} r={0} shape={(p:any) => (
+                  <g transform={`translate(${p.cx - 7},${p.cy - 18})`}>
+                    <rect x="0" y="0" width="14" height="14" rx="3" fill="#111827cc" />
+                    <path d="M4 7h6M7 4l3 3-3 3" stroke="#fff" strokeWidth="1.5" fill="none" />
+                  </g>
+                )} />
+              )}
               <Bar dataKey="gex" radius={[2, 2, 0, 0]}>
                 {filtered.map((entry, i) => <Cell key={i} fill={entry.gex >= 0 ? bull : bear} fillOpacity={0.75} />)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
+          </>
         )}
       </div>
     </div>
