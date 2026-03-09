@@ -137,9 +137,9 @@ export function OpenInterest3DWidget({ symbol = "SPY", isGlobalOverride, config,
           <>
             <details className="relative">
               <summary className="list-none cursor-pointer text-xs text-neutral-300 relative">
-                <span className="relative inline-flex items-center">📅{expBadge > 0 && <span className="absolute -top-2 -right-2 text-[9px] rounded-full px-1 py-0.5 bg-accent text-white">{expBadge}</span>}</span>
+                <span className="relative inline-flex items-center">📅{expBadge > 0 && <span className="absolute -top-2 -right-2 text-[9px] w-4 h-4 inline-flex items-center justify-center rounded-full bg-[#7c3aed] text-white">{expBadge}</span>}</span>
               </summary>
-              <div className="absolute left-0 mt-1 z-20 w-52 max-h-64 overflow-auto rounded border border-surface-border bg-surface p-2 shadow-xl">
+              <div className="absolute left-0 mt-1 z-20 w-52 max-h-64 overflow-auto rounded border border-surface-border bg-surface p-2 shadow-xl text-neutral-200">
                 <label className="flex items-center gap-2 text-xs py-1 border-b border-surface-border mb-1"><input type="checkbox" checked={allSelected} onChange={(e) => toggleAll(e.target.checked)} /><span>All</span></label>
                 {availableExpirations.map((exp) => (
                   <label key={exp} className="flex items-center gap-2 text-xs py-1"><input type="checkbox" checked={selectedExpirations.includes(exp)} onChange={(e) => toggleExpiration(exp, e.target.checked)} /><span className="font-mono">{exp}</span></label>

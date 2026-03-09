@@ -12,6 +12,18 @@ interface OpenInterestWidgetProps {
   onConfigChange?: (patch: Record<string, string>) => void;
 }
 
+function CrosshairCursor(props: any) {
+  const { points, width, height } = props || {};
+  const p = points?.[0];
+  if (!p) return null;
+  return (
+    <g>
+      <line x1={p.x} y1={0} x2={p.x} y2={height} stroke="#9ca3af66" strokeDasharray="3 3" />
+      <line x1={0} y1={p.y} x2={width} y2={p.y} stroke="#9ca3af66" strokeDasharray="3 3" />
+    </g>
+  );
+}
+
 function parseCsv(v?: string): string[] {
   if (!v) return [];
   return v.split(",").map(s => s.trim()).filter(Boolean);
@@ -122,9 +134,9 @@ export function OpenInterestWidget({ symbol = "SPY", isGlobalOverride, config, o
           <>
             <details className="relative">
               <summary className="list-none cursor-pointer text-xs text-neutral-300 relative">
-                <span className="relative inline-flex items-center">📅{expBadge > 0 && <span className="absolute -top-2 -right-2 text-[9px] rounded-full px-1 py-0.5 bg-accent text-white">{expBadge}</span>}</span>
+                <span className="relative inline-flex items-center">📅{expBadge > 0 && <span className="absolute -top-2 -right-2 text-[9px] w-4 h-4 inline-flex items-center justify-center rounded-full bg-[#7c3aed] text-white">{expBadge}</span>}</span>
               </summary>
-              <div className="absolute right-0 mt-1 z-20 w-52 max-h-64 overflow-auto rounded border border-surface-border bg-surface p-2 shadow-xl">
+              <div className="absolute left-0 mt-1 z-20 w-52 max-h-64 overflow-auto rounded border border-surface-border bg-surface p-2 shadow-xl text-neutral-200">
                 <label className="flex items-center gap-2 text-xs py-1 border-b border-surface-border mb-1">
                   <input
                     type="checkbox"
@@ -192,7 +204,7 @@ export function OpenInterestWidget({ symbol = "SPY", isGlobalOverride, config, o
                 tickLine={false} axisLine={false}
                 tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`}
               />
-              <Tooltip content={({ payload, label }) => {
+              <Tooltip cursor={<CrosshairCursor />} content={({ payload, label }) => {
                 if (!payload?.length) return null;
                 return (
                   <div className="bg-surface-overlay border border-surface-border rounded-lg px-3 py-2 text-xs space-y-1">

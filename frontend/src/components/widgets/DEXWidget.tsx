@@ -14,6 +14,18 @@ interface DEXWidgetProps {
 
 interface DEXBar { strike: number; dex: number }
 
+function CrosshairCursor(props: any) {
+  const { points, width, height } = props || {};
+  const p = points?.[0];
+  if (!p) return null;
+  return (
+    <g>
+      <line x1={p.x} y1={0} x2={p.x} y2={height} stroke="#9ca3af66" strokeDasharray="3 3" />
+      <line x1={0} y1={p.y} x2={width} y2={p.y} stroke="#9ca3af66" strokeDasharray="3 3" />
+    </g>
+  );
+}
+
 const parseCsv = (v?: string) => (v ? v.split(",").map(s => s.trim()).filter(Boolean) : []);
 
 export function DEXWidget({ symbol = "SPY", isGlobalOverride, config, onConfigChange }: DEXWidgetProps) {
@@ -101,9 +113,9 @@ export function DEXWidget({ symbol = "SPY", isGlobalOverride, config, onConfigCh
           <>
             <details className="relative">
               <summary className="list-none cursor-pointer text-xs text-neutral-300 relative">
-                <span className="relative inline-flex items-center">📅{expBadge > 0 && <span className="absolute -top-2 -right-2 text-[9px] rounded-full px-1 py-0.5 bg-accent text-white">{expBadge}</span>}</span>
+                <span className="relative inline-flex items-center">📅{expBadge > 0 && <span className="absolute -top-2 -right-2 text-[9px] w-4 h-4 inline-flex items-center justify-center rounded-full bg-[#7c3aed] text-white">{expBadge}</span>}</span>
               </summary>
-              <div className="absolute right-0 mt-1 z-20 w-52 max-h-64 overflow-auto rounded border border-surface-border bg-surface p-2 shadow-xl">
+              <div className="absolute left-0 mt-1 z-20 w-52 max-h-64 overflow-auto rounded border border-surface-border bg-surface p-2 shadow-xl text-neutral-200">
                 <label className="flex items-center gap-2 text-xs py-1 border-b border-surface-border mb-1">
                   <input type="checkbox" checked={allSelected} onChange={(e) => toggleAll(e.target.checked)} />
                   <span>All</span>
@@ -145,7 +157,7 @@ export function DEXWidget({ symbol = "SPY", isGlobalOverride, config, onConfigCh
               <XAxis dataKey="strike" tick={{ fontSize: 9, fill: "#8b8fa8" }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
               <YAxis tick={{ fontSize: 9, fill: "#8b8fa8" }} tickLine={false} axisLine={false} tickFormatter={(v: number) => `${(v / 1e6).toFixed(0)}M`} />
               <ReferenceLine y={0} stroke="#2a2a2a" />
-              <Tooltip content={({ payload, label }) => {
+              <Tooltip cursor={<CrosshairCursor />} content={({ payload, label }) => {
                 if (!payload?.length) return null;
                 const dex = Number(payload[0]?.value);
                 return <div className="bg-surface-overlay border border-surface-border rounded-lg px-3 py-2 text-xs"><div className="text-neutral-400 font-mono">Strike ${label}</div><div className={dex >= 0 ? "text-bull" : "text-bear"}>DEX: {dex >= 0 ? "+" : ""}{(dex / 1e6).toFixed(2)}M Δ</div></div>;
