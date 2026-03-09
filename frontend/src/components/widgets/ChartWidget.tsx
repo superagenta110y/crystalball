@@ -564,18 +564,33 @@ export function ChartWidget({
           setLastPrice(price);
           setIsLive(true);
 
-          // Update the most recent bar's close (and high/low if needed)
+          // Update latest bar; if stale, start a new current-time bucket so chart stays current.
           if (seriesRef.current && cacheRef.current.size > 0) {
             const times = Array.from(cacheRef.current.keys()).sort((a, b) => a - b);
             const lastTime = times[times.length - 1];
             const lastBar = cacheRef.current.get(lastTime)!;
-            const updated: Bar = {
-              ...lastBar,
-              close: price,
-              high:  Math.max(lastBar.high, price),
-              low:   Math.min(lastBar.low,  price),
+
+            const tfSecMap: Record<string, number> = {
+              "1s": 1, "5s": 5, "1m": 60, "5m": 300, "15m": 900, "30m": 1800,
+              "1h": 3600, "4h": 14400, "1d": 86400, "1w": 604800,
             };
-            cacheRef.current.set(lastTime, updated);
+            const tfSec = tfSecMap[timeframe] || 60;
+            const nowSec = Math.floor(Date.now() / 1000);
+            const bucketTime = Math.floor(nowSec / tfSec) * tfSec;
+
+            const targetTime = bucketTime > lastTime ? bucketTime : lastTime;
+            const base = targetTime > lastTime
+              ? { time: targetTime, open: lastBar.close, high: Math.max(lastBar.close, price), low: Math.min(lastBar.close, price), close: price, volume: 0 }
+              : lastBar;
+
+            const updated: Bar = {
+              ...base,
+              close: price,
+              high: Math.max(base.high, price),
+              low: Math.min(base.low, price),
+            };
+
+            cacheRef.current.set(targetTime, updated);
             seriesRef.current.update(updated);
             const bull = getComputedStyle(document.documentElement).getPropertyValue("--bull").trim() || theme.bull;
             const bear = getComputedStyle(document.documentElement).getPropertyValue("--bear").trim() || theme.bear;
