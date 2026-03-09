@@ -92,14 +92,14 @@ function ColorPicker16({ value, onChange }: { value: string; onChange: (v: strin
       />
 
       {open && (
-        <div className="absolute right-0 top-7 z-50 rounded border border-surface-border bg-surface-overlay p-2 shadow-xl">
-          <div className="grid grid-cols-4 gap-1.5">
+        <div className="absolute right-0 top-8 z-50 rounded-lg border border-surface-border bg-surface-raised/95 backdrop-blur px-2.5 py-2.5 shadow-2xl">
+          <div className="grid grid-cols-4 gap-2 min-w-[96px]">
             {PRESET_COLORS.map((c) => (
               <button
                 key={c}
                 type="button"
                 onClick={() => { onChange(c); setOpen(false); }}
-                className={`w-5 h-5 rounded-full border ${value.toLowerCase() === c.toLowerCase() ? "border-white" : "border-surface-border"}`}
+                className={`w-5 h-5 rounded-full border-2 ${value.toLowerCase() === c.toLowerCase() ? "border-white ring-1 ring-white/40" : "border-surface-border"}`}
                 style={{ background: c }}
                 title={c}
               />
@@ -107,7 +107,7 @@ function ColorPicker16({ value, onChange }: { value: string; onChange: (v: strin
             <button
               type="button"
               onClick={() => customRef.current?.click()}
-              className="w-5 h-5 rounded-full border border-surface-border bg-gradient-to-br from-red-400 via-emerald-400 to-blue-500"
+              className="w-5 h-5 rounded-full border-2 border-surface-border bg-gradient-to-br from-red-400 via-emerald-400 to-blue-500"
               title="Custom color"
             />
           </div>
