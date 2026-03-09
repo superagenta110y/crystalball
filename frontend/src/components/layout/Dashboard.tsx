@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import GridLayout, { type Layout } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
@@ -24,6 +24,8 @@ import { ScreenerWidget }      from "@/components/widgets/ScreenerWidget";
 
 import { useDashboardStore, type WidgetInstance, type WidgetType } from "@/lib/store/dashboardStore";
 import useWindowSize from "@/lib/hooks/useWindowSize";
+
+const API = process.env.NEXT_PUBLIC_API_URL || "";
 
 // ─── Hex → "r, g, b" for CSS rgba() ──────────────────────────
 function hexToRgbTriple(hex: string): string {
@@ -147,7 +149,7 @@ function computeRowHeight(windowH: number, layout: Layout[]): number {
 // ─── Main dashboard ──────────────────────────────────────────────────────────
 
 export default function Dashboard() {
-  const { activeTabId, activeTab, updateLayout, removeWidget, updateWidgetConfig, resolveSymbol, theme } = useDashboardStore();
+  const { activeTabId, activeTab, updateLayout, removeWidget, updateWidgetConfig, resolveSymbol, theme, setTheme } = useDashboardStore();
   const { width, height } = useWindowSize();
   const tab      = activeTab();
   const layout   = tab?.layout ?? [];
@@ -165,6 +167,32 @@ export default function Dashboard() {
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);
   }, [theme.mode, theme.accent, theme.bull, theme.bear]);
+
+  // Load persisted UI theme from backend once
+  const themeHydratedRef = useRef(false);
+  useEffect(() => {
+    fetch(`${API}/api/settings/ui-theme`)
+      .then(r => r.json())
+      .then((t) => {
+        if (t && typeof t === "object") {
+          setTheme({ mode: t.mode, accent: t.accent, bull: t.bull, bear: t.bear });
+        }
+      })
+      .finally(() => { themeHydratedRef.current = true; });
+  }, [setTheme]);
+
+  // Persist theme to backend (debounced)
+  useEffect(() => {
+    if (!themeHydratedRef.current) return;
+    const t = setTimeout(() => {
+      fetch(`${API}/api/settings/ui-theme`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(theme),
+      }).catch(() => {});
+    }, 200);
+    return () => clearTimeout(t);
+  }, [theme]);
 
   const handleLayoutChange = useCallback(
     (newLayout: Layout[]) => updateLayout(activeTabId, newLayout),

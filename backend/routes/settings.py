@@ -1,7 +1,8 @@
 """Settings API — configure providers from the UI (legacy shim routes)."""
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from db import get_provider_config, set_provider_config, get_active_provider, set_active_provider
+import json
+from db import get_provider_config, set_provider_config, get_active_provider, set_active_provider, get_setting, set_setting
 from routes.deps import invalidate_provider_cache
 
 router = APIRouter(prefix="/settings", tags=["settings"])
@@ -21,6 +22,13 @@ class HoodwinkConfig(BaseModel):
 
 class ActiveProviderBody(BaseModel):
     provider: str  # "alpaca" | "hoodwink"
+
+
+class UIThemeBody(BaseModel):
+    mode: str = "dark"
+    accent: str = "#00d4aa"
+    bull: str = "#00d4aa"
+    bear: str = "#ff4d6d"
 
 
 @router.get("")
@@ -71,3 +79,21 @@ async def update_active_provider(body: ActiveProviderBody):
     await set_active_provider(body.provider)
     invalidate_provider_cache()
     return {"ok": True, "active_provider": body.provider}
+
+
+@router.get("/ui-theme")
+async def get_ui_theme():
+    raw = await get_setting("ui_theme")
+    if not raw:
+        return {"mode": "dark", "accent": "#00d4aa", "bull": "#00d4aa", "bear": "#ff4d6d"}
+    try:
+        return json.loads(raw)
+    except Exception:
+        return {"mode": "dark", "accent": "#00d4aa", "bull": "#00d4aa", "bear": "#ff4d6d"}
+
+
+@router.put("/ui-theme")
+async def put_ui_theme(body: UIThemeBody):
+    payload = {"mode": body.mode, "accent": body.accent, "bull": body.bull, "bear": body.bear}
+    await set_setting("ui_theme", json.dumps(payload))
+    return {"ok": True, "theme": payload}

@@ -26,6 +26,90 @@ const THEME_MODES: { id: ThemeMode; label: string; Icon: React.ElementType }[] =
   { id: "auto",  label: "Auto",  Icon: Monitor },
 ];
 
+const PRESET_COLORS = ["#60a5fa","#f59e0b","#22d3ee","#a78bfa","#e879f9","#ef4444","#10b981","#3b82f6","#f97316","#14b8a6","#84cc16","#f43f5e","#8b5cf6","#64748b","#ffffff"];
+
+function hslToHex(h: number, s = 100, l = 50) {
+  s /= 100; l /= 100;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+  const m = l - c / 2;
+  let r = 0, g = 0, b = 0;
+  if (h < 60) [r, g, b] = [c, x, 0];
+  else if (h < 120) [r, g, b] = [x, c, 0];
+  else if (h < 180) [r, g, b] = [0, c, x];
+  else if (h < 240) [r, g, b] = [0, x, c];
+  else if (h < 300) [r, g, b] = [x, 0, c];
+  else [r, g, b] = [c, 0, x];
+  const toHex = (v: number) => Math.round((v + m) * 255).toString(16).padStart(2, "0");
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+function ColorRingPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const ringRef = useRef<HTMLDivElement>(null);
+  const setFromMouse = (e: MouseEvent) => {
+    if (!ringRef.current) return;
+    const r = ringRef.current.getBoundingClientRect();
+    const cx = r.left + r.width / 2; const cy = r.top + r.height / 2;
+    const x = e.clientX - cx; const y = e.clientY - cy;
+    const ang = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+    onChange(hslToHex(ang));
+  };
+  return (
+    <div
+      ref={ringRef}
+      onMouseDown={(e) => {
+        setFromMouse(e.nativeEvent);
+        const mv = (ev: MouseEvent) => setFromMouse(ev);
+        const up = () => { window.removeEventListener("mousemove", mv); window.removeEventListener("mouseup", up); };
+        window.addEventListener("mousemove", mv);
+        window.addEventListener("mouseup", up);
+      }}
+      className="relative w-28 h-28 rounded-full cursor-crosshair"
+      style={{ background: "conic-gradient(red, yellow, lime, cyan, blue, magenta, red)" }}
+    >
+      <div className="absolute inset-[18px] rounded-full bg-surface-raised border border-surface-border flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full border border-surface-border" style={{ background: value }} />
+      </div>
+    </div>
+  );
+}
+
+function AppColorPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [customOpen, setCustomOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) { setOpen(false); setCustomOpen(false); }
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative inline-flex">
+      <button type="button" onClick={() => setOpen(v => !v)} className="block w-8 h-8 rounded-full border-2 border-surface-border shadow-inner" style={{ background: value }} />
+      {open && !customOpen && (
+        <div className="absolute right-0 top-9 z-50 rounded-lg border border-surface-border bg-surface-raised/95 backdrop-blur px-2.5 py-2.5 shadow-2xl">
+          <div className="grid grid-cols-4 gap-2 min-w-[96px]">
+            {PRESET_COLORS.map((c) => (
+              <button key={c} type="button" onClick={() => { onChange(c); setOpen(false); }} className={`w-5 h-5 rounded-full border-2 ${value.toLowerCase() === c.toLowerCase() ? "border-white ring-1 ring-white/40" : "border-surface-border"}`} style={{ background: c }} />
+            ))}
+            <button type="button" onClick={() => setCustomOpen(true)} className="w-5 h-5 rounded-full border-2 border-surface-border bg-gradient-to-br from-red-400 via-emerald-400 to-blue-500" title="Custom" />
+          </div>
+        </div>
+      )}
+      {open && customOpen && (
+        <div className="absolute right-0 top-9 z-50 rounded-lg border border-surface-border bg-surface-raised/95 backdrop-blur px-3 py-3 shadow-2xl">
+          <ColorRingPicker value={value} onChange={(v) => { onChange(v); setOpen(false); setCustomOpen(false); }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Topbar() {
   const { theme, setTheme, activeTabId, addWidget, activeTab, setGlobalSymbols } = useDashboardStore();
   const tab = activeTab();
@@ -198,17 +282,17 @@ export function Topbar() {
 
                 <div className="flex items-center justify-between">
                   <div className="flex flex-col gap-0.5"><span className="text-xs text-neutral-400">Accent</span><span className="text-xs font-mono text-neutral-600">{theme.accent}</span></div>
-                  <label className="relative cursor-pointer"><span className="block w-8 h-8 rounded-full border-2 border-surface-border shadow-inner" style={{ background: theme.accent }} /><input type="color" value={theme.accent} onChange={e => setTheme({ accent: e.target.value })} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" /></label>
+                  <AppColorPicker value={theme.accent} onChange={(v) => setTheme({ accent: v })} />
                 </div>
 
                 <div className="flex items-center justify-between">
                   <div className="flex flex-col gap-0.5"><span className="text-xs text-neutral-400">Bull / Calls</span><span className="text-xs font-mono text-neutral-600">{theme.bull}</span></div>
-                  <label className="relative cursor-pointer"><span className="block w-8 h-8 rounded-full border-2 border-surface-border shadow-inner" style={{ background: theme.bull }} /><input type="color" value={theme.bull} onChange={e => setTheme({ bull: e.target.value })} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" /></label>
+                  <AppColorPicker value={theme.bull} onChange={(v) => setTheme({ bull: v })} />
                 </div>
 
                 <div className="flex items-center justify-between">
                   <div className="flex flex-col gap-0.5"><span className="text-xs text-neutral-400">Bear / Puts</span><span className="text-xs font-mono text-neutral-600">{theme.bear}</span></div>
-                  <label className="relative cursor-pointer"><span className="block w-8 h-8 rounded-full border-2 border-surface-border shadow-inner" style={{ background: theme.bear }} /><input type="color" value={theme.bear} onChange={e => setTheme({ bear: e.target.value })} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" /></label>
+                  <AppColorPicker value={theme.bear} onChange={(v) => setTheme({ bear: v })} />
                 </div>
 
                 <button onClick={() => setTheme(DEFAULT_THEME)} className="w-full py-1.5 text-xs text-neutral-500 hover:text-white border border-surface-border rounded-lg transition">Reset</button>

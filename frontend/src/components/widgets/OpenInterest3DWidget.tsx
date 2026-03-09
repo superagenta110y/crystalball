@@ -125,25 +125,38 @@ export function OpenInterest3DWidget({ symbol = "SPY", isGlobalOverride, config,
         }
       />
 
-      <div className="flex-1 min-h-0 p-2 overflow-auto">
+      <div className="flex-1 min-h-0 p-2 overflow-hidden">
         {(loading || expLoading) && <div className="h-full flex items-center justify-center text-xs text-neutral-500 animate-pulse">Loading 3D OI…</div>}
         {error && !loading && <div className="h-full flex items-center justify-center text-xs text-neutral-500">Failed to load OI surface</div>}
         {!loading && !error && exps.length > 0 && strikes.length > 0 && (
-          <div className="min-w-[480px]">
-            <div className="text-xs text-neutral-500 mb-2">OI surface (Strike × Expiration). Higher bars = higher OI.</div>
-            <div className="grid gap-1" style={{ gridTemplateColumns: `80px repeat(${exps.length}, minmax(90px,1fr))` }}>
-              <div className="text-[10px] text-neutral-500">Strike</div>
-              {exps.map(exp => <div key={exp} className="text-[10px] text-neutral-500 font-mono truncate">{exp}</div>)}
-              {strikes.slice(-45).map((s) => (
+          <div className="h-full w-full">
+            <div className="text-[10px] text-neutral-500 mb-1">OI surface (Strike × Expiration)</div>
+            <div
+              className="grid h-[calc(100%-14px)] w-full gap-[2px]"
+              style={{
+                gridTemplateColumns: `52px repeat(${exps.length}, minmax(0, 1fr))`,
+                gridTemplateRows: `18px repeat(${strikes.length}, minmax(0, 1fr))`,
+              }}
+            >
+              <div className="text-[9px] text-neutral-500 flex items-center">Strike</div>
+              {exps.map(exp => (
+                <div key={exp} className="text-[9px] text-neutral-500 font-mono truncate flex items-center justify-center px-1">{exp}</div>
+              ))}
+
+              {strikes.map((s) => (
                 <React.Fragment key={s}>
-                  <div className="text-[10px] text-neutral-500 font-mono">{s}</div>
+                  <div className="text-[9px] text-neutral-500 font-mono flex items-center px-1 truncate">{s}</div>
                   {exps.map((exp) => {
                     const oi = matrix[exp]?.[String(s)] || 0;
-                    const h = Math.max(2, Math.round((oi / maxOI) * 34));
+                    const ratio = maxOI > 0 ? oi / maxOI : 0;
+                    const alpha = Math.max(0.06, Math.min(0.95, ratio));
                     return (
-                      <div key={`${exp}-${s}`} className="h-10 bg-surface-overlay border border-surface-border rounded flex items-end px-1 pb-1" title={`${exp} | ${s} | OI ${oi.toLocaleString()}`}>
-                        <div className="w-full rounded-sm bg-accent/70" style={{ height: `${h}px` }} />
-                      </div>
+                      <div
+                        key={`${exp}-${s}`}
+                        className="border border-surface-border/60 rounded-sm"
+                        style={{ backgroundColor: `rgba(var(--bull-rgb), ${alpha})` }}
+                        title={`${exp} | ${s} | OI ${oi.toLocaleString()}`}
+                      />
                     );
                   })}
                 </React.Fragment>
