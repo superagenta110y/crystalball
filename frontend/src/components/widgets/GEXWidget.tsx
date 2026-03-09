@@ -154,8 +154,8 @@ export function GEXWidget({ symbol = "SPY", isGlobalOverride, config, onConfigCh
               </div>
               <div className="absolute inset-y-2 z-10 border-l border-dashed border-neutral-400/60" style={{ left: hover.x }} />
               <div className="absolute inset-x-2 z-10 border-t border-dashed border-neutral-400/60" style={{ top: hover.y }} />
-              <div className="absolute z-20 px-1.5 py-0.5 text-[10px] rounded bg-black text-white dark:bg-white dark:text-black" style={{ left: Math.max(8, hover.x - 18), bottom: 2 }}>{hover.strike}</div>
-              <div className="absolute z-20 px-1.5 py-0.5 text-[10px] rounded bg-black text-white dark:bg-white dark:text-black" style={{ right: 2, top: Math.max(10, hover.y - 10) }}>{(hover.gex/1e9).toFixed(2)}B</div>
+              <div className="absolute z-20 px-1.5 py-0.5 text-[10px] rounded bg-black text-white" style={{ left: Math.max(6, hover.x - 20), bottom: 0 }}>{hover.strike}</div>
+              <div className="absolute z-20 px-1.5 py-0.5 text-[10px] rounded bg-black text-white" style={{ right: 0, top: Math.max(2, hover.y - 10) }}>{(hover.gex/1e9).toFixed(2)}B</div>
             </>
           )}
           <ResponsiveContainer width="100%" height="100%">
