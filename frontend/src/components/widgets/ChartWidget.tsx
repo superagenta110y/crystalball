@@ -129,6 +129,7 @@ export function ChartWidget({
   const historyLimitRef = useRef<number>(0);
   const loadingMoreRef = useRef<boolean>(false);
   const gapRefetchingRef = useRef<boolean>(false);
+  const pendingRangeRef = useRef<{ from: number; to: number; targetTf: Timeframe } | null>(null);
   const pollRef      = useRef<ReturnType<typeof setInterval> | null>(null);
   const wsRef        = useRef<WebSocket | null>(null);
 
@@ -366,7 +367,27 @@ export function ChartWidget({
         }))
       );
       drawIndicators(bars);
-      if (fit) chartRef.current?.timeScale().fitContent();
+
+      const pr = pendingRangeRef.current;
+      if (pr && pr.targetTf === tf && chartRef.current?.timeScale) {
+        let from = pr.from;
+        let to = pr.to;
+
+        if (tf === "1d" && sameUtcDay(pr.from, pr.to)) {
+          // Ensure at least current + previous 2 daily bars are visible.
+          from = to - 3 * 86400;
+        }
+        if (tf === "1w" && sameUtcWeek(pr.from, pr.to)) {
+          // Ensure at least current + previous 2 weekly bars are visible.
+          from = to - 3 * 7 * 86400;
+        }
+
+        chartRef.current.timeScale().setVisibleRange({ from, to });
+        pendingRangeRef.current = null;
+      } else if (fit) {
+        chartRef.current?.timeScale().fitContent();
+      }
+
       setLastPrice(bars[bars.length - 1].close);
 
       // If loaded history is stale, automatically expand history window to bridge gaps.
@@ -558,7 +579,30 @@ export function ChartWidget({
     onConfigChange?.({ symbol: s });
   };
 
+  const sameUtcDay = (a: number, b: number) => {
+    const da = new Date(a * 1000), db = new Date(b * 1000);
+    return da.getUTCFullYear() === db.getUTCFullYear() && da.getUTCMonth() === db.getUTCMonth() && da.getUTCDate() === db.getUTCDate();
+  };
+
+  const sameUtcWeek = (a: number, b: number) => {
+    const week = (t: number) => {
+      const d = new Date(t * 1000);
+      const target = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+      const dayNr = (target.getUTCDay() + 6) % 7;
+      target.setUTCDate(target.getUTCDate() - dayNr + 3);
+      const firstThursday = new Date(Date.UTC(target.getUTCFullYear(), 0, 4));
+      const diff = target.getTime() - firstThursday.getTime();
+      return [target.getUTCFullYear(), 1 + Math.round(diff / 604800000)] as const;
+    };
+    const wa = week(a), wb = week(b);
+    return wa[0] === wb[0] && wa[1] === wb[1];
+  };
+
   const setTF = (tf: Timeframe) => {
+    const vr = chartRef.current?.timeScale?.().getVisibleRange?.();
+    if (vr && typeof vr.from === "number" && typeof vr.to === "number") {
+      pendingRangeRef.current = { from: vr.from, to: vr.to, targetTf: tf };
+    }
     setTimeframe(tf);
     onConfigChange?.({ timeframe: tf });
   };
