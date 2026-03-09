@@ -1,6 +1,8 @@
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Query
 from providers.base import BaseProvider
 from routes.deps import get_provider
+from services import history_cache
 
 router = APIRouter(prefix="/market", tags=["market"])
 
@@ -10,6 +12,29 @@ async def quote(symbol: str, provider: BaseProvider = Depends(get_provider)):
     return await provider.get_quote(symbol.upper())
 
 
+def _tf_sec(tf: str) -> int:
+    t = (tf or "1Day").lower()
+    return {
+        "1min": 60, "5min": 300, "15min": 900, "30min": 1800,
+        "1hour": 3600, "4hour": 14400, "1day": 86400, "1week": 604800,
+    }.get(t, 86400)
+
+
+def _parse_latest_to_end_iso(latest: str | None, timeframe: str) -> str:
+    if not latest or latest == "now":
+        ts = int(datetime.now(timezone.utc).timestamp())
+    else:
+        # accept unix seconds or ISO-8601
+        try:
+            ts = int(float(latest))
+        except Exception:
+            dt = datetime.fromisoformat(latest.replace("Z", "+00:00"))
+            ts = int(dt.timestamp())
+    step = _tf_sec(timeframe)
+    ts = (ts // step) * step
+    return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat().replace("+00:00", "Z")
+
+
 @router.get("/history/{symbol}")
 async def history(
     symbol: str,
@@ -17,9 +42,40 @@ async def history(
     limit: int = Query(252, le=5000),
     start: str | None = Query(None, description="ISO timestamp"),
     end: str | None = Query(None, description="ISO timestamp"),
+    latest: str | None = Query(None, description="cursor or 'now' for paged mode"),
     provider: BaseProvider = Depends(get_provider),
 ):
-    return await provider.get_history(symbol.upper(), timeframe=timeframe, limit=limit, start=start, end=end)
+    sym = symbol.upper()
+
+    # Cursor-based mode (preferred for frontend panning)
+    if latest is not None:
+        end_iso = _parse_latest_to_end_iso(latest, timeframe)
+        key = f"hist:{sym}:{timeframe}:{limit}:{end_iso}"
+        cached = history_cache.get(key)
+        if cached is not None:
+            return cached
+
+        bars = await provider.get_history(sym, timeframe=timeframe, limit=limit, start=start, end=end_iso)
+        next_cursor = None
+        if bars:
+            try:
+                oldest = datetime.fromisoformat(str(bars[0]["timestamp"]).replace("Z", "+00:00"))
+                next_cursor = str(int(oldest.timestamp()) - 1)
+            except Exception:
+                next_cursor = None
+
+        payload = {
+            "symbol": sym,
+            "timeframe": timeframe,
+            "bars": bars,
+            "cursor": next_cursor,
+            "has_more": bool(next_cursor and len(bars) >= limit),
+        }
+        history_cache.setex(key, history_cache.ttl_for_timeframe(timeframe), payload)
+        return payload
+
+    # Legacy mode (backward compatible)
+    return await provider.get_history(sym, timeframe=timeframe, limit=limit, start=start, end=end)
 
 
 @router.get("/trades/{symbol}")

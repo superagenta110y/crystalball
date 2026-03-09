@@ -137,6 +137,7 @@ export function ChartWidget({
   const loadingMoreRef = useRef<boolean>(false);
   const gapRefetchingRef = useRef<boolean>(false);
   const pendingRangeRef = useRef<{ from: number; to: number; targetTf: Timeframe } | null>(null);
+  const cursorRef = useRef<string | null>(null);
   const [symItems, setSymItems] = useState<{ symbol: string; name?: string }[]>([]);
   const [symOpen, setSymOpen] = useState(false);
   const symRef = useRef<HTMLDivElement>(null);
@@ -262,9 +263,10 @@ export function ChartWidget({
     };
   }, []);
 
-  // Parse raw bar array → sorted Bar[]
-  const parseBars = (raw: any[]): Bar[] =>
-    (Array.isArray(raw) ? raw : [])
+  // Parse raw bar array (or paged payload) → sorted Bar[]
+  const parseBars = (raw: any): Bar[] => {
+    const arr = Array.isArray(raw) ? raw : (Array.isArray(raw?.bars) ? raw.bars : []);
+    return (Array.isArray(arr) ? arr : [])
       .filter(b => b?.timestamp)
       .map(b => ({
         time:  Math.floor(new Date(b.timestamp).getTime() / 1000),
@@ -272,6 +274,7 @@ export function ChartWidget({
         volume: Number(b.volume || 0),
       }))
       .sort((a, b) => a.time - b.time);
+  };
 
   const clearIndicators = useCallback(() => {
     if (!chartRef.current) return;
@@ -381,9 +384,11 @@ export function ChartWidget({
 
     setStatus("loading");
     try {
-      const r = await fetch(`${API}/api/market/history/${sym}?timeframe=${alpacaTF}&limit=${limit}`);
+      const r = await fetch(`${API}/api/market/history/${sym}?timeframe=${alpacaTF}&limit=${limit}&latest=now`);
       if (!r.ok) throw new Error();
-      const bars = parseBars(await r.json());
+      const payload = await r.json();
+      const bars = parseBars(payload);
+      cursorRef.current = payload?.cursor || null;
       if (!bars.length || !seriesRef.current) { setStatus("error"); return; }
 
       cacheRef.current = new Map(bars.map(b => [b.time, b]));
@@ -448,9 +453,10 @@ export function ChartWidget({
     if (!seriesRef.current) return;
     const alpacaTF = TF_MAP[tf] || "5Min";
     try {
-      const r = await fetch(`${API}/api/market/history/${sym}?timeframe=${alpacaTF}&limit=3`);
+      const r = await fetch(`${API}/api/market/history/${sym}?timeframe=${alpacaTF}&limit=3&latest=now`);
       if (!r.ok) return;
-      const bars = parseBars(await r.json());
+      const payload = await r.json();
+      const bars = parseBars(payload);
       if (!bars.length || !seriesRef.current) return;
 
       for (const bar of bars) {
@@ -494,13 +500,15 @@ export function ChartWidget({
     if (!times.length) return;
     const oldest = times[0];
     const alpacaTF = TF_MAP[timeframe] || "5Min";
-    const endIso = new Date((oldest - 1) * 1000).toISOString();
+    const latestCursor = cursorRef.current || String(oldest - 1);
 
     loadingMoreRef.current = true;
     try {
-      const r = await fetch(`${API}/api/market/history/${symbol}?timeframe=${alpacaTF}&limit=400&end=${encodeURIComponent(endIso)}`);
+      const r = await fetch(`${API}/api/market/history/${symbol}?timeframe=${alpacaTF}&limit=400&latest=${encodeURIComponent(latestCursor)}`);
       if (!r.ok) return;
-      const older = parseBars(await r.json()).filter(b => b.time < oldest);
+      const payload = await r.json();
+      const older = parseBars(payload).filter(b => b.time < oldest);
+      cursorRef.current = payload?.cursor || null;
       if (!older.length) return;
 
       for (const b of older) cacheRef.current.set(b.time, b);
@@ -536,6 +544,7 @@ export function ChartWidget({
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
     setIsLive(false);
     cacheRef.current = new Map();
+    cursorRef.current = null;
 
     const alpacaTF = TF_MAP[timeframe] || "5Min";
     const pollMs   = POLL_MS[alpacaTF] || 15000;
