@@ -86,6 +86,7 @@ export function OpenInterest3DWidget({ symbol = "SPY", isGlobalOverride, config,
     if (selectedExpirations.length === 1) return selectedExpirations[0];
     return `${selectedExpirations.length} selected`;
   }, [availableExpirations.length, allSelected, selectedExpirations]);
+  const expBadge = allSelected ? 0 : selectedExpirations.length;
 
   const toggleExpiration = (exp: string, checked: boolean) => {
     setSelectedExpirations(prev => {
@@ -117,8 +118,8 @@ export function OpenInterest3DWidget({ symbol = "SPY", isGlobalOverride, config,
         extra={
           <>
             <details className="relative">
-              <summary className="list-none cursor-pointer text-xs border border-surface-border bg-surface-overlay rounded px-2 py-1 text-neutral-200">
-                Exp: <span className="font-mono">{expLabel}</span>
+              <summary className="list-none cursor-pointer text-xs text-neutral-300 relative">
+                <span className="relative inline-flex items-center">📅{expBadge > 0 && <span className="absolute -top-2 -right-2 text-[9px] rounded-full px-1 py-0.5 bg-accent text-white">{expBadge}</span>}</span>
               </summary>
               <div className="absolute right-0 mt-1 z-20 w-52 max-h-64 overflow-auto rounded border border-surface-border bg-surface p-2 shadow-xl">
                 <label className="flex items-center gap-2 text-xs py-1 border-b border-surface-border mb-1">

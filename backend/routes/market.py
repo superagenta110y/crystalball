@@ -15,9 +15,11 @@ async def history(
     symbol: str,
     timeframe: str = Query("1Day", description="1Min|5Min|1Hour|1Day|1Week"),
     limit: int = Query(252, le=5000),
+    start: str | None = Query(None, description="ISO timestamp"),
+    end: str | None = Query(None, description="ISO timestamp"),
     provider: BaseProvider = Depends(get_provider),
 ):
-    return await provider.get_history(symbol.upper(), timeframe=timeframe, limit=limit)
+    return await provider.get_history(symbol.upper(), timeframe=timeframe, limit=limit, start=start, end=end)
 
 
 @router.get("/trades/{symbol}")
@@ -49,11 +51,11 @@ async def option_expirations(
 
 
 POPULAR_SYMBOLS = [
-    "SPY","QQQ","IWM","DIA","VIX","UVXY","TLT","GLD","SLV","XLE","XLF","XLK","SMH",
-    "AAPL","MSFT","NVDA","AMZN","GOOGL","META","TSLA","AMD","NFLX","AVGO","ADBE","CRM",
-    "PLTR","COIN","MSTR","MARA","RIOT","PYPL","SHOP","UBER","ABNB","SNOW","INTC","MU",
-    "JPM","BAC","WFC","GS","MS","C","XOM","CVX","UNH","JNJ","PFE","MRNA","LLY","NVO",
-    "BABA","NIO","RIVN","LCID","SOFI","HOOD","DIS","KO","PEP","WMT","COST","HD","LOW",
+    ("SPY","SPDR S&P 500 ETF"),("QQQ","Invesco QQQ Trust"),("IWM","iShares Russell 2000 ETF"),("DIA","SPDR Dow Jones ETF"),
+    ("AAPL","Apple Inc."),("MSFT","Microsoft Corp."),("NVDA","NVIDIA Corp."),("AMZN","Amazon.com Inc."),("GOOGL","Alphabet Class A"),("META","Meta Platforms"),("TSLA","Tesla Inc."),("AMD","Advanced Micro Devices"),("NFLX","Netflix Inc."),
+    ("JPM","JPMorgan Chase"),("BAC","Bank of America"),("GS","Goldman Sachs"),("XOM","Exxon Mobil"),("CVX","Chevron Corp."),("UNH","UnitedHealth Group"),("PFE","Pfizer Inc."),
+    ("PLTR","Palantir Technologies"),("COIN","Coinbase Global"),("MSTR","MicroStrategy"),("HOOD","Robinhood Markets"),("SOFI","SoFi Technologies"),
+    ("BABA","Alibaba Group"),("NIO","NIO Inc."),("DIS","Walt Disney Co."),("KO","Coca-Cola Co."),("WMT","Walmart Inc."),
 ]
 
 
@@ -64,8 +66,11 @@ async def symbol_suggestions(
 ):
     query = (q or "").strip().upper()
     if not query:
-        return {"symbols": POPULAR_SYMBOLS[:limit]}
+        items = [{"symbol": s, "name": n} for s, n in POPULAR_SYMBOLS[:limit]]
+        return {"symbols": [x["symbol"] for x in items], "items": items}
 
-    starts = [s for s in POPULAR_SYMBOLS if s.startswith(query)]
-    contains = [s for s in POPULAR_SYMBOLS if query in s and s not in starts]
-    return {"symbols": (starts + contains)[:limit]}
+    starts = [(s, n) for s, n in POPULAR_SYMBOLS if s.startswith(query) or n.upper().startswith(query)]
+    contains = [(s, n) for s, n in POPULAR_SYMBOLS if (query in s or query in n.upper()) and (s, n) not in starts]
+    merged = (starts + contains)[:limit]
+    items = [{"symbol": s, "name": n} for s, n in merged]
+    return {"symbols": [x["symbol"] for x in items], "items": items}

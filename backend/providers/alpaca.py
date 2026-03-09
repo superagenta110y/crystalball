@@ -63,7 +63,7 @@ class AlpacaProvider(BaseProvider):
                 "timestamp": ts,
             }
 
-    async def get_history(self, symbol: str, timeframe: str = "1Day", limit: int = 252) -> list[dict[str, Any]]:
+    async def get_history(self, symbol: str, timeframe: str = "1Day", limit: int = 252, start: str | None = None, end: str | None = None) -> list[dict[str, Any]]:
         tf = (timeframe or "1Day").strip()
         tf_to_minutes = {
             "1Min": 1,
@@ -76,34 +76,37 @@ class AlpacaProvider(BaseProvider):
         }
         minutes = tf_to_minutes.get(tf, 390)
         end_dt = datetime.now(timezone.utc)
+        end_iso = end or end_dt.isoformat().replace("+00:00", "Z")
 
         async with httpx.AsyncClient() as c:
-            # Primary path: ask for latest bars ending now.
+            # Primary path: ask for latest bars ending at end_iso.
             primary = {
                 "timeframe": tf,
                 "limit": limit,
                 "adjustment": "raw",
-                "end": end_dt.isoformat().replace("+00:00", "Z"),
+                "end": end_iso,
                 "feed": self._feed,
             }
+            if start:
+                primary["start"] = start
             r = await c.get(
                 f"{self._data_url}/v2/stocks/{symbol}/bars",
                 headers=self._headers,
                 params=primary,
             )
-            r.raise_for_status()
-            bars = r.json().get("bars") or []
+            bars = r.json().get("bars") or [] if r.status_code == 200 else []
 
-            # Fallback: explicit window for sparse/weekend behavior.
+            # Fallback: explicit window for sparse/weekend behavior or API 400 on end-only requests.
             if not bars:
                 lookback_minutes = max(max(limit, 1) * minutes * 12, 7 * 24 * 60)
-                start_dt = end_dt - timedelta(minutes=lookback_minutes)
+                fallback_end = datetime.fromisoformat(end_iso.replace("Z", "+00:00"))
+                start_dt = fallback_end - timedelta(minutes=lookback_minutes)
                 fallback = {
                     "timeframe": tf,
                     "limit": limit,
                     "adjustment": "raw",
                     "start": start_dt.isoformat().replace("+00:00", "Z"),
-                    "end": end_dt.isoformat().replace("+00:00", "Z"),
+                    "end": end_iso,
                     "feed": self._feed,
                 }
                 rr = await c.get(

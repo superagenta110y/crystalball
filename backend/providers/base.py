@@ -32,6 +32,8 @@ class BaseProvider(ABC):
         symbol: str,
         timeframe: str = "1Day",
         limit: int = 252,
+        start: str | None = None,
+        end: str | None = None,
     ) -> list[dict[str, Any]]:
         """
         Return OHLCV bars for *symbol*.

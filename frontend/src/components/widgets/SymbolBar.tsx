@@ -1,49 +1,79 @@
 "use client";
-/**
- * Reusable per-widget symbol input bar.
- * Shows the currently active symbol (which may come from global override or widget config).
- * User can type a new one and press Enter to override locally.
- */
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+
+const API = process.env.NEXT_PUBLIC_API_URL || "";
+
+type SymbolItem = { symbol: string; name?: string };
 
 interface SymbolBarProps {
-  symbol: string;                          // resolved/effective symbol
-  isGlobalOverride?: boolean;              // if true, input is read-only (globally controlled)
-  onSymbolChange: (sym: string) => void;  // fires when user types a local override
-  extra?: React.ReactNode;                 // optional extra content (status, price, etc.)
+  symbol: string;
+  isGlobalOverride?: boolean;
+  onSymbolChange: (sym: string) => void;
+  extra?: React.ReactNode;
 }
 
 export function SymbolBar({ symbol, isGlobalOverride, onSymbolChange, extra }: SymbolBarProps) {
   const [draft, setDraft] = useState(symbol);
+  const [items, setItems] = useState<SymbolItem[]>([]);
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
 
-  // Keep draft in sync when resolved symbol changes (e.g., global override update)
   useEffect(() => { setDraft(symbol); }, [symbol]);
 
-  const commit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const s = draft.trim().toUpperCase();
-    if (s) onSymbolChange(s);
+  useEffect(() => {
+    if (isGlobalOverride) return;
+    const q = draft.trim();
+    if (!q) { setItems([]); return; }
+    const t = setTimeout(() => {
+      fetch(`${API}/api/market/symbols?q=${encodeURIComponent(q)}&limit=12`)
+        .then(r => r.json())
+        .then(d => setItems((d?.items || []).slice(0, 12)))
+        .catch(() => setItems([]));
+    }, 100);
+    return () => clearTimeout(t);
+  }, [draft, isGlobalOverride]);
+
+  useEffect(() => {
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+
+  const selectItem = (s: string) => {
+    setDraft(s);
+    onSymbolChange(s);
+    setOpen(false);
   };
 
   return (
     <div className="flex items-center gap-2 px-2 py-1.5 border-b border-surface-border shrink-0">
-      <form onSubmit={commit} className="flex items-center gap-1">
+      <div ref={ref} className="relative">
         <input
           value={draft}
-          onChange={(e) => setDraft(e.target.value.toUpperCase())}
+          onChange={(e) => { setDraft(e.target.value.toUpperCase()); setOpen(true); }}
+          onFocus={() => setOpen(true)}
           disabled={isGlobalOverride}
-          title={isGlobalOverride ? "Controlled by global override in the header" : "Enter symbol and press Enter"}
-          className={`border rounded px-2 py-0.5 text-xs font-mono w-16 focus:outline-none text-white transition
+          title={isGlobalOverride ? "Controlled by global override in the header" : "Select symbol"}
+          className={`border rounded px-2 py-0.5 text-xs font-mono w-20 focus:outline-none text-white transition
             ${isGlobalOverride
               ? "bg-surface-overlay border-accent/70 text-accent cursor-not-allowed shadow-[0_0_0_1px_rgba(0,212,170,0.25)]"
-              : "bg-surface-overlay border-surface-border focus:border-accent/60"
-            }`}
+              : "bg-surface-overlay border-surface-border focus:border-accent/60"}`}
         />
-        {isGlobalOverride && (
-          <span className="text-neutral-700 text-xs" title="Global override active">⬡</span>
+        {open && !isGlobalOverride && items.length > 0 && (
+          <div className="absolute left-0 top-7 z-40 w-56 rounded-md border border-surface-border bg-surface-raised shadow-xl max-h-64 overflow-auto">
+            {items.map((it) => (
+              <button key={it.symbol} onClick={() => selectItem(it.symbol)} className="w-full text-left px-2 py-1.5 hover:bg-surface-overlay">
+                <div className="text-xs font-mono text-white">{it.symbol}</div>
+                <div className="text-[10px] text-neutral-500 truncate">{it.name || ""}</div>
+              </button>
+            ))}
+          </div>
         )}
-      </form>
-      {extra && <div className="ml-auto flex items-center gap-2">{extra}</div>}
+      </div>
+      {isGlobalOverride && <span className="text-neutral-700 text-xs" title="Global override active">⬡</span>}
+      {extra && <div className="flex items-center gap-2">{extra}</div>}
     </div>
   );
 }

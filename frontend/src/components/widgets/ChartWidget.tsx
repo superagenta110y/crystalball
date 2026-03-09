@@ -130,6 +130,9 @@ export function ChartWidget({
   const loadingMoreRef = useRef<boolean>(false);
   const gapRefetchingRef = useRef<boolean>(false);
   const pendingRangeRef = useRef<{ from: number; to: number; targetTf: Timeframe } | null>(null);
+  const [symItems, setSymItems] = useState<{ symbol: string; name?: string }[]>([]);
+  const [symOpen, setSymOpen] = useState(false);
+  const symRef = useRef<HTMLDivElement>(null);
   const pollRef      = useRef<ReturnType<typeof setInterval> | null>(null);
   const wsRef        = useRef<WebSocket | null>(null);
 
@@ -174,6 +177,27 @@ export function ChartWidget({
       setSymbolInput(initSymbol);
     }
   }, [initSymbol]);
+
+  useEffect(() => {
+    if (isGlobalOverride) return;
+    const q = symbolInput.trim();
+    if (!q) { setSymItems([]); return; }
+    const t = setTimeout(() => {
+      fetch(`${API}/api/market/symbols?q=${encodeURIComponent(q)}&limit=10`)
+        .then(r => r.json())
+        .then(d => setSymItems(d?.items || []))
+        .catch(() => setSymItems([]));
+    }, 100);
+    return () => clearTimeout(t);
+  }, [symbolInput, isGlobalOverride]);
+
+  useEffect(() => {
+    const onDoc = (e: MouseEvent) => {
+      if (symRef.current && !symRef.current.contains(e.target as Node)) setSymOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
 
   // Build chart once on mount
   useEffect(() => {
@@ -457,6 +481,33 @@ export function ChartWidget({
     } catch { /* silent — don't flicker status on transient errors */ }
   }, [theme.bull, theme.bear, drawIndicators, loadFull]);
 
+  const fetchOlder = useCallback(async () => {
+    if (!seriesRef.current || loadingMoreRef.current) return;
+    const times = Array.from(cacheRef.current.keys()).sort((a, b) => a - b);
+    if (!times.length) return;
+    const oldest = times[0];
+    const alpacaTF = TF_MAP[timeframe] || "5Min";
+    const endIso = new Date((oldest - 1) * 1000).toISOString();
+
+    loadingMoreRef.current = true;
+    try {
+      const r = await fetch(`${API}/api/market/history/${symbol}?timeframe=${alpacaTF}&limit=400&end=${encodeURIComponent(endIso)}`);
+      if (!r.ok) return;
+      const older = parseBars(await r.json()).filter(b => b.time < oldest);
+      if (!older.length) return;
+
+      for (const b of older) cacheRef.current.set(b.time, b);
+      const merged = Array.from(cacheRef.current.values()).sort((a, b) => a.time - b.time);
+      seriesRef.current.setData(merged);
+      const bull = getComputedStyle(document.documentElement).getPropertyValue("--bull").trim() || theme.bull;
+      const bear = getComputedStyle(document.documentElement).getPropertyValue("--bear").trim() || theme.bear;
+      volumeRef.current?.setData(merged.map(b => ({ time: b.time, value: b.volume || 0, color: b.close >= b.open ? toRgba(bull, 0.5) : toRgba(bear, 0.5) })));
+      drawIndicators(merged);
+    } finally {
+      loadingMoreRef.current = false;
+    }
+  }, [symbol, timeframe, theme.bull, theme.bear, drawIndicators]);
+
   // Auto-backfill older candles when panning to the left edge
   useEffect(() => {
     if (!chartRef.current) return;
@@ -465,19 +516,12 @@ export function ChartWidget({
     const onRange = (range: any) => {
       if (!range || loadingMoreRef.current) return;
       if (range.from > 20) return;
-
-      const cur = historyLimitRef.current || 0;
-      const nextLimit = Math.min(5000, cur + 300);
-      if (nextLimit <= cur) return;
-
-      loadingMoreRef.current = true;
-      loadFull(symbol, timeframe, nextLimit, false)
-        .finally(() => { loadingMoreRef.current = false; });
+      fetchOlder();
     };
 
     ts.subscribeVisibleLogicalRangeChange(onRange);
     return () => ts.unsubscribeVisibleLogicalRangeChange(onRange);
-  }, [symbol, timeframe, loadFull]);
+  }, [fetchOlder]);
 
   // Main effect: full load then polling
   useEffect(() => {
@@ -615,19 +659,30 @@ export function ChartWidget({
       {/* Toolbar */}
       <div className="flex items-center gap-2 px-2 py-1.5 border-b border-surface-border shrink-0 flex-wrap">
         {/* Symbol */}
-        <form onSubmit={submitSymbol} className="flex items-center gap-1">
+        <div ref={symRef} className="relative flex items-center gap-1">
           <input
             value={symbolInput}
-            onChange={e => setSymbolInput(e.target.value.toUpperCase())}
+            onChange={e => { setSymbolInput(e.target.value.toUpperCase()); setSymOpen(true); }}
+            onFocus={() => setSymOpen(true)}
             disabled={isGlobalOverride}
-            title={isGlobalOverride ? "Controlled by global override" : "Symbol — press Enter"}
-            className={`border rounded px-2 py-0.5 text-xs font-mono w-16 focus:outline-none text-white transition
+            title={isGlobalOverride ? "Controlled by global override" : "Select symbol"}
+            className={`border rounded px-2 py-0.5 text-xs font-mono w-20 focus:outline-none text-white transition
               ${isGlobalOverride
                 ? "bg-surface-overlay border-accent/70 text-accent cursor-not-allowed shadow-[0_0_0_1px_rgba(0,212,170,0.25)]"
                 : "bg-surface-overlay border-surface-border focus:border-accent/60"}`}
           />
           {isGlobalOverride && <span className="text-neutral-700 text-xs">⬡</span>}
-        </form>
+          {symOpen && !isGlobalOverride && symItems.length > 0 && (
+            <div className="absolute left-0 top-6 z-50 w-56 rounded-md border border-surface-border bg-surface-raised shadow-xl max-h-64 overflow-auto">
+              {symItems.map((it) => (
+                <button key={it.symbol} onClick={() => { setSymbol(it.symbol); setSymbolInput(it.symbol); onConfigChange?.({ symbol: it.symbol }); setSymOpen(false); }} className="w-full text-left px-2 py-1.5 hover:bg-surface-overlay">
+                  <div className="text-xs font-mono text-white">{it.symbol}</div>
+                  <div className="text-[10px] text-neutral-500 truncate">{it.name || ""}</div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Timeframes */}
         <div className="flex items-center gap-0.5 flex-wrap">
@@ -643,7 +698,7 @@ export function ChartWidget({
         </div>
 
         <details className="relative">
-          <summary className="list-none cursor-pointer px-1.5 py-0.5 rounded text-xs text-neutral-500 hover:text-white border border-surface-border relative">
+          <summary className="list-none cursor-pointer px-1 py-0.5 text-xs text-neutral-500 hover:text-white relative">
             <SlidersHorizontal size={13} />
             {enabledCount > 0 && <span className="absolute -top-1 -right-2 text-[9px] leading-none px-1 py-0.5 rounded-full bg-accent text-white border border-accent">{enabledCount}</span>}
           </summary>

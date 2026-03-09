@@ -47,7 +47,7 @@ class HoodwinkProvider(BaseProvider):
             "timestamp": data.get("updated_at"),
         }
 
-    async def get_history(self, symbol: str, timeframe: str = "1Day", limit: int = 252) -> list[dict[str, Any]]:
+    async def get_history(self, symbol: str, timeframe: str = "1Day", limit: int = 252, start: str | None = None, end: str | None = None) -> list[dict[str, Any]]:
         # Map CrystalBall timeframe → Hoodwink interval/span
         interval_map = {
             "1Min": ("5minute", "day"),
