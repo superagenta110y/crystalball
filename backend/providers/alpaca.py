@@ -64,8 +64,6 @@ class AlpacaProvider(BaseProvider):
             }
 
     async def get_history(self, symbol: str, timeframe: str = "1Day", limit: int = 252) -> list[dict[str, Any]]:
-        # Alpaca can return empty bars when only limit is provided (e.g., weekends/after-hours).
-        # Provide an explicit time window so historical candles always resolve.
         tf = (timeframe or "1Day").strip()
         tf_to_minutes = {
             "1Min": 1,
@@ -77,30 +75,49 @@ class AlpacaProvider(BaseProvider):
             "1Week": 5 * 390,
         }
         minutes = tf_to_minutes.get(tf, 390)
-        # Add generous padding to survive weekends/holidays and sparse feeds.
-        # For intraday, always look back at least 7 days.
-        lookback_minutes = max(max(limit, 1) * minutes * 12, 7 * 24 * 60)
-
         end_dt = datetime.now(timezone.utc)
-        start_dt = end_dt - timedelta(minutes=lookback_minutes)
-
-        params = {
-            "timeframe": tf,
-            "limit": limit,
-            "adjustment": "raw",
-            "start": start_dt.isoformat().replace("+00:00", "Z"),
-            "end": end_dt.isoformat().replace("+00:00", "Z"),
-            "feed": self._feed,
-        }
 
         async with httpx.AsyncClient() as c:
+            # Primary path: ask for latest bars ending now.
+            primary = {
+                "timeframe": tf,
+                "limit": limit,
+                "adjustment": "raw",
+                "end": end_dt.isoformat().replace("+00:00", "Z"),
+                "feed": self._feed,
+            }
             r = await c.get(
                 f"{self._data_url}/v2/stocks/{symbol}/bars",
                 headers=self._headers,
-                params=params,
+                params=primary,
             )
             r.raise_for_status()
             bars = r.json().get("bars") or []
+
+            # Fallback: explicit window for sparse/weekend behavior.
+            if not bars:
+                lookback_minutes = max(max(limit, 1) * minutes * 12, 7 * 24 * 60)
+                start_dt = end_dt - timedelta(minutes=lookback_minutes)
+                fallback = {
+                    "timeframe": tf,
+                    "limit": limit,
+                    "adjustment": "raw",
+                    "start": start_dt.isoformat().replace("+00:00", "Z"),
+                    "end": end_dt.isoformat().replace("+00:00", "Z"),
+                    "feed": self._feed,
+                }
+                rr = await c.get(
+                    f"{self._data_url}/v2/stocks/{symbol}/bars",
+                    headers=self._headers,
+                    params=fallback,
+                )
+                rr.raise_for_status()
+                bars = rr.json().get("bars") or []
+
+            # Guard against APIs returning oldest slice for a wide start window.
+            if len(bars) > limit:
+                bars = bars[-limit:]
+
             return [
                 {"timestamp": b["t"], "open": b["o"], "high": b["h"],
                  "low": b["l"], "close": b["c"], "volume": b["v"]}
