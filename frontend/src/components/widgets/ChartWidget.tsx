@@ -16,8 +16,15 @@ const TF_MAP: Record<string, string> = {
   "1d":"1Day","1w":"1Week",
 };
 const BAR_LIMIT: Record<string, number> = {
-  "1Min":390,"5Min":390,"15Min":200,"30Min":200,
-  "1Hour":200,"4Hour":120,"1Day":252,"1Week":104,
+  // default windows by timeframe (larger by default for better panning continuity)
+  "1Min":780,   // ~2 trading days
+  "5Min":780,   // ~10 trading days
+  "15Min":600,
+  "30Min":500,
+  "1Hour":500,
+  "4Hour":300,
+  "1Day":756,   // ~3 years
+  "1Week":260,  // ~5 years
 };
 // Poll interval per Alpaca TF (ms)
 const POLL_MS: Record<string, number> = {

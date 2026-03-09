@@ -96,8 +96,15 @@ class AlpacaProvider(BaseProvider):
             )
             bars = r.json().get("bars") or [] if r.status_code == 200 else []
 
-            # Fallback: explicit window for sparse/weekend behavior or API 400 on end-only requests.
-            if not bars:
+            # Fallback: explicit window for sparse/weekend behavior / API quirks.
+            # Some timeframes (notably 1Day) can return too-few bars on end-only queries.
+            need_fallback = (not bars)
+            if not start and bars:
+                min_expected = 5 if limit >= 20 else max(1, limit)
+                if len(bars) < min_expected:
+                    need_fallback = True
+
+            if need_fallback:
                 lookback_minutes = max(max(limit, 1) * minutes * 12, 7 * 24 * 60)
                 fallback_end = datetime.fromisoformat(end_iso.replace("Z", "+00:00"))
                 start_dt = fallback_end - timedelta(minutes=lookback_minutes)
