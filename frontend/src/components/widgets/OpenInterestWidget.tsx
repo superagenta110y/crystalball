@@ -24,12 +24,15 @@ export function OpenInterestWidget({ symbol = "SPY", isGlobalOverride, config, o
   const [expLoading, setExpLoading] = useState(true);
   const [availableExpirations, setAvailableExpirations] = useState<string[]>([]);
   const [selectedExpirations, setSelectedExpirations] = useState<string[]>(parseCsv(config?.expDates));
+  const [strikeRange, setStrikeRange] = useState<string>(config?.strikeRange || "5");
+  const [spot, setSpot] = useState<number>(0);
   const { bull, bear } = useDashboardStore(s => s.theme);
   const API = process.env.NEXT_PUBLIC_API_URL || "";
 
   useEffect(() => {
     setSelectedExpirations(parseCsv(config?.expDates));
-  }, [config?.expDates]);
+    setStrikeRange(config?.strikeRange || "5");
+  }, [config?.expDates, config?.strikeRange]);
 
   useEffect(() => {
     setExpLoading(true);
@@ -43,7 +46,7 @@ export function OpenInterestWidget({ symbol = "SPY", isGlobalOverride, config, o
         setSelectedExpirations(prev => {
           const valid = prev.filter(x => exps.includes(x));
           if (valid.length > 0) return valid;
-          return exps.length ? [exps[0]] : [];
+          return exps.slice(0, 4);
         });
 
         setExpLoading(false);
@@ -68,6 +71,7 @@ export function OpenInterestWidget({ symbol = "SPY", isGlobalOverride, config, o
       .then(r => r.json())
       .then(d => {
         setRawData((d.data || []).map((x: any) => ({ strike: x.strike, callOI: x.oi_call, putOI: x.oi_put })));
+        setSpot(Number(d.spot || 0));
         setError(false);
         setLoading(false);
       })
@@ -77,9 +81,11 @@ export function OpenInterestWidget({ symbol = "SPY", isGlobalOverride, config, o
   const atm = rawData.length
     ? rawData.reduce((best, d) => (d.callOI + d.putOI > best.callOI + best.putOI ? d : best), rawData[0])?.strike
     : 0;
-  const data = atm > 0
-    ? rawData.filter(d => d.strike >= atm * 0.95 && d.strike <= atm * 1.05)
-    : rawData.slice(0, 40);
+  const center = spot > 0 ? spot : atm;
+  const pct = strikeRange === "all" ? null : Number(strikeRange);
+  const data = center > 0
+    ? rawData.filter(d => (pct == null ? true : (d.strike >= center * (1 - pct / 100) && d.strike <= center * (1 + pct / 100))))
+    : rawData.slice(0, 60);
 
   const allSelected = availableExpirations.length > 0 && selectedExpirations.length === availableExpirations.length;
 
@@ -112,34 +118,50 @@ export function OpenInterestWidget({ symbol = "SPY", isGlobalOverride, config, o
         isGlobalOverride={isGlobalOverride}
         onSymbolChange={(s) => onConfigChange?.({ symbol: s })}
         extra={
-          <details className="relative">
-            <summary className="list-none cursor-pointer text-xs border border-surface-border bg-surface-overlay rounded px-2 py-1 text-neutral-200">
-              Exp: <span className="font-mono">{expLabel}</span>
-            </summary>
-            <div className="absolute right-0 mt-1 z-20 w-52 max-h-64 overflow-auto rounded border border-surface-border bg-surface p-2 shadow-xl">
-              <label className="flex items-center gap-2 text-xs py-1 border-b border-surface-border mb-1">
-                <input
-                  type="checkbox"
-                  checked={allSelected}
-                  onChange={(e) => toggleAll(e.target.checked)}
-                />
-                <span>All</span>
-              </label>
-              {availableExpirations.map((exp) => (
-                <label key={exp} className="flex items-center gap-2 text-xs py-1">
+          <>
+            <details className="relative">
+              <summary className="list-none cursor-pointer text-xs border border-surface-border bg-surface-overlay rounded px-2 py-1 text-neutral-200">
+                Exp: <span className="font-mono">{expLabel}</span>
+              </summary>
+              <div className="absolute right-0 mt-1 z-20 w-52 max-h-64 overflow-auto rounded border border-surface-border bg-surface p-2 shadow-xl">
+                <label className="flex items-center gap-2 text-xs py-1 border-b border-surface-border mb-1">
                   <input
                     type="checkbox"
-                    checked={selectedExpirations.includes(exp)}
-                    onChange={(e) => toggleExpiration(exp, e.target.checked)}
+                    checked={allSelected}
+                    onChange={(e) => toggleAll(e.target.checked)}
                   />
-                  <span className="font-mono">{exp}</span>
+                  <span>All</span>
                 </label>
-              ))}
-              {!availableExpirations.length && (
-                <div className="text-xs text-neutral-500 py-1">No expirations available</div>
-              )}
-            </div>
-          </details>
+                {availableExpirations.map((exp) => (
+                  <label key={exp} className="flex items-center gap-2 text-xs py-1">
+                    <input
+                      type="checkbox"
+                      checked={selectedExpirations.includes(exp)}
+                      onChange={(e) => toggleExpiration(exp, e.target.checked)}
+                    />
+                    <span className="font-mono">{exp}</span>
+                  </label>
+                ))}
+                {!availableExpirations.length && (
+                  <div className="text-xs text-neutral-500 py-1">No expirations available</div>
+                )}
+              </div>
+            </details>
+            <select
+              value={strikeRange}
+              onChange={(e) => { setStrikeRange(e.target.value); onConfigChange?.({ strikeRange: e.target.value }); }}
+              className="text-xs border border-surface-border bg-surface-overlay rounded px-1.5 py-1"
+              title="Strike filter"
+            >
+              <option value="all">All Strikes</option>
+              <option value="1">± 1%</option>
+              <option value="2">± 2%</option>
+              <option value="5">± 5%</option>
+              <option value="10">± 10%</option>
+              <option value="20">± 20%</option>
+              <option value="50">± 50%</option>
+            </select>
+          </>
         }
       />
 
@@ -179,7 +201,7 @@ export function OpenInterestWidget({ symbol = "SPY", isGlobalOverride, config, o
                   </div>
                 );
               }} />
-              <ReferenceLine x={atm} stroke="#ffffff22" strokeDasharray="4 2"
+              <ReferenceLine x={center} stroke="#ffffff22" strokeDasharray="4 2"
                 label={{ value: "ATM", fill: "#555", fontSize: 9 }} />
               <Bar dataKey="callOI" fill={bull} fillOpacity={0.7} radius={[2,2,0,0]} name="Calls" />
               <Bar dataKey="putOI"  fill={bear} fillOpacity={0.7} radius={[2,2,0,0]} name="Puts" />

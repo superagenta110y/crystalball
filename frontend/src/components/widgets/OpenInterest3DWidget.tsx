@@ -19,10 +19,15 @@ export function OpenInterest3DWidget({ symbol = "SPY", isGlobalOverride, config,
   const [error, setError] = useState(false);
   const [availableExpirations, setAvailableExpirations] = useState<string[]>([]);
   const [selectedExpirations, setSelectedExpirations] = useState<string[]>(parseCsv(config?.expDates));
+  const [strikeRange, setStrikeRange] = useState<string>(config?.strikeRange || "5");
+  const [spot, setSpot] = useState<number>(0);
   const [matrix, setMatrix] = useState<Record<string, Record<string, number>>>({});
   const [strikes, setStrikes] = useState<number[]>([]);
 
-  useEffect(() => { setSelectedExpirations(parseCsv(config?.expDates)); }, [config?.expDates]);
+  useEffect(() => {
+    setSelectedExpirations(parseCsv(config?.expDates));
+    setStrikeRange(config?.strikeRange || "5");
+  }, [config?.expDates, config?.strikeRange]);
 
   useEffect(() => {
     setExpLoading(true);
@@ -34,7 +39,7 @@ export function OpenInterest3DWidget({ symbol = "SPY", isGlobalOverride, config,
         setSelectedExpirations(prev => {
           const valid = prev.filter(x => exps.includes(x));
           if (valid.length > 0) return valid;
-          return exps.length ? [exps[0]] : [];
+          return exps.slice(0, 4);
         });
         setExpLoading(false);
       })
@@ -53,6 +58,7 @@ export function OpenInterest3DWidget({ symbol = "SPY", isGlobalOverride, config,
       .then((all) => {
         const m: Record<string, Record<string, number>> = {};
         const strikeSet = new Set<number>();
+        setSpot(Number(all?.[0]?.spot || 0));
         all.forEach((res, idx) => {
           const exp = exps[idx];
           m[exp] = {};
@@ -96,6 +102,10 @@ export function OpenInterest3DWidget({ symbol = "SPY", isGlobalOverride, config,
   };
 
   const exps = selectedExpirations.length ? selectedExpirations : availableExpirations.slice(0, 4);
+  const pct = strikeRange === "all" ? null : Number(strikeRange);
+  const filteredStrikes = spot > 0
+    ? strikes.filter(s => (pct == null ? true : (s >= spot * (1 - pct / 100) && s <= spot * (1 + pct / 100))))
+    : strikes;
   const maxOI = Math.max(1, ...Object.values(matrix).flatMap(v => Object.values(v)));
 
   return (
@@ -105,37 +115,53 @@ export function OpenInterest3DWidget({ symbol = "SPY", isGlobalOverride, config,
         isGlobalOverride={isGlobalOverride}
         onSymbolChange={(s) => onConfigChange?.({ symbol: s })}
         extra={
-          <details className="relative">
-            <summary className="list-none cursor-pointer text-xs border border-surface-border bg-surface-overlay rounded px-2 py-1 text-neutral-200">
-              Exp: <span className="font-mono">{expLabel}</span>
-            </summary>
-            <div className="absolute right-0 mt-1 z-20 w-52 max-h-64 overflow-auto rounded border border-surface-border bg-surface p-2 shadow-xl">
-              <label className="flex items-center gap-2 text-xs py-1 border-b border-surface-border mb-1">
-                <input type="checkbox" checked={allSelected} onChange={(e) => toggleAll(e.target.checked)} />
-                <span>All</span>
-              </label>
-              {availableExpirations.map((exp) => (
-                <label key={exp} className="flex items-center gap-2 text-xs py-1">
-                  <input type="checkbox" checked={selectedExpirations.includes(exp)} onChange={(e) => toggleExpiration(exp, e.target.checked)} />
-                  <span className="font-mono">{exp}</span>
+          <>
+            <details className="relative">
+              <summary className="list-none cursor-pointer text-xs border border-surface-border bg-surface-overlay rounded px-2 py-1 text-neutral-200">
+                Exp: <span className="font-mono">{expLabel}</span>
+              </summary>
+              <div className="absolute right-0 mt-1 z-20 w-52 max-h-64 overflow-auto rounded border border-surface-border bg-surface p-2 shadow-xl">
+                <label className="flex items-center gap-2 text-xs py-1 border-b border-surface-border mb-1">
+                  <input type="checkbox" checked={allSelected} onChange={(e) => toggleAll(e.target.checked)} />
+                  <span>All</span>
                 </label>
-              ))}
-            </div>
-          </details>
+                {availableExpirations.map((exp) => (
+                  <label key={exp} className="flex items-center gap-2 text-xs py-1">
+                    <input type="checkbox" checked={selectedExpirations.includes(exp)} onChange={(e) => toggleExpiration(exp, e.target.checked)} />
+                    <span className="font-mono">{exp}</span>
+                  </label>
+                ))}
+              </div>
+            </details>
+            <select
+              value={strikeRange}
+              onChange={(e) => { setStrikeRange(e.target.value); onConfigChange?.({ strikeRange: e.target.value }); }}
+              className="text-xs border border-surface-border bg-surface-overlay rounded px-1.5 py-1"
+              title="Strike filter"
+            >
+              <option value="all">All Strikes</option>
+              <option value="1">± 1%</option>
+              <option value="2">± 2%</option>
+              <option value="5">± 5%</option>
+              <option value="10">± 10%</option>
+              <option value="20">± 20%</option>
+              <option value="50">± 50%</option>
+            </select>
+          </>
         }
       />
 
       <div className="flex-1 min-h-0 p-2 overflow-hidden">
         {(loading || expLoading) && <div className="h-full flex items-center justify-center text-xs text-neutral-500 animate-pulse">Loading 3D OI…</div>}
         {error && !loading && <div className="h-full flex items-center justify-center text-xs text-neutral-500">Failed to load OI surface</div>}
-        {!loading && !error && exps.length > 0 && strikes.length > 0 && (
+        {!loading && !error && exps.length > 0 && filteredStrikes.length > 0 && (
           <div className="h-full w-full">
             <div className="text-[10px] text-neutral-500 mb-1">OI surface (Strike × Expiration)</div>
             <div
               className="grid h-[calc(100%-14px)] w-full gap-[2px]"
               style={{
                 gridTemplateColumns: `52px repeat(${exps.length}, minmax(0, 1fr))`,
-                gridTemplateRows: `18px repeat(${strikes.length}, minmax(0, 1fr))`,
+                gridTemplateRows: `18px repeat(${filteredStrikes.length}, minmax(0, 1fr))`,
               }}
             >
               <div className="text-[9px] text-neutral-500 flex items-center">Strike</div>
@@ -143,7 +169,7 @@ export function OpenInterest3DWidget({ symbol = "SPY", isGlobalOverride, config,
                 <div key={exp} className="text-[9px] text-neutral-500 font-mono truncate flex items-center justify-center px-1">{exp}</div>
               ))}
 
-              {strikes.map((s) => (
+              {filteredStrikes.map((s) => (
                 <React.Fragment key={s}>
                   <div className="text-[9px] text-neutral-500 font-mono flex items-center px-1 truncate">{s}</div>
                   {exps.map((exp) => {

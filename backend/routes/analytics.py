@@ -87,13 +87,16 @@ async def open_interest(
     sym = symbol.upper()
     requested_exps = _parse_expirations(expiration_date, expiration_dates)
 
+    quote = await provider.get_quote(sym)
+    spot = float(quote.get("last_price") or 0)
+
     if not requested_exps:
-        chain, _ = await _chain_and_spot(sym, None, provider)
-        return {"symbol": sym, "expirations": [], "data": compute_oi(chain)}
+        chain = await provider.get_options_chain(sym)
+        return {"symbol": sym, "spot": spot, "expirations": [], "data": compute_oi(chain)}
 
     chain: list[dict] = []
     for exp in requested_exps:
         part = await provider.get_options_chain(sym, expiration_date=exp)
         chain.extend(part)
 
-    return {"symbol": sym, "expirations": requested_exps, "data": compute_oi(chain)}
+    return {"symbol": sym, "spot": spot, "expirations": requested_exps, "data": compute_oi(chain)}

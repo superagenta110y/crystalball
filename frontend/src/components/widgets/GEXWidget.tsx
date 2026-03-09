@@ -24,10 +24,14 @@ export function GEXWidget({ symbol = "SPY", isGlobalOverride, config, onConfigCh
   const [expLoading, setExpLoading] = useState(true);
   const [availableExpirations, setAvailableExpirations] = useState<string[]>([]);
   const [selectedExpirations, setSelectedExpirations] = useState<string[]>(parseCsv(config?.expDates));
+  const [strikeRange, setStrikeRange] = useState<string>(config?.strikeRange || "5");
   const { bull, bear } = useDashboardStore(s => s.theme);
   const API = process.env.NEXT_PUBLIC_API_URL || "";
 
-  useEffect(() => { setSelectedExpirations(parseCsv(config?.expDates)); }, [config?.expDates]);
+  useEffect(() => {
+    setSelectedExpirations(parseCsv(config?.expDates));
+    setStrikeRange(config?.strikeRange || "5");
+  }, [config?.expDates, config?.strikeRange]);
 
   useEffect(() => {
     setExpLoading(true);
@@ -39,7 +43,7 @@ export function GEXWidget({ symbol = "SPY", isGlobalOverride, config, onConfigCh
         setSelectedExpirations(prev => {
           const valid = prev.filter(x => exps.includes(x));
           if (valid.length > 0) return valid;
-          return exps.length ? [exps[0]] : [];
+          return exps.slice(0, 4);
         });
         setExpLoading(false);
       })
@@ -57,7 +61,10 @@ export function GEXWidget({ symbol = "SPY", isGlobalOverride, config, onConfigCh
       .catch(() => { setError(true); setLoading(false); });
   }, [symbol, selectedExpirations, expLoading]);
 
-  const filtered = spot > 0 ? data.filter(d => d.strike >= spot * 0.95 && d.strike <= spot * 1.05) : data.slice(0, 40);
+  const pct = strikeRange === "all" ? null : Number(strikeRange);
+  const filtered = spot > 0
+    ? data.filter(d => (pct == null ? true : (d.strike >= spot * (1 - pct / 100) && d.strike <= spot * (1 + pct / 100))))
+    : data.slice(0, 60);
   const netGEX = filtered.reduce((sum, d) => sum + d.gex, 0);
   const flipStrike = filtered.find((d, i) => i > 0 && Math.sign(d.gex) !== Math.sign(filtered[i - 1].gex))?.strike;
 
@@ -109,6 +116,20 @@ export function GEXWidget({ symbol = "SPY", isGlobalOverride, config, onConfigCh
                 ))}
               </div>
             </details>
+            <select
+              value={strikeRange}
+              onChange={(e) => { setStrikeRange(e.target.value); onConfigChange?.({ strikeRange: e.target.value }); }}
+              className="text-xs border border-surface-border bg-surface-overlay rounded px-1.5 py-1"
+              title="Strike filter"
+            >
+              <option value="all">All Strikes</option>
+              <option value="1">± 1%</option>
+              <option value="2">± 2%</option>
+              <option value="5">± 5%</option>
+              <option value="10">± 10%</option>
+              <option value="20">± 20%</option>
+              <option value="50">± 50%</option>
+            </select>
             <div className="flex items-center gap-3 text-xs">
               <span className={netGEX >= 0 ? "text-bull font-mono" : "text-bear font-mono"}>{netGEX >= 0 ? "+" : ""}{(netGEX / 1e9).toFixed(1)}B</span>
               {flipStrike && <span className="text-neutral-600">Flip: <span className="text-white font-mono">${flipStrike}</span></span>}
