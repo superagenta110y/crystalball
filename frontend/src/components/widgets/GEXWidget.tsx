@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { BarChart, Bar, XAxis, YAxis, ReferenceLine, ReferenceDot, ResponsiveContainer, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, ReferenceLine, ReferenceDot, ResponsiveContainer, Cell, Tooltip } from "recharts";
 import { SymbolBar } from "./SymbolBar";
 import { useDashboardStore } from "@/lib/store/dashboardStore";
 
@@ -173,6 +173,7 @@ export function GEXWidget({ symbol = "SPY", isGlobalOverride, config, onConfigCh
               <XAxis dataKey="strike" tick={{ fontSize: 9, fill: "#8b8fa8" }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
               <YAxis tick={{ fontSize: 9, fill: "#8b8fa8" }} tickLine={false} axisLine={false} tickFormatter={(v: number) => `${(v / 1e9).toFixed(1)}B`} />
               <ReferenceLine y={0} stroke="#2a2a2a" />
+              <Tooltip content={() => null} cursor={false} wrapperStyle={{ display: "none" }} isAnimationActive={false} />
               {flipStrike && <ReferenceLine x={flipStrike} stroke="#ffffff33" strokeDasharray="4 2" />}
               {flipStrike && (
                 <ReferenceDot x={flipStrike} y={0} r={0} shape={(p:any) => (

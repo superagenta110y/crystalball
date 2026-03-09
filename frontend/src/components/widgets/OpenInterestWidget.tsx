@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { BarChart, Bar, XAxis, YAxis, Legend, ResponsiveContainer, ReferenceLine, ReferenceDot } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Legend, ResponsiveContainer, ReferenceLine, ReferenceDot, Tooltip } from "recharts";
 import { SymbolBar } from "./SymbolBar";
 import { useDashboardStore } from "@/lib/store/dashboardStore";
 
@@ -220,6 +220,7 @@ export function OpenInterestWidget({ symbol = "SPY", isGlobalOverride, config, o
                 tickLine={false} axisLine={false}
                 tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`}
               />
+              <Tooltip content={() => null} cursor={false} wrapperStyle={{ display: "none" }} isAnimationActive={false} />
               <ReferenceLine x={center} stroke="#ffffff22" strokeDasharray="4 2" />
               <ReferenceDot x={center} y={0} r={0} shape={(p:any) => (
                 <g transform={`translate(${p.cx - 7},${p.cy + 4})`}>
