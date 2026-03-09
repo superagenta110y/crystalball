@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { SlidersHorizontal, Settings2, CircleHelp, X } from "lucide-react";
 import { useDashboardStore } from "@/lib/store/dashboardStore";
+import { AppColorPicker } from "@/components/ui/AppColorPicker";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -65,102 +66,6 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
   );
 }
 
-const PRESET_COLORS = ["#60a5fa","#f59e0b","#22d3ee","#a78bfa","#e879f9","#ef4444","#10b981","#3b82f6","#f97316","#14b8a6","#84cc16","#f43f5e","#8b5cf6","#64748b","#ffffff"];
-
-function hslToHex(h: number, s = 100, l = 50) {
-  s /= 100; l /= 100;
-  const c = (1 - Math.abs(2 * l - 1)) * s;
-  const x = c * (1 - Math.abs((h / 60) % 2 - 1));
-  const m = l - c / 2;
-  let r = 0, g = 0, b = 0;
-  if (h < 60) [r, g, b] = [c, x, 0];
-  else if (h < 120) [r, g, b] = [x, c, 0];
-  else if (h < 180) [r, g, b] = [0, c, x];
-  else if (h < 240) [r, g, b] = [0, x, c];
-  else if (h < 300) [r, g, b] = [x, 0, c];
-  else [r, g, b] = [c, 0, x];
-  const toHex = (v: number) => Math.round((v + m) * 255).toString(16).padStart(2, "0");
-  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-}
-
-function ColorRingPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const ringRef = useRef<HTMLDivElement>(null);
-  const setFromEvent = (e: React.MouseEvent | MouseEvent) => {
-    if (!ringRef.current) return;
-    const r = ringRef.current.getBoundingClientRect();
-    const cx = r.left + r.width / 2; const cy = r.top + r.height / 2;
-    const x = (e as MouseEvent).clientX - cx; const y = (e as MouseEvent).clientY - cy;
-    const dist = Math.sqrt(x * x + y * y);
-    const outer = r.width / 2;
-    const inner = outer - 14; // keep ring interaction only on ring thickness
-    if (dist < inner || dist > outer) return;
-
-    // conic-gradient starts at top (0°), clockwise
-    const ang = (Math.atan2(y, x) * 180 / Math.PI + 450) % 360;
-    onChange(hslToHex(ang));
-  };
-  return (
-    <div className="flex flex-col items-center gap-2">
-      <div
-        ref={ringRef}
-        onMouseDown={(e) => {
-          setFromEvent(e.nativeEvent);
-          const move = (ev: MouseEvent) => setFromEvent(ev);
-          const up = () => { window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
-          window.addEventListener("mousemove", move);
-          window.addEventListener("mouseup", up);
-        }}
-        className="relative w-28 h-28 rounded-full cursor-crosshair"
-        style={{ background: "conic-gradient(red, yellow, lime, cyan, blue, magenta, red)" }}
-      >
-        <div className="absolute inset-[11px] rounded-full bg-white flex items-center justify-center">
-          <div className="w-[74px] h-[74px] rounded-full border border-surface-border" style={{ background: value }} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ColorPicker16({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const [open, setOpen] = useState(false);
-  const [customOpen, setCustomOpen] = useState(false);
-  const wrapRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDoc = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) { setOpen(false); setCustomOpen(false); }
-    };
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [open]);
-
-  return (
-    <div ref={wrapRef} className="relative inline-flex">
-      <button type="button" onClick={() => setOpen(v => !v)} className="w-6 h-6 rounded-full border border-surface-border" style={{ background: value }} title="Pick color" />
-      {open && !customOpen && (
-        <div className="absolute right-0 top-8 z-50 rounded-lg border border-surface-border bg-surface-raised/95 backdrop-blur px-2.5 py-2.5 shadow-2xl">
-          <div className="grid grid-cols-4 gap-2 min-w-[96px]">
-            {PRESET_COLORS.map((c) => (
-              <button key={c} type="button" onClick={() => { onChange(c); setOpen(false); }} className={`w-5 h-5 rounded-full border-2 ${value.toLowerCase() === c.toLowerCase() ? "border-white ring-1 ring-white/40" : "border-surface-border"}`} style={{ background: c }} title={c} />
-            ))}
-            <button type="button" onClick={() => setCustomOpen(true)} className="w-5 h-5 rounded-full border-2 border-surface-border bg-gradient-to-br from-red-400 via-emerald-400 to-blue-500" title="Custom color" />
-          </div>
-        </div>
-      )}
-      {open && customOpen && (
-        <div className="absolute right-0 top-8 z-50 rounded-lg border border-surface-border bg-surface-raised/95 backdrop-blur px-3 py-3 shadow-2xl">
-          <div className="flex justify-end mb-1">
-            <button type="button" onClick={() => { setOpen(false); setCustomOpen(false); }} className="p-0.5 rounded hover:bg-surface-overlay">
-              <X size={12} />
-            </button>
-          </div>
-          <ColorRingPicker value={value} onChange={onChange} />
-        </div>
-      )}
-    </div>
-  );
-}
 
 interface ChartWidgetProps {
   symbol?: string;
@@ -715,11 +620,11 @@ export function ChartWidget({
                 <div className="space-y-2">
                   <div className="text-[11px] text-neutral-500 uppercase tracking-wide">Fast Line</div>
                   <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Fast Period" help="Bars used for fast SMA." /><input type="number" value={smaFastPeriod} onChange={e=>setSmaFastPeriod(Number(e.target.value)||20)} className="w-10 bg-surface-overlay border border-surface-border rounded px-1 py-1" /></label>
-                  <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Fast Color" help="Color of fast SMA line." /><ColorPicker16 value={smaFastColor} onChange={setSmaFastColor} /></label>
+                  <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Fast Color" help="Color of fast SMA line." /><AppColorPicker value={smaFastColor} onChange={setSmaFastColor} /></label>
                   <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Fast Width" help="Thickness of fast SMA line." /><input type="number" min={1} max={6} value={smaFastWidth} onChange={e=>setSmaFastWidth(Number(e.target.value)||1)} className="w-10 bg-surface-overlay border border-surface-border rounded px-1 py-1" /></label>
                   <div className="pt-1 text-[11px] text-neutral-500 uppercase tracking-wide">Slow Line</div>
                   <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Slow Period" help="Bars used for slow SMA." /><input type="number" value={smaSlowPeriod} onChange={e=>setSmaSlowPeriod(Number(e.target.value)||50)} className="w-10 bg-surface-overlay border border-surface-border rounded px-1 py-1" /></label>
-                  <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Slow Color" help="Color of slow SMA line." /><ColorPicker16 value={smaSlowColor} onChange={setSmaSlowColor} /></label>
+                  <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Slow Color" help="Color of slow SMA line." /><AppColorPicker value={smaSlowColor} onChange={setSmaSlowColor} /></label>
                   <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Slow Width" help="Thickness of slow SMA line." /><input type="number" min={1} max={6} value={smaSlowWidth} onChange={e=>setSmaSlowWidth(Number(e.target.value)||1)} className="w-10 bg-surface-overlay border border-surface-border rounded px-1 py-1" /></label>
                 </div>
               )}
@@ -727,11 +632,11 @@ export function ChartWidget({
                 <div className="space-y-2">
                   <div className="text-[11px] text-neutral-500 uppercase tracking-wide">Fast Line</div>
                   <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Fast Period" help="Bars used for fast EMA." /><input type="number" value={emaFastPeriod} onChange={e=>setEmaFastPeriod(Number(e.target.value)||12)} className="w-10 bg-surface-overlay border border-surface-border rounded px-1 py-1" /></label>
-                  <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Fast Color" help="Color of fast EMA line." /><ColorPicker16 value={emaFastColor} onChange={setEmaFastColor} /></label>
+                  <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Fast Color" help="Color of fast EMA line." /><AppColorPicker value={emaFastColor} onChange={setEmaFastColor} /></label>
                   <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Fast Width" help="Thickness of fast EMA line." /><input type="number" min={1} max={6} value={emaFastWidth} onChange={e=>setEmaFastWidth(Number(e.target.value)||1)} className="w-10 bg-surface-overlay border border-surface-border rounded px-1 py-1" /></label>
                   <div className="pt-1 text-[11px] text-neutral-500 uppercase tracking-wide">Slow Line</div>
                   <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Slow Period" help="Bars used for slow EMA." /><input type="number" value={emaSlowPeriod} onChange={e=>setEmaSlowPeriod(Number(e.target.value)||26)} className="w-10 bg-surface-overlay border border-surface-border rounded px-1 py-1" /></label>
-                  <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Slow Color" help="Color of slow EMA line." /><ColorPicker16 value={emaSlowColor} onChange={setEmaSlowColor} /></label>
+                  <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Slow Color" help="Color of slow EMA line." /><AppColorPicker value={emaSlowColor} onChange={setEmaSlowColor} /></label>
                   <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Slow Width" help="Thickness of slow EMA line." /><input type="number" min={1} max={6} value={emaSlowWidth} onChange={e=>setEmaSlowWidth(Number(e.target.value)||1)} className="w-10 bg-surface-overlay border border-surface-border rounded px-1 py-1" /></label>
                 </div>
               )}
@@ -739,7 +644,7 @@ export function ChartWidget({
                 <div className="space-y-2">
                   <label className="flex items-center justify-between"><LabelWithHelp label="Period" help="Window length for Bollinger calculations." /><input type="number" value={bbPeriod} onChange={e=>setBbPeriod(Number(e.target.value)||20)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
                   <label className="flex items-center justify-between"><LabelWithHelp label="Std Dev" help="Standard deviation multiplier for upper/lower bands." /><input type="number" step="0.1" value={bbStd} onChange={e=>setBbStd(Number(e.target.value)||2)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
-                  <label className="flex items-center justify-between"><LabelWithHelp label="Line Color" help="Display color for BB lines." /><ColorPicker16 value={bbColor} onChange={setBbColor} /></label>
+                  <label className="flex items-center justify-between"><LabelWithHelp label="Line Color" help="Display color for BB lines." /><AppColorPicker value={bbColor} onChange={setBbColor} /></label>
                   <label className="flex items-center justify-between"><LabelWithHelp label="Line Thickness" help="Pixel width for BB lines." /><input type="number" min={1} max={6} value={bbWidth} onChange={e=>setBbWidth(Number(e.target.value)||1)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
                 </div>
               )}
@@ -748,19 +653,19 @@ export function ChartWidget({
                   <label className="flex items-center justify-between"><LabelWithHelp label="Show Previous Close" help="Adds yesterday close level." /><Toggle checked={showPrevClose} onChange={setShowPrevClose} /></label>
                   <label className="flex items-center justify-between"><LabelWithHelp label="Show Day High/Low" help="Adds current session high and low." /><Toggle checked={showDayHighLow} onChange={setShowDayHighLow} /></label>
                   <label className="flex items-center justify-between"><LabelWithHelp label="Show Premarket H/L" help="Adds premarket high and low (4:00–9:30 ET)." /><Toggle checked={showPremarketHighLow} onChange={setShowPremarketHighLow} /></label>
-                  <label className="flex items-center justify-between"><LabelWithHelp label="Line Color" help="Display color for all price levels." /><ColorPicker16 value={levelColor} onChange={setLevelColor} /></label>
+                  <label className="flex items-center justify-between"><LabelWithHelp label="Line Color" help="Display color for all price levels." /><AppColorPicker value={levelColor} onChange={setLevelColor} /></label>
                   <label className="flex items-center justify-between"><LabelWithHelp label="Line Thickness" help="Pixel width for level lines." /><input type="number" min={1} max={6} value={levelWidth} onChange={e=>setLevelWidth(Number(e.target.value)||1)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
                 </div>
               )}
               {indicatorModal === "vwap" && (
                 <div className="space-y-2">
-                  <label className="flex items-center justify-between"><LabelWithHelp label="Line Color" help="Display color for VWAP line." /><ColorPicker16 value={vwapColor} onChange={setVwapColor} /></label>
+                  <label className="flex items-center justify-between"><LabelWithHelp label="Line Color" help="Display color for VWAP line." /><AppColorPicker value={vwapColor} onChange={setVwapColor} /></label>
                   <label className="flex items-center justify-between"><LabelWithHelp label="Line Thickness" help="Pixel width for VWAP line." /><input type="number" min={1} max={6} value={vwapWidth} onChange={e=>setVwapWidth(Number(e.target.value)||1)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
                 </div>
               )}
               {indicatorModal === "vp" && (
                 <div className="space-y-2">
-                  <label className="flex items-center justify-between"><LabelWithHelp label="Line Color" help="Display color for POC line." /><ColorPicker16 value={vpColor} onChange={setVpColor} /></label>
+                  <label className="flex items-center justify-between"><LabelWithHelp label="Line Color" help="Display color for POC line." /><AppColorPicker value={vpColor} onChange={setVpColor} /></label>
                   <label className="flex items-center justify-between"><LabelWithHelp label="Line Thickness" help="Pixel width for POC line." /><input type="number" min={1} max={6} value={vpWidth} onChange={e=>setVpWidth(Number(e.target.value)||2)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
                 </div>
               )}
