@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { SlidersHorizontal, Settings2, CircleHelp, X, Check } from "lucide-react";
+import { SlidersHorizontal, Settings2, CircleHelp, X } from "lucide-react";
 import { useDashboardStore } from "@/lib/store/dashboardStore";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "";
@@ -67,15 +67,63 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 
 const PRESET_COLORS = ["#60a5fa","#f59e0b","#22d3ee","#a78bfa","#e879f9","#ef4444","#10b981","#3b82f6","#f97316","#14b8a6","#84cc16","#f43f5e","#8b5cf6","#64748b","#ffffff"];
 
+function hslToHex(h: number, s = 100, l = 50) {
+  s /= 100; l /= 100;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+  const m = l - c / 2;
+  let r = 0, g = 0, b = 0;
+  if (h < 60) [r, g, b] = [c, x, 0];
+  else if (h < 120) [r, g, b] = [x, c, 0];
+  else if (h < 180) [r, g, b] = [0, c, x];
+  else if (h < 240) [r, g, b] = [0, x, c];
+  else if (h < 300) [r, g, b] = [x, 0, c];
+  else [r, g, b] = [c, 0, x];
+  const toHex = (v: number) => Math.round((v + m) * 255).toString(16).padStart(2, "0");
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+function ColorRingPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const ringRef = useRef<HTMLDivElement>(null);
+  const setFromEvent = (e: React.MouseEvent | MouseEvent) => {
+    if (!ringRef.current) return;
+    const r = ringRef.current.getBoundingClientRect();
+    const cx = r.left + r.width / 2; const cy = r.top + r.height / 2;
+    const x = (e as MouseEvent).clientX - cx; const y = (e as MouseEvent).clientY - cy;
+    const ang = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+    onChange(hslToHex(ang));
+  };
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <div
+        ref={ringRef}
+        onMouseDown={(e) => {
+          setFromEvent(e.nativeEvent);
+          const move = (ev: MouseEvent) => setFromEvent(ev);
+          const up = () => { window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
+          window.addEventListener("mousemove", move);
+          window.addEventListener("mouseup", up);
+        }}
+        className="relative w-28 h-28 rounded-full cursor-crosshair"
+        style={{ background: "conic-gradient(red, yellow, lime, cyan, blue, magenta, red)" }}
+      >
+        <div className="absolute inset-[18px] rounded-full bg-surface-raised border border-surface-border flex items-center justify-center">
+          <div className="w-8 h-8 rounded-full border border-surface-border" style={{ background: value }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ColorPicker16({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [open, setOpen] = useState(false);
+  const [customOpen, setCustomOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const customRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) { setOpen(false); setCustomOpen(false); }
     };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
@@ -83,41 +131,20 @@ function ColorPicker16({ value, onChange }: { value: string; onChange: (v: strin
 
   return (
     <div ref={wrapRef} className="relative inline-flex">
-      <button
-        type="button"
-        onClick={() => setOpen(v => !v)}
-        className="w-6 h-6 rounded-full border border-surface-border"
-        style={{ background: value }}
-        title="Pick color"
-      />
-
-      {open && (
+      <button type="button" onClick={() => setOpen(v => !v)} className="w-6 h-6 rounded-full border border-surface-border" style={{ background: value }} title="Pick color" />
+      {open && !customOpen && (
         <div className="absolute right-0 top-8 z-50 rounded-lg border border-surface-border bg-surface-raised/95 backdrop-blur px-2.5 py-2.5 shadow-2xl">
           <div className="grid grid-cols-4 gap-2 min-w-[96px]">
             {PRESET_COLORS.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => { onChange(c); setOpen(false); }}
-                className={`w-5 h-5 rounded-full border-2 ${value.toLowerCase() === c.toLowerCase() ? "border-white ring-1 ring-white/40" : "border-surface-border"}`}
-                style={{ background: c }}
-                title={c}
-              />
+              <button key={c} type="button" onClick={() => { onChange(c); setOpen(false); }} className={`w-5 h-5 rounded-full border-2 ${value.toLowerCase() === c.toLowerCase() ? "border-white ring-1 ring-white/40" : "border-surface-border"}`} style={{ background: c }} title={c} />
             ))}
-            <button
-              type="button"
-              onClick={() => customRef.current?.click()}
-              className="w-5 h-5 rounded-full border-2 border-surface-border bg-gradient-to-br from-red-400 via-emerald-400 to-blue-500"
-              title="Custom color"
-            />
+            <button type="button" onClick={() => setCustomOpen(true)} className="w-5 h-5 rounded-full border-2 border-surface-border bg-gradient-to-br from-red-400 via-emerald-400 to-blue-500" title="Custom color" />
           </div>
-          <input
-            ref={customRef}
-            type="color"
-            value={value}
-            onChange={(e) => { onChange(e.target.value); setOpen(false); }}
-            className="sr-only"
-          />
+        </div>
+      )}
+      {open && customOpen && (
+        <div className="absolute right-0 top-8 z-50 rounded-lg border border-surface-border bg-surface-raised/95 backdrop-blur px-3 py-3 shadow-2xl">
+          <ColorRingPicker value={value} onChange={(v) => { onChange(v); setOpen(false); setCustomOpen(false); }} />
         </div>
       )}
     </div>
@@ -150,12 +177,18 @@ export function ChartWidget({
   const [indBB, setIndBB] = useState(false);
   const [indLevels, setIndLevels] = useState(false);
   const [indVP, setIndVP] = useState(false);
-  const [smaPeriod, setSmaPeriod] = useState(20);
-  const [smaColor, setSmaColor] = useState("#60a5fa");
-  const [smaWidth, setSmaWidth] = useState(1);
-  const [emaPeriod, setEmaPeriod] = useState(20);
-  const [emaColor, setEmaColor] = useState("#f59e0b");
-  const [emaWidth, setEmaWidth] = useState(1);
+  const [smaFastPeriod, setSmaFastPeriod] = useState(20);
+  const [smaFastColor, setSmaFastColor] = useState("#60a5fa");
+  const [smaFastWidth, setSmaFastWidth] = useState(1);
+  const [smaSlowPeriod, setSmaSlowPeriod] = useState(50);
+  const [smaSlowColor, setSmaSlowColor] = useState("#2563eb");
+  const [smaSlowWidth, setSmaSlowWidth] = useState(1);
+  const [emaFastPeriod, setEmaFastPeriod] = useState(12);
+  const [emaFastColor, setEmaFastColor] = useState("#f59e0b");
+  const [emaFastWidth, setEmaFastWidth] = useState(1);
+  const [emaSlowPeriod, setEmaSlowPeriod] = useState(26);
+  const [emaSlowColor, setEmaSlowColor] = useState("#b45309");
+  const [emaSlowWidth, setEmaSlowWidth] = useState(1);
   const [vwapColor, setVwapColor] = useState("#a78bfa");
   const [vwapWidth, setVwapWidth] = useState(1);
   const [bbPeriod, setBbPeriod] = useState(20);
@@ -320,8 +353,14 @@ export function ChartWidget({
       s.setData(data); indicatorSeriesRef.current.push(s);
     };
 
-    if (indSMA) addLine(computeSMA(bars, Math.max(2, smaPeriod)), smaColor, Math.max(1, smaWidth));
-    if (indEMA) addLine(computeEMA(bars, Math.max(2, emaPeriod)), emaColor, Math.max(1, emaWidth));
+    if (indSMA) {
+      addLine(computeSMA(bars, Math.max(2, smaFastPeriod)), smaFastColor, Math.max(1, smaFastWidth));
+      addLine(computeSMA(bars, Math.max(2, smaSlowPeriod)), smaSlowColor, Math.max(1, smaSlowWidth));
+    }
+    if (indEMA) {
+      addLine(computeEMA(bars, Math.max(2, emaFastPeriod)), emaFastColor, Math.max(1, emaFastWidth));
+      addLine(computeEMA(bars, Math.max(2, emaSlowPeriod)), emaSlowColor, Math.max(1, emaSlowWidth));
+    }
     if (indVWAP) {
       let pv = 0, vv = 0;
       const d = bars.map(b => { pv += ((b.high+b.low+b.close)/3)*(b.volume||0); vv += (b.volume||0); return { time:b.time, value: vv? pv/vv : b.close }; });
@@ -370,7 +409,7 @@ export function ChartWidget({
       s.setData([{ time: bars[0].time, value: poc }, { time: bars[bars.length - 1].time, value: poc }]);
       levelLinesRef.current.push(s);
     }
-  }, [clearIndicators, indSMA, indEMA, indVWAP, indBB, indLevels, indVP, smaPeriod, smaColor, smaWidth, emaPeriod, emaColor, emaWidth, vwapColor, vwapWidth, bbPeriod, bbStd, bbColor, bbWidth, levelColor, levelWidth, showPrevClose, showDayHighLow, showPremarketHighLow, vpColor, vpWidth]);
+  }, [clearIndicators, indSMA, indEMA, indVWAP, indBB, indLevels, indVP, smaFastPeriod, smaFastColor, smaFastWidth, smaSlowPeriod, smaSlowColor, smaSlowWidth, emaFastPeriod, emaFastColor, emaFastWidth, emaSlowPeriod, emaSlowColor, emaSlowWidth, vwapColor, vwapWidth, bbPeriod, bbStd, bbColor, bbWidth, levelColor, levelWidth, showPrevClose, showDayHighLow, showPremarketHighLow, vpColor, vpWidth]);
 
   useEffect(() => {
     const bars = Array.from(cacheRef.current.values()).sort((a,b)=>a.time-b.time);
@@ -619,7 +658,7 @@ export function ChartWidget({
               { key: 'vp', label: 'Volume Profile', enabled: indVP, set: setIndVP },
             ].map((it:any) => (
               <div key={it.key} className="flex items-center justify-between gap-2 py-1">
-                <label className="flex items-center gap-2"><Toggle checked={it.enabled} onChange={it.set} /><span>{it.label}</span></label>
+                <label className="flex items-center gap-2"><input type="checkbox" checked={it.enabled} onChange={e=>it.set(e.target.checked)} /><span>{it.label}</span></label>
                 {it.enabled && <button onClick={() => setIndicatorModal(it.key)} className="p-0.5 rounded border border-surface-border hover:border-accent/50"><Settings2 size={12} /></button>}
               </div>
             ))}
@@ -648,16 +687,26 @@ export function ChartWidget({
             <div className="pt-2">
               {indicatorModal === "sma" && (
                 <div className="space-y-2">
-                  <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Period" help="Bars used to compute the simple moving average." /><input type="number" value={smaPeriod} onChange={e=>setSmaPeriod(Number(e.target.value)||20)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
-                  <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Line Color" help="Display color for SMA line." /><ColorPicker16 value={smaColor} onChange={setSmaColor} /></label>
-                  <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Line Thickness" help="Pixel width of SMA line." /><input type="number" min={1} max={6} value={smaWidth} onChange={e=>setSmaWidth(Number(e.target.value)||1)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
+                  <div className="text-[11px] text-neutral-500 uppercase tracking-wide">Fast Line</div>
+                  <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Fast Period" help="Bars used for fast SMA." /><input type="number" value={smaFastPeriod} onChange={e=>setSmaFastPeriod(Number(e.target.value)||20)} className="w-10 bg-surface-overlay border border-surface-border rounded px-1 py-1" /></label>
+                  <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Fast Color" help="Color of fast SMA line." /><ColorPicker16 value={smaFastColor} onChange={setSmaFastColor} /></label>
+                  <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Fast Width" help="Thickness of fast SMA line." /><input type="number" min={1} max={6} value={smaFastWidth} onChange={e=>setSmaFastWidth(Number(e.target.value)||1)} className="w-10 bg-surface-overlay border border-surface-border rounded px-1 py-1" /></label>
+                  <div className="pt-1 text-[11px] text-neutral-500 uppercase tracking-wide">Slow Line</div>
+                  <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Slow Period" help="Bars used for slow SMA." /><input type="number" value={smaSlowPeriod} onChange={e=>setSmaSlowPeriod(Number(e.target.value)||50)} className="w-10 bg-surface-overlay border border-surface-border rounded px-1 py-1" /></label>
+                  <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Slow Color" help="Color of slow SMA line." /><ColorPicker16 value={smaSlowColor} onChange={setSmaSlowColor} /></label>
+                  <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Slow Width" help="Thickness of slow SMA line." /><input type="number" min={1} max={6} value={smaSlowWidth} onChange={e=>setSmaSlowWidth(Number(e.target.value)||1)} className="w-10 bg-surface-overlay border border-surface-border rounded px-1 py-1" /></label>
                 </div>
               )}
               {indicatorModal === "ema" && (
                 <div className="space-y-2">
-                  <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Period" help="Bars used to compute exponential moving average." /><input type="number" value={emaPeriod} onChange={e=>setEmaPeriod(Number(e.target.value)||20)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
-                  <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Line Color" help="Display color for EMA line." /><ColorPicker16 value={emaColor} onChange={setEmaColor} /></label>
-                  <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Line Thickness" help="Pixel width of EMA line." /><input type="number" min={1} max={6} value={emaWidth} onChange={e=>setEmaWidth(Number(e.target.value)||1)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
+                  <div className="text-[11px] text-neutral-500 uppercase tracking-wide">Fast Line</div>
+                  <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Fast Period" help="Bars used for fast EMA." /><input type="number" value={emaFastPeriod} onChange={e=>setEmaFastPeriod(Number(e.target.value)||12)} className="w-10 bg-surface-overlay border border-surface-border rounded px-1 py-1" /></label>
+                  <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Fast Color" help="Color of fast EMA line." /><ColorPicker16 value={emaFastColor} onChange={setEmaFastColor} /></label>
+                  <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Fast Width" help="Thickness of fast EMA line." /><input type="number" min={1} max={6} value={emaFastWidth} onChange={e=>setEmaFastWidth(Number(e.target.value)||1)} className="w-10 bg-surface-overlay border border-surface-border rounded px-1 py-1" /></label>
+                  <div className="pt-1 text-[11px] text-neutral-500 uppercase tracking-wide">Slow Line</div>
+                  <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Slow Period" help="Bars used for slow EMA." /><input type="number" value={emaSlowPeriod} onChange={e=>setEmaSlowPeriod(Number(e.target.value)||26)} className="w-10 bg-surface-overlay border border-surface-border rounded px-1 py-1" /></label>
+                  <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Slow Color" help="Color of slow EMA line." /><ColorPicker16 value={emaSlowColor} onChange={setEmaSlowColor} /></label>
+                  <label className="flex items-center justify-between gap-2"><LabelWithHelp label="Slow Width" help="Thickness of slow EMA line." /><input type="number" min={1} max={6} value={emaSlowWidth} onChange={e=>setEmaSlowWidth(Number(e.target.value)||1)} className="w-10 bg-surface-overlay border border-surface-border rounded px-1 py-1" /></label>
                 </div>
               )}
               {indicatorModal === "bb" && (
@@ -691,7 +740,7 @@ export function ChartWidget({
               )}
             </div>
 
-            <div className="flex justify-end"><button onClick={() => setIndicatorModal(null)} className="p-1.5 rounded border border-surface-border hover:border-accent/50 text-accent"><Check size={14} /></button></div>
+
           </div>
         </div>
       )}
