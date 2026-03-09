@@ -26,7 +26,7 @@ export function GEXWidget({ symbol = "SPY", isGlobalOverride, config, onConfigCh
   const [availableExpirations, setAvailableExpirations] = useState<string[]>([]);
   const [selectedExpirations, setSelectedExpirations] = useState<string[]>(parseCsv(config?.expDates));
   const [strikeRange, setStrikeRange] = useState<string>(config?.strikeRange || "5");
-  const [hover, setHover] = useState<{ x:number; y:number; strike:number; gex:number; plotLeft:number; plotTop:number; plotWidth:number; plotHeight:number; xAxisY:number; yAxisX:number } | null>(null);
+  const [hover, setHover] = useState<{ x:number; y:number; strike:number; gex:number; w:number; h:number } | null>(null);
   const { bull, bear } = useDashboardStore(s => s.theme);
   const API = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -152,10 +152,10 @@ export function GEXWidget({ symbol = "SPY", isGlobalOverride, config, onConfigCh
                 <span className="mx-2 text-neutral-500">|</span>
                 <span className={hover.gex >= 0 ? "text-bull" : "text-bear"}>GEX {hover.gex >= 0 ? "+" : ""}{(hover.gex/1e9).toFixed(2)}B</span>
               </div>
-              <div className="absolute z-10 border-l border-dashed border-neutral-400/60" style={{ left: hover.x, top: hover.plotTop, height: hover.plotHeight }} />
-              <div className="absolute z-10 border-t border-dashed border-neutral-400/60" style={{ top: hover.y, left: hover.plotLeft, width: hover.plotWidth }} />
-              <div className="absolute z-20 px-1.5 py-0.5 text-[10px] rounded-[2px] bg-black !text-white" style={{ left: Math.max(hover.plotLeft, Math.min(hover.plotLeft + hover.plotWidth - 44, hover.x - 22)), top: hover.xAxisY + 1, color: '#fff' }}>{hover.strike}</div>
-              <div className="absolute z-20 px-1.5 py-0.5 text-[10px] rounded-[2px] bg-black !text-white" style={{ left: hover.yAxisX + 1, top: Math.max(hover.plotTop, Math.min(hover.plotTop + hover.plotHeight - 18, hover.y - 9)), color: '#fff' }}>{(hover.gex/1e9).toFixed(2)}B</div>
+              <div className="absolute z-10 border-l border-dashed border-neutral-400/60" style={{ left: hover.x, top: 4, height: Math.max(0, hover.h - 24) }} />
+              <div className="absolute z-10 border-t border-dashed border-neutral-400/60" style={{ top: hover.y, left: 2, width: Math.max(0, hover.w - 56) }} />
+              <div className="absolute z-20 px-1.5 py-0.5 text-[10px] rounded-[2px] bg-black !text-white" style={{ left: Math.max(4, Math.min(hover.w - 60, hover.x - 22)), bottom: 0, color: '#fff' }}>{hover.strike}</div>
+              <div className="absolute z-20 px-1.5 py-0.5 text-[10px] rounded-[2px] bg-black !text-white" style={{ right: 0, top: Math.max(4, Math.min(hover.h - 28, hover.y - 9)), color: '#fff' }}>{(hover.gex/1e9).toFixed(2)}B</div>
             </>
           )}
           <ResponsiveContainer width="100%" height="100%">
@@ -166,19 +166,13 @@ export function GEXWidget({ symbol = "SPY", isGlobalOverride, config, onConfigCh
                 if (!s?.isTooltipActive || !s?.activePayload?.length) { setHover(null); return; }
                 const row = s.activePayload[0]?.payload;
                 if (!row) return;
-                const xAxis: any = Object.values(s?.xAxisMap || {})[0] || {};
-                const yAxis: any = Object.values(s?.yAxisMap || {})[0] || {};
                 setHover({
                   x: s.chartX,
                   y: s.chartY,
                   strike: Number(row.strike),
                   gex: Number(row.gex),
-                  plotLeft: Number(xAxis.x ?? 0),
-                  plotTop: Number(xAxis.y ?? 0),
-                  plotWidth: Number(xAxis.width ?? 0),
-                  plotHeight: Number(xAxis.height ?? 0),
-                  xAxisY: Number(xAxis.y ?? 0) + Number(xAxis.height ?? 0),
-                  yAxisX: Number(yAxis.x ?? 0),
+                  w: Number(s.width || 0),
+                  h: Number(s.height || 0),
                 });
               }}
               onMouseLeave={() => setHover(null)}

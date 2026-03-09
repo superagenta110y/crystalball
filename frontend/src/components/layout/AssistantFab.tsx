@@ -39,6 +39,12 @@ export function AssistantFab() {
     fetch("/api/ai/status").then(r => r.json()).then(d => setConfigured(!!d?.configured)).catch(() => setConfigured(false));
   }, []);
 
+  useEffect(() => {
+    const onOpen = () => setOpen(true);
+    window.addEventListener("assistant:open", onOpen as EventListener);
+    return () => window.removeEventListener("assistant:open", onOpen as EventListener);
+  }, []);
+
   const active = useMemo(() => threads.find(t => t.id === activeId), [threads, activeId]);
 
   const addThread = () => {

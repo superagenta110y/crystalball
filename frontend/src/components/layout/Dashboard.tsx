@@ -227,9 +227,19 @@ export default function Dashboard() {
       <TabBar />
 
       {widgets.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center gap-3 text-neutral-600">
-          <span className="text-4xl">🔮</span>
-          <p className="text-sm">No widgets — click <strong className="text-neutral-400">+ Add Widget</strong> to build your dashboard.</p>
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 text-neutral-500">
+          <svg width="96" height="96" viewBox="0 0 96 96" className="opacity-90">
+            <defs>
+              <radialGradient id="cbGlow" cx="50%" cy="42%" r="58%">
+                <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.45" />
+                <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.05" />
+              </radialGradient>
+            </defs>
+            <circle cx="48" cy="48" r="28" fill="url(#cbGlow)" stroke="var(--accent)" strokeOpacity="0.45"/>
+            <path d="M24 72h48" stroke="currentColor" strokeOpacity="0.5" strokeWidth="4" strokeLinecap="round"/>
+            <path d="M32 76h32" stroke="currentColor" strokeOpacity="0.35" strokeWidth="4" strokeLinecap="round"/>
+          </svg>
+          <p className="text-sm">Click <strong className="text-neutral-300">[+Add Widget]</strong> or <button className="text-accent underline" onClick={() => window.dispatchEvent(new Event('assistant:open'))}>[Use AI]</button> to build your dashboard.</p>
         </div>
       ) : isMobile ? (
         <MobileLayout
