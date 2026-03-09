@@ -27,18 +27,40 @@ class AlpacaProvider(BaseProvider):
 
     async def get_quote(self, symbol: str) -> dict[str, Any]:
         async with httpx.AsyncClient() as c:
-            r = await c.get(
+            bid = ask = last = ts = None
+
+            # Best effort: latest quote
+            qr = await c.get(
                 f"{self._data_url}/v2/stocks/{symbol}/quotes/latest",
                 headers=self._headers,
             )
-            r.raise_for_status()
-            q = r.json().get("quote", {})
+            if qr.status_code == 200:
+                q = qr.json().get("quote", {})
+                bid = q.get("bp")
+                ask = q.get("ap")
+                ts = q.get("t")
+
+            # Prefer latest trade as last price when available
+            tr = await c.get(
+                f"{self._data_url}/v2/stocks/{symbol}/trades/latest",
+                headers=self._headers,
+            )
+            if tr.status_code == 200:
+                t = tr.json().get("trade", {})
+                last = t.get("p")
+                ts = t.get("t") or ts
+
+            if last is None and bid is not None and ask is not None:
+                last = (float(bid) + float(ask)) / 2
+            if last is None:
+                last = ask or bid
+
             return {
                 "symbol": symbol,
-                "bid_price": q.get("bp"),
-                "ask_price": q.get("ap"),
-                "last_price": q.get("ap"),
-                "timestamp": q.get("t"),
+                "bid_price": bid,
+                "ask_price": ask,
+                "last_price": last,
+                "timestamp": ts,
             }
 
     async def get_history(self, symbol: str, timeframe: str = "1Day", limit: int = 252) -> list[dict[str, Any]]:

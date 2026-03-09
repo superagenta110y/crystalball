@@ -90,7 +90,13 @@ function ColorRingPicker({ value, onChange }: { value: string; onChange: (v: str
     const r = ringRef.current.getBoundingClientRect();
     const cx = r.left + r.width / 2; const cy = r.top + r.height / 2;
     const x = (e as MouseEvent).clientX - cx; const y = (e as MouseEvent).clientY - cy;
-    const ang = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+    const dist = Math.sqrt(x * x + y * y);
+    const outer = r.width / 2;
+    const inner = outer - 14; // keep ring interaction only on ring thickness
+    if (dist < inner || dist > outer) return;
+
+    // conic-gradient starts at top (0°), clockwise
+    const ang = (Math.atan2(y, x) * 180 / Math.PI + 450) % 360;
     onChange(hslToHex(ang));
   };
   return (
@@ -107,8 +113,8 @@ function ColorRingPicker({ value, onChange }: { value: string; onChange: (v: str
         className="relative w-28 h-28 rounded-full cursor-crosshair"
         style={{ background: "conic-gradient(red, yellow, lime, cyan, blue, magenta, red)" }}
       >
-        <div className="absolute inset-[18px] rounded-full bg-surface-raised border border-surface-border flex items-center justify-center">
-          <div className="w-8 h-8 rounded-full border border-surface-border" style={{ background: value }} />
+        <div className="absolute inset-[11px] rounded-full bg-white flex items-center justify-center">
+          <div className="w-[74px] h-[74px] rounded-full border border-surface-border" style={{ background: value }} />
         </div>
       </div>
     </div>
@@ -144,7 +150,12 @@ function ColorPicker16({ value, onChange }: { value: string; onChange: (v: strin
       )}
       {open && customOpen && (
         <div className="absolute right-0 top-8 z-50 rounded-lg border border-surface-border bg-surface-raised/95 backdrop-blur px-3 py-3 shadow-2xl">
-          <ColorRingPicker value={value} onChange={(v) => { onChange(v); setOpen(false); setCustomOpen(false); }} />
+          <div className="flex justify-end mb-1">
+            <button type="button" onClick={() => { setOpen(false); setCustomOpen(false); }} className="p-0.5 rounded hover:bg-surface-overlay">
+              <X size={12} />
+            </button>
+          </div>
+          <ColorRingPicker value={value} onChange={onChange} />
         </div>
       )}
     </div>
