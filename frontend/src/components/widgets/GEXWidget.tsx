@@ -154,14 +154,14 @@ export function GEXWidget({ symbol = "SPY", isGlobalOverride, config, onConfigCh
               </div>
               <div className="absolute inset-y-2 z-10 border-l border-dashed border-neutral-400/60" style={{ left: hover.x }} />
               <div className="absolute inset-x-2 z-10 border-t border-dashed border-neutral-400/60" style={{ top: hover.y }} />
-              <div className="absolute z-20 px-1.5 py-0.5 text-[10px] rounded bg-black text-white" style={{ left: Math.max(6, hover.x - 20), bottom: 0 }}>{hover.strike}</div>
-              <div className="absolute z-20 px-1.5 py-0.5 text-[10px] rounded bg-black text-white" style={{ right: 0, top: Math.max(2, hover.y - 10) }}>{(hover.gex/1e9).toFixed(2)}B</div>
+              <div className="absolute z-20 px-1.5 py-0.5 text-[10px] rounded bg-black !text-white" style={{ left: Math.max(6, hover.x - 22), bottom: 0, color: '#fff' }}>{hover.strike}</div>
+              <div className="absolute z-20 px-1.5 py-0.5 text-[10px] rounded bg-black !text-white" style={{ right: 0, top: Math.max(2, hover.y - 10), color: '#fff' }}>{(hover.gex/1e9).toFixed(2)}B</div>
             </>
           )}
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={filtered}
-              margin={{ top: 4, right: 8, bottom: 4, left: 0 }}
+              margin={{ top: 4, right: 4, bottom: 2, left: 2 }}
               onMouseMove={(s:any) => {
                 if (!s?.isTooltipActive || !s?.activePayload?.length) { setHover(null); return; }
                 const row = s.activePayload[0]?.payload;
@@ -170,8 +170,8 @@ export function GEXWidget({ symbol = "SPY", isGlobalOverride, config, onConfigCh
               }}
               onMouseLeave={() => setHover(null)}
             >
-              <XAxis dataKey="strike" tick={{ fontSize: 9, fill: "#8b8fa8" }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-              <YAxis tick={{ fontSize: 9, fill: "#8b8fa8" }} tickLine={false} axisLine={false} tickFormatter={(v: number) => `${(v / 1e9).toFixed(1)}B`} />
+              <XAxis dataKey="strike" height={18} tick={{ fontSize: 9, fill: "#8b8fa8" }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+              <YAxis orientation="right" width={52} tick={{ fontSize: 9, fill: "#8b8fa8" }} tickLine={false} axisLine={false} tickFormatter={(v: number) => `${(v / 1e9).toFixed(1)}B`} />
               <ReferenceLine y={0} stroke="#2a2a2a" />
               <Tooltip content={() => null} cursor={false} wrapperStyle={{ display: "none" }} isAnimationActive={false} />
               {flipStrike && <ReferenceLine x={flipStrike} stroke="#ffffff33" strokeDasharray="4 2" />}
