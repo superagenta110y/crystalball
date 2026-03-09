@@ -58,8 +58,13 @@ html[data-theme="light"] .text-neutral-600 { color: #d1d5db !important; }
 html[data-theme="light"] .text-neutral-700 { color: #e5e7eb !important; }
 /* Inputs and form elements */
 html[data-theme="light"] input,
-html[data-theme="light"] textarea { color: #111827 !important; }
-html[data-theme="light"] input::placeholder { color: #9ca3af !important; }
+html[data-theme="light"] textarea,
+html[data-theme="light"] select {
+  color: #111827 !important;
+  background: #ffffff !important;
+}
+html[data-theme="light"] input::placeholder,
+html[data-theme="light"] textarea::placeholder { color: #9ca3af !important; }
 /* Font-mono code blocks */
 html[data-theme="light"] .font-mono { color: #1f2937; }
 
