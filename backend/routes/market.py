@@ -42,7 +42,7 @@ async def history(
     limit: int = Query(252, le=5000),
     start: str | None = Query(None, description="ISO timestamp"),
     end: str | None = Query(None, description="ISO timestamp"),
-    latest: str | None = Query(None, description="cursor or 'now' for paged mode"),
+    latest: str | None = Query(None, description="unix seconds/ISO anchor or 'now' for paged mode"),
     provider: BaseProvider = Depends(get_provider),
 ):
     sym = symbol.upper()
@@ -56,21 +56,12 @@ async def history(
             return cached
 
         bars = await provider.get_history(sym, timeframe=timeframe, limit=limit, start=start, end=end_iso)
-        next_cursor = None
-        if bars:
-            try:
-                oldest = datetime.fromisoformat(str(bars[0]["timestamp"]).replace("Z", "+00:00"))
-                next_cursor = str(int(oldest.timestamp()) - 1)
-            except Exception:
-                next_cursor = None
 
-        payload = {
-            "symbol": sym,
-            "timeframe": timeframe,
-            "bars": bars,
-            "cursor": next_cursor,
-            "has_more": bool(next_cursor and len(bars) >= limit),
-        }
+        compact = [
+            {"ts": b.get("timestamp"), "o": b.get("open"), "h": b.get("high"), "l": b.get("low"), "c": b.get("close"), "v": b.get("volume")}
+            for b in bars
+        ]
+        payload = {"s": sym, "tf": timeframe, "b": compact}
         history_cache.setex(key, history_cache.ttl_for_timeframe(timeframe), payload)
         return payload
 
