@@ -5,20 +5,24 @@ from collections import defaultdict
 
 def compute_oi(options_chain: list[dict]) -> list[dict]:
     """
-    Returns a list of {strike, oi_call, oi_put, oi_total} sorted by strike.
+    Returns a list of {strike, oi_call, oi_put, oi_total, volume_total} sorted by strike.
     """
     calls: dict[float, float] = defaultdict(float)
     puts: dict[float, float] = defaultdict(float)
+    vols: dict[float, float] = defaultdict(float)
 
     for opt in options_chain:
         try:
             strike = float(opt.get("strike_price", 0))
             oi = float(opt.get("open_interest") or 0)
             opt_type = (opt.get("option_type") or "").lower()
+            vol = float(opt.get("volume") or 0)
             if opt_type == "call":
                 calls[strike] += oi
+                vols[strike] += vol
             elif opt_type == "put":
                 puts[strike] += oi
+                vols[strike] += vol
         except (TypeError, ValueError):
             continue
 
@@ -29,6 +33,7 @@ def compute_oi(options_chain: list[dict]) -> list[dict]:
             "oi_call": round(calls.get(s, 0), 0),
             "oi_put": round(puts.get(s, 0), 0),
             "oi_total": round(calls.get(s, 0) + puts.get(s, 0), 0),
+            "volume_total": round(vols.get(s, 0), 0),
         }
         for s in all_strikes
     ]

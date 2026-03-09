@@ -12,7 +12,7 @@ const WIDGET_LIST: { id: WidgetType; label: string }[] = [
   { id: "chart",          label: "Chart" },
   { id: "orderflow",      label: "Order Flow" },
   { id: "openinterest",   label: "Open Interest" },
-  { id: "openinterest3d", label: "3D OI" },
+  { id: "openinterest3d", label: "OI Grid" },
   { id: "gex",            label: "GEX" },
   { id: "dex",            label: "DEX" },
   { id: "newsfeed",       label: "News Feed" },

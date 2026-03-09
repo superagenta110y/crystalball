@@ -7,7 +7,7 @@ const WIDGET_LABELS: Record<string, string> = {
   chart:          "Chart",
   orderflow:      "Order Flow",
   openinterest:   "Open Interest",
-  openinterest3d: "3D Open Interest",
+  openinterest3d: "OI Grid (Open Interest Grid)",
   gex:            "Gamma Exposure (GEX)",
   dex:            "Delta Exposure (DEX)",
   newsfeed:       "News Feed",

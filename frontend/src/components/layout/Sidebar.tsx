@@ -10,7 +10,7 @@ const WIDGETS = [
   { id: "chart",        label: "Chart",           icon: CandlestickChart, desc: "Candles + VWAP/VP/RSI" },
   { id: "orderflow",    label: "Order Flow",      icon: Activity,         desc: "Buy/sell bubble chart" },
   { id: "openinterest", label: "Open Interest",   icon: BarChart2,        desc: "OI by strike" },
-  { id: "openinterest3d",label: "3D OI",          icon: Layers,           desc: "Strike × expiry × OI" },
+  { id: "openinterest3d",label: "OI Grid",        icon: Layers,           desc: "Net OI skew grid by strike/expiry" },
   { id: "gex",          label: "GEX",             icon: TrendingUp,       desc: "Gamma exposure levels" },
   { id: "dex",          label: "DEX",             icon: TrendingDown,     desc: "Delta exposure" },
   { id: "newsfeed",     label: "News Feed",       icon: Newspaper,        desc: "Real-time market news" },
