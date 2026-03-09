@@ -14,7 +14,7 @@ async def quote(symbol: str, provider: BaseProvider = Depends(get_provider)):
 async def history(
     symbol: str,
     timeframe: str = Query("1Day", description="1Min|5Min|1Hour|1Day|1Week"),
-    limit: int = Query(252, le=1000),
+    limit: int = Query(252, le=5000),
     provider: BaseProvider = Depends(get_provider),
 ):
     return await provider.get_history(symbol.upper(), timeframe=timeframe, limit=limit)

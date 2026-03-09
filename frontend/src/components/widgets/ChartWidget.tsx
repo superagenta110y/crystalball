@@ -398,9 +398,9 @@ export function ChartWidget({
       const tfSec = tfSecMap[tf] || 60;
       const newest = bars[bars.length - 1]?.time || 0;
       const nowSec = Math.floor(Date.now() / 1000);
-      if (!gapRefetchingRef.current && nowSec - newest > tfSec * 20 && limit < 1000) {
+      if (!gapRefetchingRef.current && nowSec - newest > tfSec * 20 && limit < 5000) {
         gapRefetchingRef.current = true;
-        const nextLimit = Math.min(1000, Math.max(limit + 200, 600));
+        const nextLimit = Math.min(5000, Math.max(limit + 400, 1200));
         await loadFull(sym, tf, nextLimit, fit);
         gapRefetchingRef.current = false;
         return;
@@ -466,8 +466,9 @@ export function ChartWidget({
       if (!range || loadingMoreRef.current) return;
       if (range.from > 20) return;
 
-      const nextLimit = Math.min(1000, (historyLimitRef.current || 0) + 200);
-      if (nextLimit <= (historyLimitRef.current || 0)) return;
+      const cur = historyLimitRef.current || 0;
+      const nextLimit = Math.min(5000, cur + 300);
+      if (nextLimit <= cur) return;
 
       loadingMoreRef.current = true;
       loadFull(symbol, timeframe, nextLimit, false)
