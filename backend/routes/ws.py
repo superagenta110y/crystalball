@@ -9,33 +9,30 @@ import json
 from collections import defaultdict
 from typing import Set
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from services import screener_cache
+from routes.deps import get_provider
 
 router = APIRouter(tags=["websocket"])
 
-# symbol → set of connected WebSocket clients
 _connections: dict[str, Set[WebSocket]] = defaultdict(set)
-# symbol → running asyncio Task
 _poll_tasks: dict[str, asyncio.Task] = {}
 
 
 async def _poll_loop(symbol: str):
-    """Poll Alpaca REST every 1s and broadcast to all connected clients for this symbol."""
-    from routes.deps import get_provider
-
     while True:
         clients = _connections.get(symbol)
         if not clients:
-            break  # no subscribers left — exit and let GC clean up
+            break
 
         try:
             provider = await get_provider()
             quote = await provider.get_quote(symbol)
             msg = json.dumps({
                 "symbol": symbol,
-                "price":  quote.get("last_price"),
-                "bid":    quote.get("bid_price"),
-                "ask":    quote.get("ask_price"),
-                "ts":     quote.get("timestamp"),
+                "price": quote.get("last_price"),
+                "bid": quote.get("bid_price"),
+                "ask": quote.get("ask_price"),
+                "ts": quote.get("timestamp"),
             })
             dead: Set[WebSocket] = set()
             for ws in list(clients):
@@ -45,28 +42,24 @@ async def _poll_loop(symbol: str):
                     dead.add(ws)
             clients -= dead
         except Exception:
-            pass  # transient API errors — keep polling
+            pass
 
         await asyncio.sleep(1)
 
-    # Clean up task ref
     _poll_tasks.pop(symbol, None)
 
 
 async def _handle_client(websocket: WebSocket, symbol: str):
     symbol = symbol.upper()
     await websocket.accept()
-
     _connections[symbol].add(websocket)
 
-    # Start polling task for this symbol if not already running
     task = _poll_tasks.get(symbol)
     if task is None or task.done():
         _poll_tasks[symbol] = asyncio.create_task(_poll_loop(symbol))
 
     try:
         while True:
-            # Wait for client close or ping — 30s timeout then send keepalive
             try:
                 await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
             except asyncio.TimeoutError:
@@ -82,7 +75,30 @@ async def quote_stream(websocket: WebSocket, symbol: str):
     await _handle_client(websocket, symbol)
 
 
-# Legacy endpoint — kept for any existing consumers
 @router.websocket("/ws/market/{symbol}")
 async def market_stream_legacy(websocket: WebSocket, symbol: str):
     await _handle_client(websocket, symbol)
+
+
+@router.websocket("/ws/screener")
+async def screener_stream(websocket: WebSocket):
+    await websocket.accept()
+    symbols: list[str] = []
+    provider = await get_provider()
+    try:
+        while True:
+            try:
+                raw = await asyncio.wait_for(websocket.receive_text(), timeout=2.0)
+                msg = json.loads(raw)
+                symbols = [str(s).upper() for s in (msg.get("symbols") or [])][:100]
+            except asyncio.TimeoutError:
+                pass
+
+            if symbols:
+                await screener_cache.refresh_if_needed(provider, symbols, {})
+                items = [x for x in (screener_cache.get_symbol(s) for s in symbols) if x]
+                await websocket.send_text(json.dumps({"type": "screener", "items": items}))
+            else:
+                await websocket.send_text(json.dumps({"ping": True}))
+    except (WebSocketDisconnect, Exception):
+        return

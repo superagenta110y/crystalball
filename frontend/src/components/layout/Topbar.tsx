@@ -34,6 +34,7 @@ export function Topbar() {
 
   const [showAddWidget, setShowAddWidget] = useState(false);
   const [showStyle, setShowStyle] = useState(false);
+  const [showThemeMenu, setShowThemeMenu] = useState(false);
 
   const [draft, setDraft] = useState("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -55,7 +56,7 @@ export function Topbar() {
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (addRef.current && !addRef.current.contains(e.target as Node)) setShowAddWidget(false);
-      if (styleRef.current && !styleRef.current.contains(e.target as Node)) setShowStyle(false);
+      if (styleRef.current && !styleRef.current.contains(e.target as Node)) { setShowStyle(false); setShowThemeMenu(false); }
       if (overrideRef.current && !overrideRef.current.contains(e.target as Node)) setShowSuggestions(false);
     };
     document.addEventListener("mousedown", handler);
@@ -187,15 +188,21 @@ export function Topbar() {
             <div className="absolute right-0 top-full mt-1 w-56 bg-surface-raised border border-surface-border rounded-xl shadow-2xl z-50 overflow-hidden">
               <div className="px-3 py-2 text-xs text-neutral-500 uppercase tracking-widest border-b border-surface-border">Style</div>
               <div className="py-3 px-3 flex flex-col gap-4">
-                <div className="flex flex-col gap-1.5">
+                <div className="flex flex-col gap-1.5 relative">
                   <span className="text-xs text-neutral-500">Theme</span>
-                  <div className="flex gap-1.5">
-                    {THEME_MODES.map(({ id, Icon }) => (
-                      <button key={id} onClick={() => setTheme({ mode: id })} className={`flex-1 flex items-center justify-center py-2.5 rounded-lg border text-xs transition ${theme.mode === id ? "border-accent/60 bg-accent/10 text-accent" : "border-surface-border text-neutral-500 hover:text-white hover:border-neutral-500"}`}>
-                        <Icon size={15} />
-                      </button>
-                    ))}
-                  </div>
+                  <button onClick={() => setShowThemeMenu(v=>!v)} className="w-full flex items-center justify-between px-2 py-2 rounded-lg border border-surface-border hover:bg-surface-overlay">
+                    {(() => { const cur = THEME_MODES.find(m => m.id === theme.mode) || THEME_MODES[0]; const Icon = cur.Icon; return <Icon size={15} />; })()}
+                    <ChevronDown size={12} className={`transition ${showThemeMenu ? "rotate-180" : ""}`} />
+                  </button>
+                  {showThemeMenu && (
+                    <div className="absolute left-0 right-0 top-[56px] z-20 rounded-lg border border-surface-border bg-surface-overlay shadow-xl p-1">
+                      {THEME_MODES.filter(m => m.id !== theme.mode).map(({ id, Icon }) => (
+                        <button key={id} onClick={() => { setTheme({ mode: id }); setShowThemeMenu(false); }} className="w-full flex items-center justify-center py-2 rounded hover:bg-surface-border text-neutral-300 hover:text-white">
+                          <Icon size={15} />
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-between">

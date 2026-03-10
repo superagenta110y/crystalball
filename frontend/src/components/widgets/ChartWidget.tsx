@@ -96,7 +96,7 @@ export function ChartWidget({
   const [barStatus, setBarStatus] = useState<string>("");
   const [crosshairStatus, setCrosshairStatus] = useState<string>("");
   const [crosshairActive, setCrosshairActive] = useState(false);
-  const [indicatorModal, setIndicatorModal] = useState<null | "sma" | "ema" | "bb" | "levels" | "vp" | "vwap">(null);
+  const [indicatorModal, setIndicatorModal] = useState<null | "sma" | "ema" | "bb" | "levels" | "vp" | "vwap" | "cvd">(null);
   const [indSMA, setIndSMA] = useState(false);
   const [indEMA, setIndEMA] = useState(false);
   const [indVWAP, setIndVWAP] = useState(false);
@@ -104,6 +104,7 @@ export function ChartWidget({
   const [indLevels, setIndLevels] = useState(false);
   const [indVP, setIndVP] = useState(false);
   const [indCVD, setIndCVD] = useState(false);
+  const [cvdAnchor, setCvdAnchor] = useState<"auto"|"day"|"week"|"month"|"year">("auto");
   const [smaFastPeriod, setSmaFastPeriod] = useState(20);
   const [smaFastColor, setSmaFastColor] = useState("#60a5fa");
   const [smaFastWidth, setSmaFastWidth] = useState(1);
@@ -175,11 +176,11 @@ export function ChartWidget({
       });
       const bars = Array.from(cacheRef.current.values()).sort((a, b) => a.time - b.time);
       volumeRef.current.setData(
-        bars.map(b => ({
+        indCVD ? bars.map(b => ({
           time: b.time,
           value: b.volume || 0,
           color: b.close >= b.open ? toRgba(bull, 0.5) : toRgba(bear, 0.5),
-        }))
+        })) : []
       );
     }
     if (extShadeRef.current) {
@@ -194,7 +195,7 @@ export function ChartWidget({
       rightPriceScale: { borderColor: "transparent" },
       timeScale: { borderColor: "transparent" },
     });
-  }, [theme.bull, theme.bear, theme.mode]);
+  }, [theme.bull, theme.bear, theme.mode, indCVD]);
 
   // Sync global override → local state
   useEffect(() => {
@@ -460,16 +461,17 @@ export function ChartWidget({
       levelLinesRef.current.push(s);
     }
     if (indCVD && bars.length) {
+      const src = anchorBars(bars, cvdAnchor);
       let cvd = 0;
-      const d = bars.map((b, i) => {
-        const prev = bars[Math.max(0, i - 1)]?.close ?? b.open;
+      const bull = getComputedStyle(document.documentElement).getPropertyValue("--bull").trim() || theme.bull;
+      const bear = getComputedStyle(document.documentElement).getPropertyValue("--bear").trim() || theme.bear;
+      const d = src.map((b, i) => {
+        const prev = src[Math.max(0, i - 1)]?.close ?? b.open;
         const delta = b.close >= prev ? (b.volume || 0) : -(b.volume || 0);
         cvd += delta;
-        return { time: b.time, value: cvd };
+        return { time: b.time, value: cvd, color: delta >= 0 ? toRgba(bull, 0.75) : toRgba(bear, 0.75) };
       });
-      const s = chartRef.current.addLineSeries({
-        color: "#7dd3fc",
-        lineWidth: 1,
+      const s = chartRef.current.addHistogramSeries({
         priceScaleId: "cvd",
         priceLineVisible: false,
         lastValueVisible: false,
@@ -478,7 +480,7 @@ export function ChartWidget({
       s.setData(d);
       indicatorSeriesRef.current.push(s);
     }
-  }, [clearIndicators, timeframe, vwapAnchor, vpAnchor, indSMA, indEMA, indVWAP, indBB, indLevels, indVP, indCVD, smaFastPeriod, smaFastColor, smaFastWidth, smaSlowPeriod, smaSlowColor, smaSlowWidth, emaFastPeriod, emaFastColor, emaFastWidth, emaSlowPeriod, emaSlowColor, emaSlowWidth, vwapColor, vwapWidth, bbPeriod, bbStd, bbColor, bbWidth, levelColor, levelWidth, showPrevClose, showDayHighLow, showPremarketHighLow, vpColor, vpWidth]);
+  }, [clearIndicators, timeframe, vwapAnchor, vpAnchor, cvdAnchor, theme.bull, theme.bear, indSMA, indEMA, indVWAP, indBB, indLevels, indVP, indCVD, smaFastPeriod, smaFastColor, smaFastWidth, smaSlowPeriod, smaSlowColor, smaSlowWidth, emaFastPeriod, emaFastColor, emaFastWidth, emaSlowPeriod, emaSlowColor, emaSlowWidth, vwapColor, vwapWidth, bbPeriod, bbStd, bbColor, bbWidth, levelColor, levelWidth, showPrevClose, showDayHighLow, showPremarketHighLow, vpColor, vpWidth]);
 
   const updateSessionShading = useCallback(() => {
     if (!extShadeRef.current) return;
@@ -551,11 +553,11 @@ export function ChartWidget({
       const bull = getComputedStyle(document.documentElement).getPropertyValue("--bull").trim() || theme.bull;
       const bear = getComputedStyle(document.documentElement).getPropertyValue("--bear").trim() || theme.bear;
       volumeRef.current?.setData(
-        bars.map(b => ({
+        indCVD ? bars.map(b => ({
           time: b.time,
           value: b.volume || 0,
           color: b.close >= b.open ? toRgba(bull, 0.5) : toRgba(bear, 0.5),
-        }))
+        })) : []
       );
       drawIndicators(bars);
       const lb = bars[bars.length - 1];
@@ -589,7 +591,7 @@ export function ChartWidget({
     } catch {
       setStatus("error");
     }
-  }, [theme.bull, theme.bear, drawIndicators, updateSessionShading]);
+  }, [theme.bull, theme.bear, indCVD, drawIndicators, updateSessionShading]);
 
   // Incremental update — fetches last 3 bars and upserts changes
   const pollUpdate = useCallback(async (sym: string, tf: Timeframe) => {
@@ -611,11 +613,13 @@ export function ChartWidget({
           seriesRef.current.update(bar);   // lightweight-charts upserts by time
           const bull = getComputedStyle(document.documentElement).getPropertyValue("--bull").trim() || theme.bull;
           const bear = getComputedStyle(document.documentElement).getPropertyValue("--bear").trim() || theme.bear;
-          volumeRef.current?.update({
-            time: bar.time,
-            value: bar.volume || 0,
-            color: bar.close >= bar.open ? toRgba(bull, 0.5) : toRgba(bear, 0.5),
-          });
+          if (indCVD) {
+            volumeRef.current?.update({
+              time: bar.time,
+              value: bar.volume || 0,
+              color: bar.close >= bar.open ? toRgba(bull, 0.5) : toRgba(bear, 0.5),
+            });
+          }
         }
       }
       if (hasNewBar) drawIndicators(Array.from(cacheRef.current.values()).sort((a,b)=>a.time-b.time));
@@ -655,13 +659,13 @@ export function ChartWidget({
       seriesRef.current.setData(merged);
       const bull = getComputedStyle(document.documentElement).getPropertyValue("--bull").trim() || theme.bull;
       const bear = getComputedStyle(document.documentElement).getPropertyValue("--bear").trim() || theme.bear;
-      volumeRef.current?.setData(merged.map(b => ({ time: b.time, value: b.volume || 0, color: b.close >= b.open ? toRgba(bull, 0.5) : toRgba(bear, 0.5) })));
+      volumeRef.current?.setData(indCVD ? merged.map(b => ({ time: b.time, value: b.volume || 0, color: b.close >= b.open ? toRgba(bull, 0.5) : toRgba(bear, 0.5) })) : []);
       drawIndicators(merged);
       updateSessionShading();
     } finally {
       loadingMoreRef.current = false;
     }
-  }, [symbol, timeframe, theme.bull, theme.bear, drawIndicators, updateSessionShading]);
+  }, [symbol, timeframe, theme.bull, theme.bear, indCVD, drawIndicators, updateSessionShading]);
 
   // Auto-backfill older candles when panning to the left edge
   useEffect(() => {
@@ -881,7 +885,7 @@ export function ChartWidget({
             ].map((it:any) => (
               <div key={it.key} className="flex items-center justify-between gap-2 py-1">
                 <label className="flex items-center gap-2"><input type="checkbox" checked={it.enabled} onChange={e=>it.set(e.target.checked)} /><span>{it.label}</span></label>
-                {it.enabled && it.key !== 'cvd' && <button onClick={() => setIndicatorModal(it.key)} className="p-0.5 rounded border border-surface-border hover:border-accent/50"><Settings2 size={12} /></button>}
+                {it.enabled && <button onClick={() => setIndicatorModal(it.key)} className="p-0.5 rounded border border-surface-border hover:border-accent/50"><Settings2 size={12} /></button>}
               </div>
             ))}
           </div>
@@ -971,6 +975,16 @@ export function ChartWidget({
                   </label>
                   <label className="flex items-center justify-between"><LabelWithHelp label="Line Color" help="Display color for POC line." /><AppColorPicker value={vpColor} onChange={setVpColor} /></label>
                   <label className="flex items-center justify-between"><LabelWithHelp label="Line Thickness" help="Pixel width for POC line." /><input type="number" min={1} max={6} value={vpWidth} onChange={e=>setVpWidth(Number(e.target.value)||2)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
+                </div>
+              )}
+              {indicatorModal === "cvd" && (
+                <div className="space-y-2">
+                  <label className="flex items-center justify-between"><LabelWithHelp label="Anchor" help="Reset point for cumulative delta." />
+                    <select value={cvdAnchor} onChange={e=>setCvdAnchor(e.target.value as any)} className="w-24 bg-surface-overlay border border-surface-border rounded px-2 py-1">
+                      <option value="auto">Auto</option><option value="day">Day</option><option value="week">Week</option><option value="month">Month</option><option value="year">Year</option>
+                    </select>
+                  </label>
+                  <div className="text-[11px] text-neutral-500">Colors inherit Bull/Bear theme.</div>
                 </div>
               )}
             </div>

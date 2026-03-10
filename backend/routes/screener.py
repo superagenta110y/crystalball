@@ -4,6 +4,7 @@ import json
 from fastapi import APIRouter, Depends, Query
 from providers.base import BaseProvider
 from routes.deps import get_provider
+from services import screener_cache
 
 router = APIRouter(prefix="/screener", tags=["screener"])
 
@@ -123,35 +124,8 @@ async def screener(
     else:
         syms = list(dict.fromkeys(list(UNIVERSE.keys()) + EXTRA_SYMBOLS))
 
-    rows: list[dict] = []
-    for sym in syms:
-        try:
-            q = await provider.get_quote(sym)
-            h1 = await provider.get_history(sym, timeframe="1Min", limit=390)
-            hh = await provider.get_history(sym, timeframe="1Hour", limit=200)
-            dd = await provider.get_history(sym, timeframe="1Day", limit=260)
-            p = float(q.get("last_price") or 0)
-            vol_now = sum(float(x.get("volume") or x.get("v") or 0) for x in h1)
-            dd30 = dd[-30:]
-            vol_avg = (sum(float(x.get("volume") or x.get("v") or 0) for x in dd30) / max(1, len(dd30))) if dd30 else 0
-            meta = UNIVERSE.get(sym) or {}
-            rows.append({
-                "s": sym,
-                "p": p,
-                "sec": meta.get("sec", "Unknown"),
-                "mc": float(meta.get("mc", 0)),
-                "rv": (vol_now / vol_avg) if vol_avg else 0,
-                "c1m": _pct(p, _close(h1, 1)),
-                "c1h": _pct(p, _close(hh, 1)),
-                "c1d": _pct(p, _close(dd, 1)),
-                "c1w": _pct(p, _close(dd, 5)),
-                "c1mo": _pct(p, _close(dd, 21)),
-                "c1y": _pct(p, _close(dd, 252)),
-                "ytd": _pct(p, _close(dd, min(max(0, len(dd)-1), 60))),
-                "lg": meta.get("logo", ""),
-            })
-        except Exception:
-            continue
+    await screener_cache.refresh_if_needed(provider, syms, UNIVERSE)
+    rows: list[dict] = screener_cache.get_rows(syms)
 
     conds = []
     if filters:
