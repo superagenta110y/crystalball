@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Cell, Tooltip } from "recharts";
 
 type Row = { strike: number; value: number; color: string; meta?: any };
 
@@ -10,20 +11,33 @@ export function OptionsLightHistogram({ rows, valueFormat, statusRender }: {
   statusRender?: (r: Row) => string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const lwRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
   const seriesRef = useRef<any>(null);
   const strikeByTimeRef = useRef<Map<number, number>>(new Map());
   const rowByTimeRef = useRef<Map<number, Row>>(new Map());
   const [status, setStatus] = useState<string>("");
+  const [portrait, setPortrait] = useState(false);
 
   useEffect(() => {
+    const ro = new ResizeObserver((entries) => {
+      const r = entries[0]?.contentRect;
+      if (!r) return;
+      setPortrait(r.height > r.width * 1.05);
+    });
+    if (ref.current) ro.observe(ref.current);
+    return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (portrait) return;
     let alive = true;
     (async () => {
-      if (!ref.current) return;
+      if (!lwRef.current) return;
       const mod = await import("lightweight-charts");
-      if (!alive || !ref.current) return;
+      if (!alive || !lwRef.current) return;
 
-      const chart = mod.createChart(ref.current, {
+      const chart = mod.createChart(lwRef.current, {
         autoSize: true,
         layout: { background: { color: "transparent" }, textColor: "#8b8fa8" },
         grid: { vertLines: { color: "transparent" }, horzLines: { color: "transparent" } },
@@ -72,7 +86,7 @@ export function OptionsLightHistogram({ rows, valueFormat, statusRender }: {
       }
       seriesRef.current = null;
     };
-  }, [valueFormat, statusRender]);
+  }, [valueFormat, statusRender, portrait]);
 
   useEffect(() => {
     if (!seriesRef.current) return;
@@ -87,9 +101,32 @@ export function OptionsLightHistogram({ rows, valueFormat, statusRender }: {
   }, [rows]);
 
   return (
-    <div className="h-full w-full relative">
+    <div ref={ref} className="h-full w-full relative">
       {status && <div className="absolute left-2 top-2 z-20 text-xs font-mono text-neutral-300">{status}</div>}
-      <div ref={ref} className="h-full w-full" />
+      {portrait ? (
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart
+            data={rows}
+            layout="vertical"
+            margin={{ top: 20, right: 6, bottom: 6, left: 6 }}
+            onMouseMove={(s:any) => {
+              const row = s?.activePayload?.[0]?.payload as Row | undefined;
+              if (!row) { setStatus(""); return; }
+              setStatus(statusRender ? statusRender(row) : `Strike ${row.strike} | ${valueFormat(row.value)}`);
+            }}
+            onMouseLeave={() => setStatus("")}
+          >
+            <XAxis type="number" tick={{ fontSize: 9, fill: "#8b8fa8" }} tickLine={false} axisLine={false} tickFormatter={valueFormat} />
+            <YAxis type="category" dataKey="strike" width={48} tick={{ fontSize: 9, fill: "#8b8fa8" }} tickLine={false} axisLine={false} />
+            <Tooltip content={() => null} cursor={false} wrapperStyle={{ display: "none" }} isAnimationActive={false} />
+            <Bar dataKey="value" radius={[0, 2, 2, 0]}>
+              {rows.map((r, i) => <Cell key={i} fill={r.color} fillOpacity={0.85} />)}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      ) : (
+        <div ref={lwRef} className="h-full w-full" />
+      )}
     </div>
   );
 }
