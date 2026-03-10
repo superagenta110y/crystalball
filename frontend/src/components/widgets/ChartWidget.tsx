@@ -159,8 +159,8 @@ export function ChartWidget({
   const theme = useDashboardStore(s => s.theme);
   useEffect(() => {
     if (!seriesRef.current || !chartRef.current) return;
-    const bull     = getComputedStyle(document.documentElement).getPropertyValue("--bull").trim()      || theme.bull;
-    const bear     = getComputedStyle(document.documentElement).getPropertyValue("--bear").trim()      || theme.bear;
+    const bull = theme.bull || getComputedStyle(document.documentElement).getPropertyValue("--bull").trim();
+    const bear = theme.bear || getComputedStyle(document.documentElement).getPropertyValue("--bear").trim();
     const gridLine = getComputedStyle(document.documentElement).getPropertyValue("--grid-line").trim() || "#1e1e1e";
     const axisText = getComputedStyle(document.documentElement).getPropertyValue("--chart-text").trim()|| "#8b8fa8";
     seriesRef.current.applyOptions({
@@ -244,8 +244,8 @@ export function ChartWidget({
         height: containerRef.current.clientHeight,
       });
       // Read bull/bear from CSS variables so theme changes apply
-      const bull = getComputedStyle(document.documentElement).getPropertyValue("--bull").trim() || "#00d4aa";
-      const bear = getComputedStyle(document.documentElement).getPropertyValue("--bear").trim() || "#ff4d6d";
+      const bull = theme.bull || getComputedStyle(document.documentElement).getPropertyValue("--bull").trim() || "#00d4aa";
+      const bear = theme.bear || getComputedStyle(document.documentElement).getPropertyValue("--bear").trim() || "#ff4d6d";
       const series = chart.addCandlestickSeries({
         upColor: bull, downColor: bear,
         borderVisible: false, wickUpColor: bull, wickDownColor: bear,
@@ -466,8 +466,8 @@ export function ChartWidget({
     if (indCVD && bars.length) {
       const src = anchorBars(bars, cvdAnchor);
       let cvd = 0;
-      const bull = getComputedStyle(document.documentElement).getPropertyValue("--bull").trim() || theme.bull;
-      const bear = getComputedStyle(document.documentElement).getPropertyValue("--bear").trim() || theme.bear;
+      const bull = theme.bull || getComputedStyle(document.documentElement).getPropertyValue("--bull").trim();
+      const bear = theme.bear || getComputedStyle(document.documentElement).getPropertyValue("--bear").trim();
       const d = src.map((b, i) => {
         const prevPx = src[Math.max(0, i - 1)]?.close ?? b.open;
         const delta = b.close >= prevPx ? (b.volume || 0) : -(b.volume || 0);
@@ -525,8 +525,8 @@ export function ChartWidget({
     if (!bars.length || !seriesRef.current) return;
     // Re-apply full datasets so existing candles/derived series re-color immediately on theme changes.
     seriesRef.current.setData(bars);
-    const bull = getComputedStyle(document.documentElement).getPropertyValue("--bull").trim() || theme.bull;
-    const bear = getComputedStyle(document.documentElement).getPropertyValue("--bear").trim() || theme.bear;
+    const bull = theme.bull || getComputedStyle(document.documentElement).getPropertyValue("--bull").trim();
+    const bear = theme.bear || getComputedStyle(document.documentElement).getPropertyValue("--bear").trim();
     volumeRef.current?.setData(
       bars.map(b => ({ time: b.time, value: b.volume || 0, color: b.close >= b.open ? toRgba(bull, 0.5) : toRgba(bear, 0.5) }))
     );
@@ -568,8 +568,8 @@ export function ChartWidget({
 
       cacheRef.current = new Map(bars.map(b => [b.time, b]));
       seriesRef.current.setData(bars);
-      const bull = getComputedStyle(document.documentElement).getPropertyValue("--bull").trim() || theme.bull;
-      const bear = getComputedStyle(document.documentElement).getPropertyValue("--bear").trim() || theme.bear;
+      const bull = theme.bull || getComputedStyle(document.documentElement).getPropertyValue("--bull").trim();
+      const bear = theme.bear || getComputedStyle(document.documentElement).getPropertyValue("--bear").trim();
       volumeRef.current?.setData(
         bars.map(b => ({
           time: b.time,
@@ -629,8 +629,8 @@ export function ChartWidget({
           if (!cached) hasNewBar = true;
           cacheRef.current.set(bar.time, bar);
           seriesRef.current.update(bar);   // lightweight-charts upserts by time
-          const bull = getComputedStyle(document.documentElement).getPropertyValue("--bull").trim() || theme.bull;
-          const bear = getComputedStyle(document.documentElement).getPropertyValue("--bear").trim() || theme.bear;
+          const bull = theme.bull || getComputedStyle(document.documentElement).getPropertyValue("--bull").trim();
+          const bear = theme.bear || getComputedStyle(document.documentElement).getPropertyValue("--bear").trim();
           volumeRef.current?.update({
             time: bar.time,
             value: bar.volume || 0,
@@ -673,8 +673,8 @@ export function ChartWidget({
       for (const b of older) cacheRef.current.set(b.time, b);
       const merged = Array.from(cacheRef.current.values()).sort((a, b) => a.time - b.time);
       seriesRef.current.setData(merged);
-      const bull = getComputedStyle(document.documentElement).getPropertyValue("--bull").trim() || theme.bull;
-      const bear = getComputedStyle(document.documentElement).getPropertyValue("--bear").trim() || theme.bear;
+      const bull = theme.bull || getComputedStyle(document.documentElement).getPropertyValue("--bull").trim();
+      const bear = theme.bear || getComputedStyle(document.documentElement).getPropertyValue("--bear").trim();
       volumeRef.current?.setData(merged.map(b => ({ time: b.time, value: b.volume || 0, color: b.close >= b.open ? toRgba(bull, 0.5) : toRgba(bear, 0.5) })));
       drawIndicators(merged);
       updateSessionShading();
@@ -768,8 +768,8 @@ export function ChartWidget({
 
             cacheRef.current.set(lastTime, updated);
             seriesRef.current.update(updated);
-            const bull = getComputedStyle(document.documentElement).getPropertyValue("--bull").trim() || theme.bull;
-            const bear = getComputedStyle(document.documentElement).getPropertyValue("--bear").trim() || theme.bear;
+            const bull = theme.bull || getComputedStyle(document.documentElement).getPropertyValue("--bull").trim();
+            const bear = theme.bear || getComputedStyle(document.documentElement).getPropertyValue("--bear").trim();
             volumeRef.current?.update({
               time: updated.time,
               value: updated.volume || 0,
