@@ -139,6 +139,8 @@ export function OrderFlowWidget({ symbol = "SPY", isGlobalOverride, onConfigChan
   return (
     <div className="h-full w-full flex flex-col">
       <SymbolBar
+        label="Order Flow"
+        mobileLabel="Flow"
         symbol={symbol}
         isGlobalOverride={isGlobalOverride}
         onSymbolChange={s => onConfigChange?.({ symbol: s })}

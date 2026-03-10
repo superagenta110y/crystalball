@@ -94,6 +94,8 @@ export function DEXWidget({ symbol = "SPY", isGlobalOverride, config, onConfigCh
   return (
     <div className="h-full w-full flex flex-col">
       <SymbolBar
+        label="Delta Exposure"
+        mobileLabel="DEX"
         symbol={symbol}
         isGlobalOverride={isGlobalOverride}
         onSymbolChange={(s) => onConfigChange?.({ symbol: s })}

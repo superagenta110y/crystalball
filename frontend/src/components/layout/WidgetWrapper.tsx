@@ -27,37 +27,33 @@ interface WidgetWrapperProps {
 
 export function WidgetWrapper({ instance, onRemove, onToggleZoom, isZoomed, children }: WidgetWrapperProps) {
   const label = WIDGET_LABELS[instance.type] ?? { full: instance.type, mobile: instance.type.slice(0, 5) };
+  const inlineHeaderTypes = new Set(["chart", "gex", "dex", "openinterest", "openinterest3d", "orderflow"]);
+  const isChart = instance.type === "chart";
+  const useInlineHeader = inlineHeaderTypes.has(instance.type);
   return (
     <div className="flex flex-col h-full group/widget">
-      <div className="widget-header widget-drag-handle cursor-grab active:cursor-grabbing select-none">
-        <div className="flex items-center gap-1.5">
-          <GripHorizontal size={11} className="opacity-30" />
-          <span className="hidden sm:inline">{label.full}</span><span className="sm:hidden">{label.mobile}</span>
-          {instance.config.symbol && (
-            <span className="text-neutral-600 font-mono">{instance.config.symbol}</span>
-          )}
+      {!useInlineHeader && (
+        <div className="widget-header widget-drag-handle cursor-grab active:cursor-grabbing select-none">
+          <div className="flex items-center gap-1.5">
+            <GripHorizontal size={11} className="opacity-30" />
+            <span className="hidden sm:inline">{label.full}</span><span className="sm:hidden">{label.mobile}</span>
+            {instance.config.symbol && (
+              <span className="text-neutral-600 font-mono">{instance.config.symbol}</span>
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            <button onMouseDown={(e) => e.stopPropagation()} onClick={onToggleZoom} className="opacity-0 group-hover/widget:opacity-50 hover:!opacity-100 transition p-0.5 rounded" aria-label={isZoomed ? "Zoom out" : "Zoom in"} title={isZoomed ? "Zoom out" : "Zoom in"}>{isZoomed ? <Minimize2 size={11} /> : <Maximize2 size={11} />}</button>
+            <button onMouseDown={(e) => e.stopPropagation()} onClick={onRemove} className="opacity-0 group-hover/widget:opacity-50 hover:!opacity-100 transition p-0.5 rounded hover:text-red-400" aria-label="Remove widget"><X size={11} /></button>
+          </div>
         </div>
-        <div className="flex items-center gap-1">
-          <button
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={onToggleZoom}
-            className="opacity-0 group-hover/widget:opacity-50 hover:!opacity-100 transition p-0.5 rounded"
-            aria-label={isZoomed ? "Zoom out" : "Zoom in"}
-            title={isZoomed ? "Zoom out" : "Zoom in"}
-          >
-            {isZoomed ? <Minimize2 size={11} /> : <Maximize2 size={11} />}
-          </button>
-          <button
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={onRemove}
-            className="opacity-0 group-hover/widget:opacity-50 hover:!opacity-100 transition p-0.5 rounded hover:text-red-400"
-            aria-label="Remove widget"
-          >
-            <X size={11} />
-          </button>
-        </div>
-      </div>
+      )}
       <div className="flex-1 overflow-hidden relative">
+        {useInlineHeader && (
+          <div className="absolute top-1 right-1 z-30 flex items-center gap-1">
+            <button onMouseDown={(e) => e.stopPropagation()} onClick={onToggleZoom} className="opacity-30 hover:opacity-100 transition p-0.5 rounded" aria-label={isZoomed ? "Zoom out" : "Zoom in"}>{isZoomed ? <Minimize2 size={11} /> : <Maximize2 size={11} />}</button>
+            <button onMouseDown={(e) => e.stopPropagation()} onClick={onRemove} className="opacity-30 hover:opacity-100 transition p-0.5 rounded hover:text-red-400" aria-label="Remove widget"><X size={11} /></button>
+          </div>
+        )}
         {children}
       </div>
     </div>

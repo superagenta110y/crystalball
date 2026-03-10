@@ -96,6 +96,8 @@ export function GEXWidget({ symbol = "SPY", isGlobalOverride, config, onConfigCh
   return (
     <div className="h-full w-full flex flex-col">
       <SymbolBar
+        label="Gamma Exposure"
+        mobileLabel="GEX"
         symbol={symbol}
         isGlobalOverride={isGlobalOverride}
         onSymbolChange={(s) => onConfigChange?.({ symbol: s })}

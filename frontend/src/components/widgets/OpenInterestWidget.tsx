@@ -116,6 +116,8 @@ export function OpenInterestWidget({ symbol = "SPY", isGlobalOverride, config, o
   return (
     <div className="h-full w-full flex flex-col">
       <SymbolBar
+        label="Open Interest"
+        mobileLabel="OI"
         symbol={symbol}
         isGlobalOverride={isGlobalOverride}
         onSymbolChange={(s) => onConfigChange?.({ symbol: s })}

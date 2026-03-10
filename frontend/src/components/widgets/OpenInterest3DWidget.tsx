@@ -130,6 +130,8 @@ export function OpenInterest3DWidget({ symbol = "SPY", isGlobalOverride, config,
   return (
     <div ref={wrapRef} className="h-full w-full flex flex-col">
       <SymbolBar
+        label="OI Grid"
+        mobileLabel="Grid"
         symbol={symbol}
         isGlobalOverride={isGlobalOverride}
         onSymbolChange={(s) => onConfigChange?.({ symbol: s })}

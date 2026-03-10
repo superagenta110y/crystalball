@@ -10,9 +10,11 @@ interface SymbolBarProps {
   isGlobalOverride?: boolean;
   onSymbolChange: (sym: string) => void;
   extra?: React.ReactNode;
+  label?: string;
+  mobileLabel?: string;
 }
 
-export function SymbolBar({ symbol, isGlobalOverride, onSymbolChange, extra }: SymbolBarProps) {
+export function SymbolBar({ symbol, isGlobalOverride, onSymbolChange, extra, label, mobileLabel }: SymbolBarProps) {
   const [draft, setDraft] = useState(symbol);
   const [items, setItems] = useState<SymbolItem[]>([]);
   const [open, setOpen] = useState(false);
@@ -48,7 +50,9 @@ export function SymbolBar({ symbol, isGlobalOverride, onSymbolChange, extra }: S
   };
 
   return (
-    <div className="flex items-center gap-2 px-2 py-1.5 border-b border-surface-border shrink-0">
+    <div className="flex items-center gap-2 px-2 py-1.5 pr-14 border-b border-surface-border shrink-0">
+      {label && <span className="hidden sm:inline text-xs uppercase tracking-wide text-neutral-500">{label}</span>}
+      {mobileLabel && <span className="sm:hidden text-xs uppercase tracking-wide text-neutral-500">{mobileLabel}</span>}
       <div ref={ref} className="relative">
         <input
           value={draft}
