@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
+import { GripHorizontal } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -51,8 +52,13 @@ export function SymbolBar({ symbol, isGlobalOverride, onSymbolChange, extra, lab
 
   return (
     <div className="flex items-center gap-2 px-2 py-1.5 pr-14 border-b border-surface-border shrink-0">
-      {label && <span className="hidden sm:inline text-xs uppercase tracking-wide text-neutral-500">{label}</span>}
-      {mobileLabel && <span className="sm:hidden text-xs uppercase tracking-wide text-neutral-500">{mobileLabel}</span>}
+      {(label || mobileLabel) && (
+        <div className="widget-drag-handle cursor-grab active:cursor-grabbing select-none inline-flex items-center gap-1.5 text-neutral-500">
+          <GripHorizontal size={11} className="opacity-50" />
+          {label && <span className="hidden sm:inline text-xs uppercase tracking-wide">{label}</span>}
+          {mobileLabel && <span className="sm:hidden text-xs uppercase tracking-wide">{mobileLabel}</span>}
+        </div>
+      )}
       <div ref={ref} className="relative">
         <input
           value={draft}

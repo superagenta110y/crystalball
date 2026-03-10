@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { SlidersHorizontal, Settings2, CircleHelp, X } from "lucide-react";
+import { SlidersHorizontal, Settings2, CircleHelp, X, GripHorizontal } from "lucide-react";
 import { useDashboardStore } from "@/lib/store/dashboardStore";
 import { AppColorPicker } from "@/components/ui/AppColorPicker";
 
@@ -681,7 +681,10 @@ export function ChartWidget({
     <div className="relative flex flex-col h-full w-full">
       {/* Toolbar */}
       <div className="flex items-center gap-2 px-2 py-1.5 pr-14 border-b border-surface-border shrink-0 flex-wrap">
-        <span className="text-xs uppercase tracking-wide text-neutral-500">Chart</span>
+        <div className="widget-drag-handle cursor-grab active:cursor-grabbing select-none inline-flex items-center gap-1.5 text-neutral-500">
+          <GripHorizontal size={11} className="opacity-50" />
+          <span className="text-xs uppercase tracking-wide">Chart</span>
+        </div>
 
         {/* Symbol */}
         <div ref={symRef} className="relative flex items-center gap-1">
