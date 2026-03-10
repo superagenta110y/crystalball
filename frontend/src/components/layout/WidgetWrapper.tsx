@@ -27,6 +27,7 @@ interface WidgetWrapperProps {
 
 export function WidgetWrapper({ instance, onRemove, onToggleZoom, isZoomed, children }: WidgetWrapperProps) {
   const label = WIDGET_LABELS[instance.type] ?? { full: instance.type, mobile: instance.type.slice(0, 5) };
+  const [confirmRemove, setConfirmRemove] = React.useState(false);
   const inlineHeaderTypes = new Set(["chart", "gex", "dex", "openinterest", "openinterest3d", "orderflow"]);
   const disableZoomTypes = new Set(["openinterest"]);
   const isChart = instance.type === "chart";
@@ -45,7 +46,7 @@ export function WidgetWrapper({ instance, onRemove, onToggleZoom, isZoomed, chil
           </div>
           <div className="flex items-center gap-1">
             {canZoom && <button onMouseDown={(e) => e.stopPropagation()} onClick={onToggleZoom} className="opacity-0 group-hover/widget:opacity-100 transition p-1 rounded hover:bg-surface-overlay" aria-label={isZoomed ? "Zoom out" : "Zoom in"} title={isZoomed ? "Zoom out" : "Zoom in"}>{isZoomed ? <Minimize2 size={13} /> : <Maximize2 size={13} />}</button>}
-            <button onMouseDown={(e) => e.stopPropagation()} onClick={onRemove} className="opacity-0 group-hover/widget:opacity-100 transition p-1 rounded hover:bg-surface-overlay hover:text-red-400" aria-label="Remove widget"><X size={13} /></button>
+            <button onMouseDown={(e) => e.stopPropagation()} onClick={() => setConfirmRemove(true)} className="opacity-0 group-hover/widget:opacity-100 transition p-1 rounded hover:bg-surface-overlay hover:text-red-400" aria-label="Remove widget"><X size={13} /></button>
           </div>
         </div>
       )}
@@ -53,11 +54,23 @@ export function WidgetWrapper({ instance, onRemove, onToggleZoom, isZoomed, chil
         {useInlineHeader && (
           <div className="absolute top-1 right-1 z-30 flex items-center gap-1">
             {canZoom && <button onMouseDown={(e) => e.stopPropagation()} onClick={onToggleZoom} className="opacity-0 group-hover/widget:opacity-100 transition p-1 rounded hover:bg-surface-overlay" aria-label={isZoomed ? "Zoom out" : "Zoom in"}>{isZoomed ? <Minimize2 size={13} /> : <Maximize2 size={13} />}</button>}
-            <button onMouseDown={(e) => e.stopPropagation()} onClick={onRemove} className="opacity-0 group-hover/widget:opacity-100 transition p-1 rounded hover:bg-surface-overlay hover:text-red-400" aria-label="Remove widget"><X size={13} /></button>
+            <button onMouseDown={(e) => e.stopPropagation()} onClick={() => setConfirmRemove(true)} className="opacity-0 group-hover/widget:opacity-100 transition p-1 rounded hover:bg-surface-overlay hover:text-red-400" aria-label="Remove widget"><X size={13} /></button>
           </div>
         )}
         {children}
       </div>
+
+      {confirmRemove && (
+        <div className="fixed inset-0 z-[120] bg-black/50 flex items-center justify-center p-4">
+          <div className="w-full max-w-sm rounded-xl border border-surface-border bg-surface-raised p-4 shadow-2xl">
+            <div className="text-sm text-white mb-3">Are you sure you want to remove this widget from the page?</div>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setConfirmRemove(false)} className="px-3 py-1.5 text-xs rounded border border-surface-border hover:bg-surface-overlay">Cancel</button>
+              <button onClick={() => { setConfirmRemove(false); onRemove(); }} className="px-3 py-1.5 text-xs rounded border border-red-500/40 text-red-300 hover:bg-red-500/10">Remove</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
