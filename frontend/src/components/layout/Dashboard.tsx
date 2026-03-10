@@ -139,6 +139,8 @@ const TABBAR_H  = 34;
 const MARGIN    = 6;  // gap between cells
 const PADDING   = 6;  // container padding
 
+type SnapZone = "left" | "right" | "top" | "bottom" | "top-left" | "top-right" | null;
+
 function computeRowHeight(windowH: number, layout: Layout[]): number {
   if (!layout.length) return 30;
   const maxRow = layout.reduce((m, l) => Math.max(m, l.y + l.h), 1);
@@ -208,105 +210,76 @@ export default function Dashboard() {
     [activeTabId, updateLayout]
   );
 
-  const handleDrag = useCallback((layout: Layout[], oldItem: Layout, newItem: Layout, _placeholder: Layout, e: MouseEvent) => {
-    // If dragging a full-width widget and pointer moves far left/right, snap to half during drag.
-    if (oldItem.w === 12 && newItem.w === 12 && width) {
-      const leftThreshold = width * 0.275;
-      const rightThreshold = width * 0.725;
-      if (e.clientX <= leftThreshold) {
-        newItem.w = 6; newItem.x = 0;
-      } else if (e.clientX >= rightThreshold) {
-        newItem.w = 6; newItem.x = 6;
-      }
-    }
+  const [snapZone, setSnapZone] = useState<SnapZone>(null);
 
-    // If dragged near another widget edge in the same lane, split live (less sensitive).
-    const target = layout.find(it => it.i !== newItem.i && (
-      Math.max(it.y, newItem.y) < Math.min(it.y + it.h, newItem.y + newItem.h)
-    ) && (
-      Math.max(it.x, newItem.x) < Math.min(it.x + it.w, newItem.x + newItem.w)
-    ));
+  const detectSnapZone = useCallback((x: number, y: number, w: number, h: number): SnapZone => {
+    const edge = 70;
+    const corner = 110;
+    const nearLeft = x <= edge;
+    const nearRight = x >= (w - edge);
+    const nearTop = y <= edge;
+    const nearBottom = y >= (h - edge);
+    if (x <= corner && y <= corner) return "top-left";
+    if (x >= (w - corner) && y <= corner) return "top-right";
+    if (nearLeft) return "left";
+    if (nearRight) return "right";
+    if (nearTop) return "top";
+    if (nearBottom) return "bottom";
+    return null;
+  }, []);
 
-    if (target) {
-      const c = newItem.x + newItem.w / 2;
-      const nearLeftEdge = Math.abs(c - target.x) <= 1.2;
-      const nearRightEdge = Math.abs(c - (target.x + target.w)) <= 1.2;
-      if (nearLeftEdge || nearRightEdge) {
-        const total = target.w;
-        const small = total >= 10 ? Math.max(2, Math.round(total * 0.2)) : Math.max(2, Math.floor(total / 2));
-        const large = Math.max(2, total - small);
-        const draggedLeft = nearLeftEdge;
+  const handleDrag = useCallback((_layout: Layout[], _oldItem: Layout, _newItem: Layout, _placeholder: Layout, e: MouseEvent) => {
+    if (!width || !height) return;
+    const zone = detectSnapZone(e.clientX, e.clientY - (TOPBAR_H + TABBAR_H), width, Math.max(200, height - TOPBAR_H - TABBAR_H));
+    setSnapZone(zone);
+  }, [width, height, detectSnapZone]);
 
-        newItem.y = target.y;
-        newItem.h = target.h;
-        newItem.w = small;
-        newItem.x = draggedLeft ? target.x : (target.x + large);
-
-        target.w = large;
-        target.x = draggedLeft ? (target.x + small) : target.x;
-      }
-    }
-  }, [width]);
-
-  const handleDragStop = useCallback((newLayout: Layout[], oldItem: Layout, newItem: Layout) => {
+  const handleDragStop = useCallback((newLayout: Layout[], _oldItem: Layout, newItem: Layout) => {
     const l = newLayout.map(it => ({ ...it }));
     const idx = l.findIndex(it => it.i === newItem.i);
     if (idx < 0) return updateLayout(activeTabId, newLayout);
 
-    const topSnap = newItem.y <= 1;
-    if (topSnap) {
-      const center = newItem.x + newItem.w / 2;
-      if (center >= 4 && center <= 8) {
-        l[idx].x = 0; l[idx].w = 12; l[idx].y = 0;
-      } else if (center > 8) {
-        l[idx].x = 6; l[idx].w = 6; l[idx].y = 0;
-      } else {
-        l[idx].x = 0; l[idx].w = 6; l[idx].y = 0;
+    const maxRow = Math.max(8, ...l.map(it => it.y + it.h));
+    const halfH = Math.max(4, Math.floor(maxRow / 2));
+
+    if (snapZone) {
+      if (snapZone === "left")      { l[idx].x = 0; l[idx].y = 0; l[idx].w = 6; l[idx].h = maxRow; }
+      if (snapZone === "right")     { l[idx].x = 6; l[idx].y = 0; l[idx].w = 6; l[idx].h = maxRow; }
+      if (snapZone === "top")       { l[idx].x = 0; l[idx].y = 0; l[idx].w = 12; l[idx].h = halfH; }
+      if (snapZone === "bottom")    { l[idx].x = 0; l[idx].y = maxRow - halfH; l[idx].w = 12; l[idx].h = halfH; }
+      if (snapZone === "top-left")  { l[idx].x = 0; l[idx].y = 0; l[idx].w = 6; l[idx].h = halfH; }
+      if (snapZone === "top-right") { l[idx].x = 6; l[idx].y = 0; l[idx].w = 6; l[idx].h = halfH; }
+    }
+
+    const overlaps = (a: Layout, b: Layout) => !(a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y);
+    const collides = (cand: Layout, ignoreIdx?: number) => l.some((o, i) => i !== ignoreIdx && overlaps(cand, o));
+
+    // Reflow around moved widget.
+    for (let i = 0; i < l.length; i++) {
+      if (i === idx) continue;
+      while (overlaps(l[i], l[idx])) l[i].y += 1;
+    }
+
+    // Fill available space: moved first, then others.
+    const order = [l[idx].i, ...l.filter((_, i) => i !== idx).map(it => it.i)];
+    const byId = (id: string) => l.findIndex(it => it.i === id);
+
+    for (const id of order) {
+      const i = byId(id); if (i < 0) continue;
+      let changed = true;
+      while (changed) {
+        changed = false;
+        const t = l[i];
+        if (t.x + t.w < 12 && !collides({ ...t, w: t.w + 1 }, i)) { t.w += 1; changed = true; continue; } // left->right edge
+        if (t.y > 0 && !collides({ ...t, y: t.y - 1, h: t.h + 1 }, i)) { t.y -= 1; t.h += 1; changed = true; continue; } // bottom->top edge
+        if (t.x > 0 && !collides({ ...t, x: t.x - 1, w: t.w + 1 }, i)) { t.x -= 1; t.w += 1; changed = true; continue; } // right->left
+        if (!collides({ ...t, h: t.h + 1 }, i)) { t.h += 1; changed = true; } // top->bottom
       }
     }
 
-    // If dragged high/low out of viewport, cut height in half.
-    const vh = height ?? 900;
-    const rh = 24;
-    if (newItem.y <= 0 || (newItem.y * rh) > (vh - 180)) {
-      l[idx].h = Math.max(4, Math.ceil(oldItem.h / 2));
-    }
-
-    // Finalize horizontal split only when dropped near target edge.
-    const otherIdx = l.findIndex((it, i) => i !== idx && (
-      Math.max(it.y, l[idx].y) < Math.min(it.y + it.h, l[idx].y + l[idx].h)
-    ) && (
-      Math.max(it.x, l[idx].x) < Math.min(it.x + it.w, l[idx].x + l[idx].w)
-    ));
-    if (otherIdx >= 0) {
-      const other = l[otherIdx];
-      const c = l[idx].x + l[idx].w / 2;
-      const nearLeftEdge = Math.abs(c - other.x) <= 1.2;
-      const nearRightEdge = Math.abs(c - (other.x + other.w)) <= 1.2;
-      if (nearLeftEdge || nearRightEdge) {
-        const total = other.w;
-        const small = total >= 10 ? Math.max(2, Math.round(total * 0.2)) : Math.max(2, Math.floor(total / 2));
-        const large = Math.max(2, total - small);
-        const draggedLeft = nearLeftEdge;
-
-        l[idx].x = draggedLeft ? other.x : (other.x + large);
-        l[idx].w = small;
-        l[idx].y = other.y;
-        l[idx].h = other.h;
-
-        other.x = draggedLeft ? (other.x + small) : other.x;
-        other.w = large;
-      }
-    }
-
-    // Auto-expand into empty right/bottom space after small drag.
-    const target = l[idx];
-    const collides = (cand: Layout) => l.some((o, i) => i !== idx && !(cand.x + cand.w <= o.x || o.x + o.w <= cand.x || cand.y + cand.h <= o.y || o.y + o.h <= cand.y));
-    while (target.x + target.w < 12 && !collides({ ...target, w: target.w + 1 })) target.w += 1;
-    while (target.h < 24 && !collides({ ...target, h: target.h + 1 })) target.h += 1;
-
+    setSnapZone(null);
     updateLayout(activeTabId, l);
-  }, [activeTabId, updateLayout, height]);
+  }, [activeTabId, updateLayout, snapZone]);
 
   const isGlobalOverride = (tab?.globalSymbols?.length ?? 0) > 0;
 
@@ -391,41 +364,53 @@ export default function Dashboard() {
               ))}
             </div>
           ) : (
-            <GridLayout
-              className="layout"
-              layout={layout}
-              cols={12}
-              rowHeight={rowHeight}
-              width={gridWidth}
-              onLayoutChange={handleLayoutChange}
-              onDrag={handleDrag as any}
-              onDragStop={handleDragStop}
-              draggableHandle=".widget-drag-handle"
-              margin={[MARGIN, MARGIN]}
-              containerPadding={[PADDING, PADDING]}
-              compactType="vertical"
-              preventCollision={false}
-              isDraggable
-              isResizable
-            >
-              {widgets.map(instance => (
-                <div key={instance.id} className="widget">
-                  <WidgetWrapper
-                    instance={instance}
-                    onRemove={() => removeWidget(activeTabId, instance.id)}
-                    onToggleZoom={() => setZoomedWidgetId(instance.id)}
-                    isZoomed={false}
-                  >
-                    {renderWidget({
-                      instance,
-                      resolvedSymbol: resolvedSymbols[instance.id] ?? "SPY",
-                      isGlobalOverride,
-                      onConfigChange: (patch) => updateWidgetConfig(activeTabId, instance.id, patch),
-                    })}
-                  </WidgetWrapper>
-                </div>
-              ))}
-            </GridLayout>
+            <div className="relative h-full">
+              {snapZone && (
+                <div className={`absolute z-40 pointer-events-none border-2 border-accent bg-accent/12 rounded-xl transition-all
+                  ${snapZone === "left" ? "left-0 top-0 h-full w-1/2" : ""}
+                  ${snapZone === "right" ? "right-0 top-0 h-full w-1/2" : ""}
+                  ${snapZone === "top" ? "left-0 top-0 w-full h-1/2" : ""}
+                  ${snapZone === "bottom" ? "left-0 bottom-0 w-full h-1/2" : ""}
+                  ${snapZone === "top-left" ? "left-0 top-0 w-1/2 h-1/2" : ""}
+                  ${snapZone === "top-right" ? "right-0 top-0 w-1/2 h-1/2" : ""}
+                `} />
+              )}
+              <GridLayout
+                className="layout"
+                layout={layout}
+                cols={12}
+                rowHeight={rowHeight}
+                width={gridWidth}
+                onLayoutChange={handleLayoutChange}
+                onDrag={handleDrag as any}
+                onDragStop={handleDragStop}
+                draggableHandle=".widget-drag-handle"
+                margin={[MARGIN, MARGIN]}
+                containerPadding={[PADDING, PADDING]}
+                compactType="vertical"
+                preventCollision={false}
+                isDraggable
+                isResizable
+              >
+                {widgets.map(instance => (
+                  <div key={instance.id} className="widget">
+                    <WidgetWrapper
+                      instance={instance}
+                      onRemove={() => removeWidget(activeTabId, instance.id)}
+                      onToggleZoom={() => setZoomedWidgetId(instance.id)}
+                      isZoomed={false}
+                    >
+                      {renderWidget({
+                        instance,
+                        resolvedSymbol: resolvedSymbols[instance.id] ?? "SPY",
+                        isGlobalOverride,
+                        onConfigChange: (patch) => updateWidgetConfig(activeTabId, instance.id, patch),
+                      })}
+                    </WidgetWrapper>
+                  </div>
+                ))}
+              </GridLayout>
+            </div>
           )}
         </main>
       )}
