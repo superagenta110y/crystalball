@@ -109,9 +109,14 @@ export function OpenInterest3DWidget({ symbol = "SPY", isGlobalOverride, config,
 
   const cellBg = (d: CellData) => {
     const abs = Math.min(1, Math.abs(d.skew));
-    if (abs < 0.04) return `rgba(255,255,255,${0.2 + abs * 2})`;
-    if (d.skew > 0) return `rgba(var(--bull-rgb),${0.2 + abs * 0.75})`;
-    return `rgba(var(--bear-rgb),${0.2 + abs * 0.75})`;
+    if (abs < 0.04) return "#f3f4f6";
+    // dark -> bright as skew increases
+    if (d.skew > 0) {
+      const light = 30 + abs * 28; // dark green to bright green
+      return `hsl(155 78% ${light}%)`;
+    }
+    const light = 30 + abs * 28; // dark red to bright red
+    return `hsl(352 78% ${light}%)`;
   };
 
   const toggleExpiration = (exp: string, checked: boolean) => {

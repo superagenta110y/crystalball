@@ -7,6 +7,7 @@ export function TabBar() {
   const { tabs, activeTabId, setActiveTab, addTab, removeTab, renameTab } = useDashboardStore();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
+  const [confirmTabId, setConfirmTabId] = useState<string | null>(null);
 
   const startEdit = (id: string, name: string) => {
     setEditingId(id);
@@ -55,7 +56,11 @@ export function TabBar() {
 
           {tabs.length > 1 && (
             <button
-              onClick={(e) => { e.stopPropagation(); removeTab(tab.id); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                if ((tab.widgets?.length || 0) > 0) setConfirmTabId(tab.id);
+                else removeTab(tab.id);
+              }}
               className="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition p-0.5 rounded hover:text-bear"
             >
               <X size={10} />
@@ -70,6 +75,19 @@ export function TabBar() {
       >
         <Plus size={12} /> New Tab
       </button>
+
+      {confirmTabId && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="w-full max-w-sm rounded-xl border border-surface-border bg-surface-raised p-4 shadow-2xl">
+            <div className="text-sm text-white mb-1">Close tab?</div>
+            <div className="text-xs text-neutral-400 mb-4">This tab contains widgets. Closing it will remove that layout.</div>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setConfirmTabId(null)} className="px-3 py-1.5 text-xs rounded border border-surface-border hover:bg-surface-overlay">Cancel</button>
+              <button onClick={() => { removeTab(confirmTabId); setConfirmTabId(null); }} className="px-3 py-1.5 text-xs rounded border border-red-500/40 text-red-300 hover:bg-red-500/10">Close Tab</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
