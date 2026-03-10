@@ -20,7 +20,7 @@ def _tf_sec(tf: str) -> int:
     }.get(t, 86400)
 
 
-def _parse_latest_to_end_iso(latest: str | None, timeframe: str) -> str:
+def _parse_latest_to_end_ts(latest: str | None, timeframe: str) -> int:
     if not latest or latest == "now":
         ts = int(datetime.now(timezone.utc).timestamp())
     else:
@@ -31,7 +31,10 @@ def _parse_latest_to_end_iso(latest: str | None, timeframe: str) -> str:
             dt = datetime.fromisoformat(latest.replace("Z", "+00:00"))
             ts = int(dt.timestamp())
     step = _tf_sec(timeframe)
-    ts = (ts // step) * step
+    return (ts // step) * step
+
+
+def _ts_to_iso(ts: int) -> str:
     return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat().replace("+00:00", "Z")
 
 
@@ -49,13 +52,23 @@ async def history(
 
     # Cursor-based mode (preferred for frontend panning)
     if latest is not None:
-        end_iso = _parse_latest_to_end_iso(latest, timeframe)
-        key = f"hist:{sym}:{timeframe}:{limit}:{end_iso}"
+        end_ts = _parse_latest_to_end_ts(latest, timeframe)
+        end_iso = _ts_to_iso(end_ts)
+
+        # Constrain cursor loads to a recent bounded window to avoid provider returning stale/ancient slices.
+        req_start = start
+        if not req_start:
+            step = _tf_sec(timeframe)
+            lookback_bars = max(limit * 3, 400)
+            start_ts = max(0, end_ts - step * lookback_bars)
+            req_start = _ts_to_iso(start_ts)
+
+        key = f"hist:{sym}:{timeframe}:{limit}:{req_start}:{end_iso}"
         cached = history_cache.get(key)
         if cached is not None:
             return cached
 
-        bars = await provider.get_history(sym, timeframe=timeframe, limit=limit, start=start, end=end_iso)
+        bars = await provider.get_history(sym, timeframe=timeframe, limit=limit, start=req_start, end=end_iso)
 
         compact = [
             {"ts": b.get("timestamp"), "o": b.get("open"), "h": b.get("high"), "l": b.get("low"), "c": b.get("close"), "v": b.get("volume")}
