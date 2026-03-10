@@ -139,7 +139,7 @@ const TABBAR_H  = 34;
 const MARGIN    = 6;  // gap between cells
 const PADDING   = 6;  // container padding
 
-type SnapZone = "left" | "right" | "top" | "bottom" | "top-left" | "top-right" | null;
+type SnapZone = "left" | "right" | "top" | "bottom" | "top-left" | "top-right" | "bottom-left" | "bottom-right" | null;
 
 function computeRowHeight(windowH: number, layout: Layout[]): number {
   if (!layout.length) return 30;
@@ -234,6 +234,8 @@ export default function Dashboard() {
     const nearBottom = y >= (h - edge - grace);
     if (x <= (corner + grace) && y <= (corner + grace)) return "top-left";
     if (x >= (w - corner - grace) && y <= (corner + grace)) return "top-right";
+    if (x <= (corner + grace) && y >= (h - corner - grace)) return "bottom-left";
+    if (x >= (w - corner - grace) && y >= (h - corner - grace)) return "bottom-right";
     if (nearLeft) return "left";
     if (nearRight) return "right";
     if (nearTop) return "top";
@@ -271,6 +273,8 @@ export default function Dashboard() {
       if (snapZone === "bottom")    { l[idx].x = 0; l[idx].y = maxRowsAllowed - halfH; l[idx].w = 12; l[idx].h = halfH; }
       if (snapZone === "top-left")  { l[idx].x = 0; l[idx].y = 0; l[idx].w = 6; l[idx].h = halfH; }
       if (snapZone === "top-right") { l[idx].x = 6; l[idx].y = 0; l[idx].w = 6; l[idx].h = halfH; }
+      if (snapZone === "bottom-left")  { l[idx].x = 0; l[idx].y = maxRowsAllowed - halfH; l[idx].w = 6; l[idx].h = halfH; }
+      if (snapZone === "bottom-right") { l[idx].x = 6; l[idx].y = maxRowsAllowed - halfH; l[idx].w = 6; l[idx].h = halfH; }
 
       const freeRects: Array<{x:number;y:number;w:number;h:number}> = [];
       if (snapZone === "left") freeRects.push({ x: 6, y: 0, w: 6, h: maxRowsAllowed });
@@ -284,6 +288,14 @@ export default function Dashboard() {
       if (snapZone === "top-right") {
         freeRects.push({ x: 0, y: 0, w: 6, h: halfH });
         freeRects.push({ x: 0, y: halfH, w: 12, h: Math.max(2, maxRowsAllowed - halfH) });
+      }
+      if (snapZone === "bottom-left") {
+        freeRects.push({ x: 6, y: maxRowsAllowed - halfH, w: 6, h: halfH });
+        freeRects.push({ x: 0, y: 0, w: 12, h: Math.max(2, maxRowsAllowed - halfH) });
+      }
+      if (snapZone === "bottom-right") {
+        freeRects.push({ x: 0, y: maxRowsAllowed - halfH, w: 6, h: halfH });
+        freeRects.push({ x: 0, y: 0, w: 12, h: Math.max(2, maxRowsAllowed - halfH) });
       }
 
       const others = l.filter((_, i) => i !== idx);
@@ -477,6 +489,8 @@ export default function Dashboard() {
                   ${snapZone === "bottom" ? "left-0 bottom-0 w-full h-1/2" : ""}
                   ${snapZone === "top-left" ? "left-0 top-0 w-1/2 h-1/2" : ""}
                   ${snapZone === "top-right" ? "right-0 top-0 w-1/2 h-1/2" : ""}
+                  ${snapZone === "bottom-left" ? "left-0 bottom-0 w-1/2 h-1/2" : ""}
+                  ${snapZone === "bottom-right" ? "right-0 bottom-0 w-1/2 h-1/2" : ""}
                 `} />
               )}
               <GridLayout
