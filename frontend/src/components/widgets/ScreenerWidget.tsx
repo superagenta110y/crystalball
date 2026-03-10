@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Filter as FilterIcon, Plus, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Filter as FilterIcon, Plus, X } from "lucide-react";
 import { useDashboardStore } from "@/lib/store/dashboardStore";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "";
@@ -94,6 +94,8 @@ export function ScreenerWidget() {
   const [page, setPage] = useState(1);
   const [pageSize] = useState(50);
   const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const listRef = useRef<HTMLDivElement>(null);
   const [conds, setConds] = useState<Cond[]>([
     { id: crypto.randomUUID(), field: "c1d", op: ">", value: "1" },
   ]);
@@ -141,8 +143,10 @@ export function ScreenerWidget() {
         logo: String(x.lg || ""),
       }));
 
-      setRows(mapped);
-      setTotal(Number(d?.t || 0));
+      setRows(prev => page === 1 ? mapped : [...prev, ...mapped]);
+      const t = Number(d?.t || 0);
+      setTotal(t);
+      setHasMore((page * pageSize) < t && mapped.length > 0);
     } catch {
       setRows([]);
       setTotal(0);
@@ -153,9 +157,22 @@ export function ScreenerWidget() {
 
   useEffect(() => {
     fetchPage();
-    const t = setInterval(fetchPage, 30000);
+    const t = setInterval(() => { setPage(1); }, 30000);
     return () => clearInterval(t);
   }, [page, pageSize, sortKey, sortDir, conds]);
+
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      if (!hasMore || loading) return;
+      if (el.scrollTop + el.clientHeight >= el.scrollHeight - 80) {
+        setPage(p => p + 1);
+      }
+    };
+    el.addEventListener("scroll", onScroll);
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [hasMore, loading]);
 
   useEffect(() => {
     if (!rows.length || typeof window === "undefined") return;
@@ -180,7 +197,6 @@ export function ScreenerWidget() {
   }, [rows.map(r => r.symbol).join(",")]);
 
   const sectors = useMemo(() => Array.from(new Set(rows.map((r) => r.sector))).sort(), [rows]);
-  const pageCount = Math.max(1, Math.ceil(total / pageSize));
 
   const pctCls = (v: number) => (v >= 0 ? "text-bull" : "text-bear");
 
@@ -211,7 +227,7 @@ export function ScreenerWidget() {
 
   return (
     <div className="h-full w-full flex flex-col relative" ref={popRef}>
-      <div className="absolute top-1 right-1 z-30 inline-flex items-center gap-1 text-[11px] text-neutral-500">
+      <div className="absolute top-1 left-1 z-30 inline-flex items-center gap-1 text-[11px] text-neutral-500">
         <button
           onClick={() => setShowFilters((v) => !v)}
           className="p-1.5 rounded hover:bg-surface-overlay text-neutral-500 hover:text-white opacity-100 sm:opacity-0 sm:group-hover/widget:opacity-100 transition"
@@ -219,9 +235,6 @@ export function ScreenerWidget() {
         >
           <FilterIcon size={13} />
         </button>
-        <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="p-1 rounded disabled:opacity-40 hover:bg-surface-overlay"><ChevronLeft size={12} /></button>
-        <span>{page}/{pageCount}</span>
-        <button disabled={page >= pageCount} onClick={() => setPage((p) => Math.min(pageCount, p + 1))} className="p-1 rounded disabled:opacity-40 hover:bg-surface-overlay"><ChevronRight size={12} /></button>
       </div>
 
       {showFilters && (
@@ -277,7 +290,7 @@ export function ScreenerWidget() {
           </div>
         )}
 
-      <div className="flex-1 overflow-auto text-xs relative">
+      <div ref={listRef} className="flex-1 overflow-auto text-xs relative">
         {loading && <div className="p-4 text-neutral-500 animate-pulse">Loading screener…</div>}
         {!loading && (
           <table className="w-full min-w-[980px]">
