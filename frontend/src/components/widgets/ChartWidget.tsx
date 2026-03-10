@@ -512,9 +512,17 @@ export function ChartWidget({
 
   useEffect(() => {
     const bars = Array.from(cacheRef.current.values()).sort((a,b)=>a.time-b.time);
-    if (bars.length) drawIndicators(bars);
+    if (!bars.length || !seriesRef.current) return;
+    // Re-apply full datasets so existing candles/derived series re-color immediately on theme changes.
+    seriesRef.current.setData(bars);
+    const bull = getComputedStyle(document.documentElement).getPropertyValue("--bull").trim() || theme.bull;
+    const bear = getComputedStyle(document.documentElement).getPropertyValue("--bear").trim() || theme.bear;
+    volumeRef.current?.setData(
+      indCVD ? bars.map(b => ({ time: b.time, value: b.volume || 0, color: b.close >= b.open ? toRgba(bull, 0.5) : toRgba(bear, 0.5) })) : []
+    );
+    drawIndicators(bars);
     updateSessionShading();
-  }, [drawIndicators, updateSessionShading]);
+  }, [theme.bull, theme.bear, drawIndicators, updateSessionShading, indCVD]);
 
   // Full load — clears & repopulates everything
   const loadFull = useCallback(async (sym: string, tf: Timeframe, forcedLimit?: number, fit = true) => {

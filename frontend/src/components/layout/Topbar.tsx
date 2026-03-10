@@ -185,7 +185,7 @@ export function Topbar() {
             <span className="hidden sm:inline">Style</span>
           </button>
           {showStyle && (
-            <div className="absolute right-0 top-full mt-1 w-56 bg-surface-raised border border-surface-border rounded-xl shadow-2xl z-50 overflow-hidden">
+            <div className="absolute right-0 top-full mt-1 w-56 bg-surface-raised border border-surface-border rounded-xl shadow-2xl z-50 overflow-visible">
               <div className="px-3 py-2 text-xs text-neutral-500 uppercase tracking-widest border-b border-surface-border">Style</div>
               <div className="py-3 px-3 flex flex-col gap-4">
                 <div className="flex flex-col gap-1.5 relative">

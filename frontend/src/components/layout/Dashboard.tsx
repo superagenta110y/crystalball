@@ -208,6 +208,27 @@ export default function Dashboard() {
     [activeTabId, updateLayout]
   );
 
+  const handleDragStop = useCallback((newLayout: Layout[], oldItem: Layout, newItem: Layout) => {
+    const topSnap = newItem.y <= 1;
+    if (!topSnap) return updateLayout(activeTabId, newLayout);
+
+    const l = newLayout.map(it => ({ ...it }));
+    const idx = l.findIndex(it => it.i === newItem.i);
+    if (idx < 0) return updateLayout(activeTabId, newLayout);
+
+    const center = newItem.x + newItem.w / 2;
+    // Windows-like snap zones on top edge.
+    if (center >= 4 && center <= 8) {
+      l[idx].x = 0; l[idx].w = 12; l[idx].y = 0;
+    } else if (center > 8) {
+      l[idx].x = 6; l[idx].w = 6; l[idx].y = 0;
+    } else {
+      l[idx].x = 0; l[idx].w = 6; l[idx].y = 0;
+    }
+
+    updateLayout(activeTabId, l);
+  }, [activeTabId, updateLayout]);
+
   const isGlobalOverride = (tab?.globalSymbols?.length ?? 0) > 0;
 
   const resolvedSymbols = useMemo(
@@ -298,9 +319,12 @@ export default function Dashboard() {
               rowHeight={rowHeight}
               width={gridWidth}
               onLayoutChange={handleLayoutChange}
+              onDragStop={handleDragStop}
               draggableHandle=".widget-drag-handle"
               margin={[MARGIN, MARGIN]}
               containerPadding={[PADDING, PADDING]}
+              compactType="vertical"
+              preventCollision={false}
               isDraggable
               isResizable
             >
