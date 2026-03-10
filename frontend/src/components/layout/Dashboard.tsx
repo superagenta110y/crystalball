@@ -352,46 +352,85 @@ export default function Dashboard() {
     if (idx < 0) return updateLayout(activeTabId, newLayout);
 
     const item = l[idx];
+    const oldRight = oldItem.x + oldItem.w;
+    const newRight = item.x + item.w;
+    const dx = newRight - oldRight;
+    const oldBottom = oldItem.y + oldItem.h;
+    const newBottom = item.y + item.h;
+    const dy = newBottom - oldBottom;
+
     const overlapY = (a: Layout, b: Layout) => Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+    const overlapX = (a: Layout, b: Layout) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x));
 
-    // Prefer a "pair" widget in the same horizontal row band.
-    const peers = l
-      .map((it, i) => ({ it, i }))
-      .filter(({ i, it }) => i !== idx && overlapY(it, item) >= Math.max(1, Math.min(it.h, item.h) - 1));
+    // Propagate right-edge connection: any widget connected to resized right edge moves with it.
+    if (dx !== 0) {
+      const moved = new Set<string>();
+      const queue: string[] = [];
 
-    let pair = peers[0];
-    if (peers.length > 1) {
-      pair = peers.sort((a, b) => {
-        const da = Math.min(Math.abs(a.it.x - (item.x + item.w)), Math.abs((a.it.x + a.it.w) - item.x));
-        const db = Math.min(Math.abs(b.it.x - (item.x + item.w)), Math.abs((b.it.x + b.it.w) - item.x));
-        return da - db;
-      })[0];
-    }
-
-    if (pair) {
-      const p = l[pair.i];
-      // Keep paired row equal height and aligned vertically.
-      p.y = item.y;
-      p.h = item.h;
-
-      // Fill horizontal gap so pair expands/contracts with resized item.
-      if (p.x > item.x) {
-        p.x = item.x + item.w;
-        p.w = Math.max(2, 12 - p.x);
-      } else {
-        p.w = Math.max(2, item.x - p.x);
-      }
-
-      // Shift rows below when pair-row height changes to avoid vertical gaps.
-      const oldBottom = oldItem.y + oldItem.h;
-      const newBottom = item.y + item.h;
-      const delta = newBottom - oldBottom;
-      if (delta !== 0) {
-        for (let i = 0; i < l.length; i++) {
-          if (i === idx || i === pair.i) continue;
-          if (l[i].y >= oldBottom) l[i].y += delta;
+      // seed: directly connected to resized widget right edge
+      for (const it of l) {
+        if (it.i === item.i) continue;
+        if (it.x === oldRight && overlapY(it, oldItem) > 0) {
+          queue.push(it.i);
+          moved.add(it.i);
         }
       }
+
+      while (queue.length) {
+        const id = queue.shift()!;
+        const cur = l.find(x => x.i === id);
+        if (!cur) continue;
+        const curRight = cur.x + cur.w;
+        for (const nxt of l) {
+          if (nxt.i === item.i || moved.has(nxt.i)) continue;
+          if (nxt.x === curRight && overlapY(nxt, cur) > 0) {
+            moved.add(nxt.i);
+            queue.push(nxt.i);
+          }
+        }
+      }
+
+      for (const it of l) {
+        if (moved.has(it.i)) it.x += dx;
+      }
+    }
+
+    // Propagate bottom-edge connection similarly for vertical resize.
+    if (dy !== 0) {
+      const moved = new Set<string>();
+      const queue: string[] = [];
+      for (const it of l) {
+        if (it.i === item.i) continue;
+        if (it.y === oldBottom && overlapX(it, oldItem) > 0) {
+          queue.push(it.i);
+          moved.add(it.i);
+        }
+      }
+      while (queue.length) {
+        const id = queue.shift()!;
+        const cur = l.find(x => x.i === id);
+        if (!cur) continue;
+        const curBottom = cur.y + cur.h;
+        for (const nxt of l) {
+          if (nxt.i === item.i || moved.has(nxt.i)) continue;
+          if (nxt.y === curBottom && overlapX(nxt, cur) > 0) {
+            moved.add(nxt.i);
+            queue.push(nxt.i);
+          }
+        }
+      }
+      for (const it of l) {
+        if (moved.has(it.i)) it.y += dy;
+      }
+    }
+
+    // Clamp to dashboard bounds to avoid off-screen placement.
+    for (const it of l) {
+      if (it.x < 0) it.x = 0;
+      if (it.w < 2) it.w = 2;
+      if (it.x + it.w > 12) it.x = Math.max(0, 12 - it.w);
+      if (it.y < 0) it.y = 0;
+      if (it.h < 3) it.h = 3;
     }
 
     updateLayout(activeTabId, l);
