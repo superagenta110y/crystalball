@@ -269,6 +269,33 @@ export default function Dashboard() {
       if (snapZone === "bottom")    { l[idx].x = 0; l[idx].y = maxRow - halfH; l[idx].w = 12; l[idx].h = halfH; }
       if (snapZone === "top-left")  { l[idx].x = 0; l[idx].y = 0; l[idx].w = 6; l[idx].h = halfH; }
       if (snapZone === "top-right") { l[idx].x = 6; l[idx].y = 0; l[idx].w = 6; l[idx].h = halfH; }
+
+      // Reallocate remaining widgets into free space after snap-drop.
+      const freeRects: Array<{x:number;y:number;w:number;h:number}> = [];
+      if (snapZone === "left") freeRects.push({ x: 6, y: 0, w: 6, h: maxRow });
+      if (snapZone === "right") freeRects.push({ x: 0, y: 0, w: 6, h: maxRow });
+      if (snapZone === "top") freeRects.push({ x: 0, y: halfH, w: 12, h: Math.max(2, maxRow - halfH) });
+      if (snapZone === "bottom") freeRects.push({ x: 0, y: 0, w: 12, h: Math.max(2, maxRow - halfH) });
+      if (snapZone === "top-left") {
+        freeRects.push({ x: 6, y: 0, w: 6, h: halfH });
+        freeRects.push({ x: 0, y: halfH, w: 12, h: Math.max(2, maxRow - halfH) });
+      }
+      if (snapZone === "top-right") {
+        freeRects.push({ x: 0, y: 0, w: 6, h: halfH });
+        freeRects.push({ x: 0, y: halfH, w: 12, h: Math.max(2, maxRow - halfH) });
+      }
+
+      const others = l.filter((_, i) => i !== idx);
+      let r = 0;
+      for (const it of others) {
+        const fr = freeRects[Math.min(r, freeRects.length - 1)];
+        if (!fr) break;
+        it.x = fr.x;
+        it.w = Math.min(Math.max(2, it.w), fr.w);
+        it.h = Math.min(Math.max(3, it.h), fr.h);
+        it.y = fr.y;
+        if (it.w < fr.w && r < freeRects.length - 1) r += 1;
+      }
     }
 
     const overlaps = (a: Layout, b: Layout) => !(a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y);
@@ -407,7 +434,7 @@ export default function Dashboard() {
           ) : (
             <div className="relative h-full">
               {snapZone && (
-                <div className={`absolute z-40 pointer-events-none border-2 border-accent bg-accent/20 rounded-xl shadow-[inset_0_0_0_1px_rgba(255,255,255,0.18)] backdrop-blur-[1px] transition-all duration-150
+                <div className={`absolute z-40 pointer-events-none border-2 border-accent bg-accent/35 rounded-xl shadow-[inset_0_0_0_1px_rgba(255,255,255,0.24)] backdrop-blur-[1px] transition-all duration-150
                   ${snapZone === "left" ? "left-0 top-0 h-full w-1/2" : ""}
                   ${snapZone === "right" ? "right-0 top-0 h-full w-1/2" : ""}
                   ${snapZone === "top" ? "left-0 top-0 w-full h-1/2" : ""}
