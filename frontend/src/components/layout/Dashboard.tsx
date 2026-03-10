@@ -219,6 +219,28 @@ export default function Dashboard() {
         newItem.w = 6; newItem.x = 6;
       }
     }
+
+    // If dragged into another widget's horizontal space, prepare a 1:1 split live.
+    const target = layout.find(it => it.i !== newItem.i && (
+      Math.max(it.y, newItem.y) < Math.min(it.y + it.h, newItem.y + newItem.h)
+    ) && (
+      Math.max(it.x, newItem.x) < Math.min(it.x + it.w, newItem.x + newItem.w)
+    ));
+
+    if (target) {
+      const splitW = Math.max(2, Math.floor(target.w / 2));
+      const leftX = target.x;
+      const rightX = target.x + splitW;
+      const draggedLeft = (newItem.x + newItem.w / 2) < (target.x + target.w / 2);
+
+      newItem.y = target.y;
+      newItem.h = target.h;
+      newItem.w = splitW;
+      newItem.x = draggedLeft ? leftX : rightX;
+
+      target.w = splitW;
+      target.x = draggedLeft ? rightX : leftX;
+    }
   }, [width]);
 
   const handleDragStop = useCallback((newLayout: Layout[], oldItem: Layout, newItem: Layout) => {
@@ -243,6 +265,26 @@ export default function Dashboard() {
     const rh = 24;
     if (newItem.y <= 0 || (newItem.y * rh) > (vh - 180)) {
       l[idx].h = Math.max(4, Math.ceil(oldItem.h / 2));
+    }
+
+    // Finalize 1:1 horizontal split if dropped over another widget lane.
+    const otherIdx = l.findIndex((it, i) => i !== idx && (
+      Math.max(it.y, l[idx].y) < Math.min(it.y + it.h, l[idx].y + l[idx].h)
+    ) && (
+      Math.max(it.x, l[idx].x) < Math.min(it.x + it.w, l[idx].x + l[idx].w)
+    ));
+    if (otherIdx >= 0) {
+      const other = l[otherIdx];
+      const splitW = Math.max(2, Math.floor(other.w / 2));
+      const leftX = other.x;
+      const rightX = other.x + splitW;
+      const draggedLeft = (l[idx].x + l[idx].w / 2) < (other.x + other.w / 2);
+      l[idx].x = draggedLeft ? leftX : rightX;
+      l[idx].w = splitW;
+      l[idx].y = other.y;
+      l[idx].h = other.h;
+      other.x = draggedLeft ? rightX : leftX;
+      other.w = splitW;
     }
 
     // Auto-expand into empty right/bottom space after small drag.
