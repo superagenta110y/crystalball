@@ -103,6 +103,7 @@ export function ChartWidget({
   const [indBB, setIndBB] = useState(false);
   const [indLevels, setIndLevels] = useState(false);
   const [indVP, setIndVP] = useState(false);
+  const [indCVD, setIndCVD] = useState(false);
   const [smaFastPeriod, setSmaFastPeriod] = useState(20);
   const [smaFastColor, setSmaFastColor] = useState("#60a5fa");
   const [smaFastWidth, setSmaFastWidth] = useState(1);
@@ -266,7 +267,7 @@ export function ChartWidget({
         visible: false,
         scaleMargins: { top: 0, bottom: 0 },
       });
-      volumeSeries.priceScale().applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
+      volumeSeries.priceScale().applyOptions({ scaleMargins: { top: 0.72, bottom: 0.12 } });
       chartRef.current = chart;
       seriesRef.current = series;
       volumeRef.current = volumeSeries;
@@ -458,7 +459,26 @@ export function ChartWidget({
       s.setData([{ time: src[0].time, value: poc }, { time: src[src.length - 1].time, value: poc }]);
       levelLinesRef.current.push(s);
     }
-  }, [clearIndicators, timeframe, vwapAnchor, vpAnchor, indSMA, indEMA, indVWAP, indBB, indLevels, indVP, smaFastPeriod, smaFastColor, smaFastWidth, smaSlowPeriod, smaSlowColor, smaSlowWidth, emaFastPeriod, emaFastColor, emaFastWidth, emaSlowPeriod, emaSlowColor, emaSlowWidth, vwapColor, vwapWidth, bbPeriod, bbStd, bbColor, bbWidth, levelColor, levelWidth, showPrevClose, showDayHighLow, showPremarketHighLow, vpColor, vpWidth]);
+    if (indCVD && bars.length) {
+      let cvd = 0;
+      const d = bars.map((b, i) => {
+        const prev = bars[Math.max(0, i - 1)]?.close ?? b.open;
+        const delta = b.close >= prev ? (b.volume || 0) : -(b.volume || 0);
+        cvd += delta;
+        return { time: b.time, value: cvd };
+      });
+      const s = chartRef.current.addLineSeries({
+        color: "#7dd3fc",
+        lineWidth: 1,
+        priceScaleId: "cvd",
+        priceLineVisible: false,
+        lastValueVisible: false,
+      });
+      s.priceScale().applyOptions({ scaleMargins: { top: 0.86, bottom: 0.02 }, visible: false });
+      s.setData(d);
+      indicatorSeriesRef.current.push(s);
+    }
+  }, [clearIndicators, timeframe, vwapAnchor, vpAnchor, indSMA, indEMA, indVWAP, indBB, indLevels, indVP, indCVD, smaFastPeriod, smaFastColor, smaFastWidth, smaSlowPeriod, smaSlowColor, smaSlowWidth, emaFastPeriod, emaFastColor, emaFastWidth, emaSlowPeriod, emaSlowColor, emaSlowWidth, vwapColor, vwapWidth, bbPeriod, bbStd, bbColor, bbWidth, levelColor, levelWidth, showPrevClose, showDayHighLow, showPremarketHighLow, vpColor, vpWidth]);
 
   const updateSessionShading = useCallback(() => {
     if (!extShadeRef.current) return;
@@ -794,7 +814,7 @@ export function ChartWidget({
     onConfigChange?.({ timeframe: tf });
   };
 
-  const enabledCount = useMemo(() => [indSMA, indEMA, indVWAP, indBB, indLevels, indVP].filter(Boolean).length, [indSMA, indEMA, indVWAP, indBB, indLevels, indVP]);
+  const enabledCount = useMemo(() => [indSMA, indEMA, indVWAP, indBB, indLevels, indVP, indCVD].filter(Boolean).length, [indSMA, indEMA, indVWAP, indBB, indLevels, indVP, indCVD]);
 
   return (
     <div className="relative flex flex-col h-full w-full">
@@ -857,10 +877,11 @@ export function ChartWidget({
               { key: 'bb', label: 'Bollinger Bands', enabled: indBB, set: setIndBB },
               { key: 'levels', label: 'Price Levels', enabled: indLevels, set: setIndLevels },
               { key: 'vp', label: 'Volume Profile', enabled: indVP, set: setIndVP },
+              { key: 'cvd', label: 'CVD', enabled: indCVD, set: setIndCVD },
             ].map((it:any) => (
               <div key={it.key} className="flex items-center justify-between gap-2 py-1">
                 <label className="flex items-center gap-2"><input type="checkbox" checked={it.enabled} onChange={e=>it.set(e.target.checked)} /><span>{it.label}</span></label>
-                {it.enabled && <button onClick={() => setIndicatorModal(it.key)} className="p-0.5 rounded border border-surface-border hover:border-accent/50"><Settings2 size={12} /></button>}
+                {it.enabled && it.key !== 'cvd' && <button onClick={() => setIndicatorModal(it.key)} className="p-0.5 rounded border border-surface-border hover:border-accent/50"><Settings2 size={12} /></button>}
               </div>
             ))}
           </div>
