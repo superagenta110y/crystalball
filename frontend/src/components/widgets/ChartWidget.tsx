@@ -176,11 +176,11 @@ export function ChartWidget({
       });
       const bars = Array.from(cacheRef.current.values()).sort((a, b) => a.time - b.time);
       volumeRef.current.setData(
-        indCVD ? bars.map(b => ({
+        bars.map(b => ({
           time: b.time,
           value: b.volume || 0,
           color: b.close >= b.open ? toRgba(bull, 0.5) : toRgba(bear, 0.5),
-        })) : []
+        }))
       );
     }
     if (extShadeRef.current) {
@@ -466,13 +466,20 @@ export function ChartWidget({
       const bull = getComputedStyle(document.documentElement).getPropertyValue("--bull").trim() || theme.bull;
       const bear = getComputedStyle(document.documentElement).getPropertyValue("--bear").trim() || theme.bear;
       const d = src.map((b, i) => {
-        const prev = src[Math.max(0, i - 1)]?.close ?? b.open;
-        const delta = b.close >= prev ? (b.volume || 0) : -(b.volume || 0);
-        cvd += delta;
-        return { time: b.time, value: cvd, color: delta >= 0 ? toRgba(bull, 0.75) : toRgba(bear, 0.75) };
+        const prevPx = src[Math.max(0, i - 1)]?.close ?? b.open;
+        const delta = b.close >= prevPx ? (b.volume || 0) : -(b.volume || 0);
+        const o = cvd;
+        const c = cvd + delta;
+        cvd = c;
+        return { time: b.time, open: o, high: Math.max(o, c), low: Math.min(o, c), close: c };
       });
-      const s = chartRef.current.addHistogramSeries({
+      const s = chartRef.current.addCandlestickSeries({
         priceScaleId: "cvd",
+        upColor: bull,
+        downColor: bear,
+        wickUpColor: bull,
+        wickDownColor: bear,
+        borderVisible: false,
         priceLineVisible: false,
         lastValueVisible: false,
       });
@@ -518,7 +525,7 @@ export function ChartWidget({
     const bull = getComputedStyle(document.documentElement).getPropertyValue("--bull").trim() || theme.bull;
     const bear = getComputedStyle(document.documentElement).getPropertyValue("--bear").trim() || theme.bear;
     volumeRef.current?.setData(
-      indCVD ? bars.map(b => ({ time: b.time, value: b.volume || 0, color: b.close >= b.open ? toRgba(bull, 0.5) : toRgba(bear, 0.5) })) : []
+      bars.map(b => ({ time: b.time, value: b.volume || 0, color: b.close >= b.open ? toRgba(bull, 0.5) : toRgba(bear, 0.5) }))
     );
     drawIndicators(bars);
     updateSessionShading();
@@ -561,11 +568,11 @@ export function ChartWidget({
       const bull = getComputedStyle(document.documentElement).getPropertyValue("--bull").trim() || theme.bull;
       const bear = getComputedStyle(document.documentElement).getPropertyValue("--bear").trim() || theme.bear;
       volumeRef.current?.setData(
-        indCVD ? bars.map(b => ({
+        bars.map(b => ({
           time: b.time,
           value: b.volume || 0,
           color: b.close >= b.open ? toRgba(bull, 0.5) : toRgba(bear, 0.5),
-        })) : []
+        }))
       );
       drawIndicators(bars);
       const lb = bars[bars.length - 1];
@@ -621,13 +628,11 @@ export function ChartWidget({
           seriesRef.current.update(bar);   // lightweight-charts upserts by time
           const bull = getComputedStyle(document.documentElement).getPropertyValue("--bull").trim() || theme.bull;
           const bear = getComputedStyle(document.documentElement).getPropertyValue("--bear").trim() || theme.bear;
-          if (indCVD) {
-            volumeRef.current?.update({
-              time: bar.time,
-              value: bar.volume || 0,
-              color: bar.close >= bar.open ? toRgba(bull, 0.5) : toRgba(bear, 0.5),
-            });
-          }
+          volumeRef.current?.update({
+            time: bar.time,
+            value: bar.volume || 0,
+            color: bar.close >= bar.open ? toRgba(bull, 0.5) : toRgba(bear, 0.5),
+          });
         }
       }
       if (hasNewBar) drawIndicators(Array.from(cacheRef.current.values()).sort((a,b)=>a.time-b.time));
@@ -667,7 +672,7 @@ export function ChartWidget({
       seriesRef.current.setData(merged);
       const bull = getComputedStyle(document.documentElement).getPropertyValue("--bull").trim() || theme.bull;
       const bear = getComputedStyle(document.documentElement).getPropertyValue("--bear").trim() || theme.bear;
-      volumeRef.current?.setData(indCVD ? merged.map(b => ({ time: b.time, value: b.volume || 0, color: b.close >= b.open ? toRgba(bull, 0.5) : toRgba(bear, 0.5) })) : []);
+      volumeRef.current?.setData(merged.map(b => ({ time: b.time, value: b.volume || 0, color: b.close >= b.open ? toRgba(bull, 0.5) : toRgba(bear, 0.5) })));
       drawIndicators(merged);
       updateSessionShading();
     } finally {
