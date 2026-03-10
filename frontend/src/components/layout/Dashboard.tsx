@@ -220,7 +220,7 @@ export default function Dashboard() {
       }
     }
 
-    // If dragged into another widget's horizontal space, prepare a 1:1 split live.
+    // If dragged near another widget edge in the same lane, split live (less sensitive).
     const target = layout.find(it => it.i !== newItem.i && (
       Math.max(it.y, newItem.y) < Math.min(it.y + it.h, newItem.y + newItem.h)
     ) && (
@@ -228,18 +228,23 @@ export default function Dashboard() {
     ));
 
     if (target) {
-      const splitW = Math.max(2, Math.floor(target.w / 2));
-      const leftX = target.x;
-      const rightX = target.x + splitW;
-      const draggedLeft = (newItem.x + newItem.w / 2) < (target.x + target.w / 2);
+      const c = newItem.x + newItem.w / 2;
+      const nearLeftEdge = Math.abs(c - target.x) <= 1.2;
+      const nearRightEdge = Math.abs(c - (target.x + target.w)) <= 1.2;
+      if (nearLeftEdge || nearRightEdge) {
+        const total = target.w;
+        const small = total >= 10 ? Math.max(2, Math.round(total * 0.2)) : Math.max(2, Math.floor(total / 2));
+        const large = Math.max(2, total - small);
+        const draggedLeft = nearLeftEdge;
 
-      newItem.y = target.y;
-      newItem.h = target.h;
-      newItem.w = splitW;
-      newItem.x = draggedLeft ? leftX : rightX;
+        newItem.y = target.y;
+        newItem.h = target.h;
+        newItem.w = small;
+        newItem.x = draggedLeft ? target.x : (target.x + large);
 
-      target.w = splitW;
-      target.x = draggedLeft ? rightX : leftX;
+        target.w = large;
+        target.x = draggedLeft ? (target.x + small) : target.x;
+      }
     }
   }, [width]);
 
@@ -267,7 +272,7 @@ export default function Dashboard() {
       l[idx].h = Math.max(4, Math.ceil(oldItem.h / 2));
     }
 
-    // Finalize 1:1 horizontal split if dropped over another widget lane.
+    // Finalize horizontal split only when dropped near target edge.
     const otherIdx = l.findIndex((it, i) => i !== idx && (
       Math.max(it.y, l[idx].y) < Math.min(it.y + it.h, l[idx].y + l[idx].h)
     ) && (
@@ -275,16 +280,23 @@ export default function Dashboard() {
     ));
     if (otherIdx >= 0) {
       const other = l[otherIdx];
-      const splitW = Math.max(2, Math.floor(other.w / 2));
-      const leftX = other.x;
-      const rightX = other.x + splitW;
-      const draggedLeft = (l[idx].x + l[idx].w / 2) < (other.x + other.w / 2);
-      l[idx].x = draggedLeft ? leftX : rightX;
-      l[idx].w = splitW;
-      l[idx].y = other.y;
-      l[idx].h = other.h;
-      other.x = draggedLeft ? rightX : leftX;
-      other.w = splitW;
+      const c = l[idx].x + l[idx].w / 2;
+      const nearLeftEdge = Math.abs(c - other.x) <= 1.2;
+      const nearRightEdge = Math.abs(c - (other.x + other.w)) <= 1.2;
+      if (nearLeftEdge || nearRightEdge) {
+        const total = other.w;
+        const small = total >= 10 ? Math.max(2, Math.round(total * 0.2)) : Math.max(2, Math.floor(total / 2));
+        const large = Math.max(2, total - small);
+        const draggedLeft = nearLeftEdge;
+
+        l[idx].x = draggedLeft ? other.x : (other.x + large);
+        l[idx].w = small;
+        l[idx].y = other.y;
+        l[idx].h = other.h;
+
+        other.x = draggedLeft ? (other.x + small) : other.x;
+        other.w = large;
+      }
     }
 
     // Auto-expand into empty right/bottom space after small drag.
