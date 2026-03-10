@@ -184,7 +184,9 @@ export const useDashboardStore = create<DashboardState>()(
             const nextLayout = t.layout.map((it) => ({ ...it }));
 
             let added: Layout;
-            if (base.w >= base.h && base.w >= 4) {
+            // Prefer side-by-side split in wide areas, stack split in tall/narrow areas.
+            const isWideArea = (base.w / Math.max(1, base.h)) >= 0.75;
+            if (isWideArea && base.w >= 4) {
               // split vertically (left/right)
               const w1 = Math.max(2, Math.floor(base.w / 2));
               const w2 = Math.max(2, base.w - w1);
