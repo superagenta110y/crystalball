@@ -140,6 +140,7 @@ export function ChartWidget({
   const pendingRangeRef = useRef<{ from: number; to: number; targetTf: Timeframe } | null>(null);
 
   const [symItems, setSymItems] = useState<{ symbol: string; name?: string }[]>([]);
+  const [chartReady, setChartReady] = useState(false);
   const [symOpen, setSymOpen] = useState(false);
   const symRef = useRef<HTMLDivElement>(null);
   const pollRef      = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -241,6 +242,7 @@ export function ChartWidget({
       chartRef.current = chart;
       seriesRef.current = series;
       volumeRef.current = volumeSeries;
+      setChartReady(true);
 
       const ro = new ResizeObserver(() => {
         if (containerRef.current && chartRef.current) {
@@ -256,6 +258,7 @@ export function ChartWidget({
 
     return () => {
       chartRef.current?.remove();
+      setChartReady(false);
       chartRef.current = null;
       seriesRef.current = null;
       volumeRef.current = null;
@@ -503,7 +506,7 @@ export function ChartWidget({
 
   // Auto-backfill older candles when panning to the left edge
   useEffect(() => {
-    if (!chartRef.current) return;
+    if (!chartReady || !chartRef.current) return;
     const ts = chartRef.current.timeScale();
 
     const onRange = (range: any) => {
@@ -516,8 +519,10 @@ export function ChartWidget({
     };
 
     ts.subscribeVisibleLogicalRangeChange(onRange);
+    const vr = ts.getVisibleLogicalRange?.();
+    if (vr) onRange(vr);
     return () => ts.unsubscribeVisibleLogicalRangeChange(onRange);
-  }, [fetchOlder]);
+  }, [chartReady, fetchOlder]);
 
   // Main effect: full load then polling
   useEffect(() => {
