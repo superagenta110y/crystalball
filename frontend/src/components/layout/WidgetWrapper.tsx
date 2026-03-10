@@ -45,16 +45,16 @@ export function WidgetWrapper({ instance, onRemove, onToggleZoom, isZoomed, chil
             )}
           </div>
           <div className="flex items-center gap-1">
-            {canZoom && <button onMouseDown={(e) => e.stopPropagation()} onClick={onToggleZoom} className="opacity-0 group-hover/widget:opacity-100 transition p-1 rounded hover:bg-surface-overlay" aria-label={isZoomed ? "Zoom out" : "Zoom in"} title={isZoomed ? "Zoom out" : "Zoom in"}>{isZoomed ? <Minimize2 size={13} /> : <Maximize2 size={13} />}</button>}
-            <button onMouseDown={(e) => e.stopPropagation()} onClick={() => setConfirmRemove(true)} className="opacity-0 group-hover/widget:opacity-100 transition p-1 rounded hover:bg-surface-overlay hover:text-red-400" aria-label="Remove widget"><X size={13} /></button>
+            {canZoom && <button onMouseDown={(e) => e.stopPropagation()} onClick={onToggleZoom} className="opacity-100 sm:opacity-0 sm:group-hover/widget:opacity-100 transition p-1 rounded hover:bg-surface-overlay" aria-label={isZoomed ? "Zoom out" : "Zoom in"} title={isZoomed ? "Zoom out" : "Zoom in"}>{isZoomed ? <Minimize2 size={13} /> : <Maximize2 size={13} />}</button>}
+            <button onMouseDown={(e) => e.stopPropagation()} onClick={() => setConfirmRemove(true)} className="opacity-100 sm:opacity-0 sm:group-hover/widget:opacity-100 transition p-1 rounded hover:bg-surface-overlay hover:text-red-400" aria-label="Remove widget"><X size={13} /></button>
           </div>
         </div>
       )}
       <div className="flex-1 overflow-hidden relative">
         {useInlineHeader && (
           <div className="absolute top-1 right-1 z-30 flex items-center gap-1">
-            {canZoom && <button onMouseDown={(e) => e.stopPropagation()} onClick={onToggleZoom} className="opacity-0 group-hover/widget:opacity-100 transition p-1 rounded hover:bg-surface-overlay" aria-label={isZoomed ? "Zoom out" : "Zoom in"}>{isZoomed ? <Minimize2 size={13} /> : <Maximize2 size={13} />}</button>}
-            <button onMouseDown={(e) => e.stopPropagation()} onClick={() => setConfirmRemove(true)} className="opacity-0 group-hover/widget:opacity-100 transition p-1 rounded hover:bg-surface-overlay hover:text-red-400" aria-label="Remove widget"><X size={13} /></button>
+            {canZoom && <button onMouseDown={(e) => e.stopPropagation()} onClick={onToggleZoom} className="opacity-100 sm:opacity-0 sm:group-hover/widget:opacity-100 transition p-1 rounded hover:bg-surface-overlay" aria-label={isZoomed ? "Zoom out" : "Zoom in"}>{isZoomed ? <Minimize2 size={13} /> : <Maximize2 size={13} />}</button>}
+            <button onMouseDown={(e) => e.stopPropagation()} onClick={() => setConfirmRemove(true)} className="opacity-100 sm:opacity-0 sm:group-hover/widget:opacity-100 transition p-1 rounded hover:bg-surface-overlay hover:text-red-400" aria-label="Remove widget"><X size={13} /></button>
           </div>
         )}
         {children}

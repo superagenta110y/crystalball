@@ -211,22 +211,21 @@ export function ScreenerWidget() {
 
   return (
     <div className="h-full w-full flex flex-col relative" ref={popRef}>
-      <div className="px-2 py-1.5 border-b border-surface-border flex items-center gap-2 text-xs">
-        <div className="widget-drag-handle cursor-grab active:cursor-grabbing select-none inline-flex items-center gap-1.5 text-neutral-500">
-          <span className="text-xs uppercase tracking-wide">Screener</span>
-        </div>
-        <button onClick={() => setShowFilters((v) => !v)} className="p-1.5 rounded hover:bg-surface-overlay text-neutral-500 hover:text-white" title="Filters">
+      <div className="absolute top-1 right-1 z-30 inline-flex items-center gap-1 text-[11px] text-neutral-500">
+        <button
+          onClick={() => setShowFilters((v) => !v)}
+          className="p-1.5 rounded hover:bg-surface-overlay text-neutral-500 hover:text-white opacity-100 sm:opacity-0 sm:group-hover/widget:opacity-100 transition"
+          title="Filters"
+        >
           <FilterIcon size={13} />
         </button>
-        <div className="ml-auto inline-flex items-center gap-1 text-[11px] text-neutral-500">
-          <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="p-1 rounded disabled:opacity-40 hover:bg-surface-overlay"><ChevronLeft size={12} /></button>
-          <span>{page}/{pageCount}</span>
-          <button disabled={page >= pageCount} onClick={() => setPage((p) => Math.min(pageCount, p + 1))} className="p-1 rounded disabled:opacity-40 hover:bg-surface-overlay"><ChevronRight size={12} /></button>
-        </div>
+        <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="p-1 rounded disabled:opacity-40 hover:bg-surface-overlay"><ChevronLeft size={12} /></button>
+        <span>{page}/{pageCount}</span>
+        <button disabled={page >= pageCount} onClick={() => setPage((p) => Math.min(pageCount, p + 1))} className="p-1 rounded disabled:opacity-40 hover:bg-surface-overlay"><ChevronRight size={12} /></button>
       </div>
 
       {showFilters && (
-          <div className="absolute right-2 top-10 z-40 w-[420px] max-w-[90vw] rounded-lg bg-surface-raised p-2 shadow-2xl space-y-2 pop-in">
+          <div className="absolute right-2 top-8 z-40 w-[420px] max-w-[90vw] rounded-lg bg-surface-raised p-2 shadow-2xl space-y-2 pop-in">
             {conds.map((c) => {
               const enumField = ENUM_FIELDS.includes(c.field);
               return (
@@ -278,7 +277,7 @@ export function ScreenerWidget() {
           </div>
         )}
 
-      <div className="flex-1 overflow-auto text-xs">
+      <div className="flex-1 overflow-auto text-xs relative">
         {loading && <div className="p-4 text-neutral-500 animate-pulse">Loading screener…</div>}
         {!loading && (
           <table className="w-full min-w-[980px]">
@@ -321,6 +320,11 @@ export function ScreenerWidget() {
               })}
             </tbody>
           </table>
+        )}
+        {!loading && (
+          <div className="absolute right-2 bottom-1 text-[10px] text-neutral-500/70 pointer-events-none">
+            {total} tickers
+          </div>
         )}
       </div>
     </div>
