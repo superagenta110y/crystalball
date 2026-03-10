@@ -190,15 +190,14 @@ export function Topbar() {
               <div className="py-3 px-3 flex flex-col gap-4">
                 <div className="relative flex items-center justify-between">
                   <span className="text-xs text-neutral-500">Theme</span>
-                  <button onClick={() => setShowThemeMenu(v=>!v)} className="inline-flex w-auto items-center justify-between gap-2 px-2 py-2 rounded-lg hover:bg-surface-overlay ml-auto">
+                  <button onClick={() => setShowThemeMenu(v=>!v)} className="inline-flex w-8 h-8 items-center justify-center rounded-full hover:bg-surface-overlay ml-auto">
                     {(() => { const cur = THEME_MODES.find(m => m.id === theme.mode) || THEME_MODES[0]; const Icon = cur.Icon; return <Icon size={15} />; })()}
-                    <ChevronDown size={12} className={`transition ${showThemeMenu ? "rotate-180" : ""}`} />
                   </button>
                   {showThemeMenu && (
-                    <div className="absolute right-0 top-[34px] z-20 rounded-lg bg-surface-overlay shadow-xl p-1 pop-in">
+                    <div className="absolute right-0 top-[34px] z-20 w-8 rounded-full bg-surface-overlay shadow-xl p-0.5 pop-in">
                       {THEME_MODES.filter(m => m.id !== theme.mode).map(({ id, Icon }) => (
-                        <button key={id} onClick={() => { setTheme({ mode: id }); setShowThemeMenu(false); }} className="w-full flex items-center justify-center py-2 rounded hover:bg-surface-border text-neutral-300 hover:text-white">
-                          <Icon size={15} />
+                        <button key={id} onClick={() => { setTheme({ mode: id }); setShowThemeMenu(false); }} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-surface-border text-neutral-300 hover:text-white">
+                          <Icon size={14} />
                         </button>
                       ))}
                     </div>
