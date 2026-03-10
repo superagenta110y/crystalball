@@ -375,7 +375,16 @@ export function ChartWidget({
   // Full load — clears & repopulates everything
   const loadFull = useCallback(async (sym: string, tf: Timeframe, forcedLimit?: number, fit = true) => {
     const alpacaTF = TF_MAP[tf] || "5Min";
-    const limit    = forcedLimit ?? (BAR_LIMIT[alpacaTF] || 200);
+    const tfSecMap: Record<string, number> = {
+      "1s": 1, "5s": 5, "1m": 60, "5m": 300, "15m": 900, "30m": 1800,
+      "1h": 3600, "4h": 14400, "1d": 86400, "1w": 604800,
+    };
+    const pr = pendingRangeRef.current;
+    const hasPendingRange = !!(pr && pr.targetTf === tf && typeof pr.from === "number" && typeof pr.to === "number");
+    const stepSec = tfSecMap[tf] || 60;
+    const spanSec = hasPendingRange ? Math.max(1, (pr!.to - pr!.from)) : 0;
+    const neededBars = hasPendingRange ? Math.ceil(spanSec / stepSec) + 200 : 0;
+    const limit = forcedLimit ?? Math.max(BAR_LIMIT[alpacaTF] || 200, neededBars);
     historyLimitRef.current = limit;
 
     // Wait for chart to be ready (first mount race)
@@ -388,7 +397,8 @@ export function ChartWidget({
 
     setStatus("loading");
     try {
-      const r = await fetch(`${API}/api/market/history/${sym}?timeframe=${alpacaTF}&limit=${limit}&latest=now`);
+      const latestAnchor = hasPendingRange ? String(Math.floor(pr!.to)) : "now";
+      const r = await fetch(`${API}/api/market/history/${sym}?timeframe=${alpacaTF}&limit=${limit}&latest=${encodeURIComponent(latestAnchor)}`);
       if (!r.ok) throw new Error();
       const payload = await r.json();
       const bars = parseBars(payload);
@@ -411,7 +421,6 @@ export function ChartWidget({
         setBarStatus(`O ${lb.open.toFixed(2)} H ${lb.high.toFixed(2)} L ${lb.low.toFixed(2)} C ${lb.close.toFixed(2)} V ${Math.round(lb.volume || 0).toLocaleString()}`);
       }
 
-      const pr = pendingRangeRef.current;
       if (pr && pr.targetTf === tf && chartRef.current?.timeScale) {
         let from = pr.from;
         let to = pr.to;
