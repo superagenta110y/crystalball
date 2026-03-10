@@ -152,9 +152,53 @@ export const useDashboardStore = create<DashboardState>()(
           tabs: s.tabs.map((t) => {
             if (t.id !== tabId) return t;
             const w = makeWidget(type, config);
+
+            // Empty page: first widget should fill full available canvas.
+            if (!t.layout.length) {
+              const full: Layout = { i: w.id, x: 0, y: 0, w: 12, h: 16 };
+              return { ...t, widgets: [...t.widgets, w], layout: [full] };
+            }
+
+            const collides = (cand: Layout, layout: Layout[]) =>
+              layout.some((o) => !(cand.x + cand.w <= o.x || o.x + o.w <= cand.x || cand.y + cand.h <= o.y || o.y + o.h <= cand.y));
+
+            // 1) Try to place in an existing gap first.
             const maxY = t.layout.reduce((m, l) => Math.max(m, l.y + l.h), 0);
-            const layout: Layout = { i: w.id, x: 0, y: maxY, w: 6, h: 8 };
-            return { ...t, widgets: [...t.widgets, w], layout: [...t.layout, layout] };
+            const trySizes: Array<[number, number]> = [[6, 8], [4, 8], [3, 6], [2, 4]];
+            for (const [gw, gh] of trySizes) {
+              for (let y = 0; y <= maxY + 6; y++) {
+                for (let x = 0; x <= 12 - gw; x++) {
+                  const cand: Layout = { i: w.id, x, y, w: gw, h: gh };
+                  if (!collides(cand, t.layout)) {
+                    return { ...t, widgets: [...t.widgets, w], layout: [...t.layout, cand] };
+                  }
+                }
+              }
+            }
+
+            // 2) No gap: split the smallest element in half (orientation by larger side).
+            const baseIdx = t.layout
+              .map((it, i) => ({ it, i, area: it.w * it.h }))
+              .sort((a, b) => a.area - b.area || b.it.x - a.it.x || b.it.y - a.it.y)[0].i;
+            const base = { ...t.layout[baseIdx] };
+            const nextLayout = t.layout.map((it) => ({ ...it }));
+
+            let added: Layout;
+            if (base.w >= base.h && base.w >= 4) {
+              // split vertically (left/right)
+              const w1 = Math.max(2, Math.floor(base.w / 2));
+              const w2 = Math.max(2, base.w - w1);
+              nextLayout[baseIdx] = { ...base, w: w1 };
+              added = { i: w.id, x: base.x + w1, y: base.y, w: w2, h: base.h };
+            } else {
+              // split horizontally (top/bottom)
+              const h1 = Math.max(3, Math.floor(base.h / 2));
+              const h2 = Math.max(3, base.h - h1);
+              nextLayout[baseIdx] = { ...base, h: h1 };
+              added = { i: w.id, x: base.x, y: base.y + h1, w: base.w, h: h2 };
+            }
+
+            return { ...t, widgets: [...t.widgets, w], layout: [...nextLayout, added] };
           }),
         })),
 
