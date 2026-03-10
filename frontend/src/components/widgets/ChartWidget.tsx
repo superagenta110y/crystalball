@@ -174,6 +174,9 @@ export function ChartWidget({
         priceLineVisible: false,
         lastValueVisible: false,
       });
+      volumeRef.current.priceScale().applyOptions({
+        scaleMargins: indCVD ? { top: 0.62, bottom: 0.22 } : { top: 0.8, bottom: 0 },
+      });
       const bars = Array.from(cacheRef.current.values()).sort((a, b) => a.time - b.time);
       volumeRef.current.setData(
         bars.map(b => ({
@@ -268,7 +271,7 @@ export function ChartWidget({
         visible: false,
         scaleMargins: { top: 0, bottom: 0 },
       });
-      volumeSeries.priceScale().applyOptions({ scaleMargins: { top: 0.72, bottom: 0.12 } });
+      volumeSeries.priceScale().applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
       chartRef.current = chart;
       seriesRef.current = series;
       volumeRef.current = volumeSeries;
@@ -483,7 +486,7 @@ export function ChartWidget({
         priceLineVisible: false,
         lastValueVisible: false,
       });
-      s.priceScale().applyOptions({ scaleMargins: { top: 0.86, bottom: 0.02 }, visible: false });
+      s.priceScale().applyOptions({ scaleMargins: { top: 0.82, bottom: 0.02 }, visible: false });
       s.setData(d);
       indicatorSeriesRef.current.push(s);
     }
