@@ -137,7 +137,6 @@ export function ChartWidget({
   const historyLimitRef = useRef<number>(0);
   const loadingMoreRef = useRef<boolean>(false);
   const noMoreOlderRef = useRef<boolean>(false);
-  const gapRefetchingRef = useRef<boolean>(false);
   const pendingRangeRef = useRef<{ from: number; to: number; targetTf: Timeframe } | null>(null);
 
   const [symItems, setSymItems] = useState<{ symbol: string; name?: string }[]>([]);
@@ -431,22 +430,6 @@ export function ChartWidget({
 
       setLastPrice(bars[bars.length - 1].close);
 
-      // If loaded history is stale, automatically expand history window to bridge gaps.
-      const tfSecMap: Record<string, number> = {
-        "1s": 1, "5s": 5, "1m": 60, "5m": 300, "15m": 900, "30m": 1800,
-        "1h": 3600, "4h": 14400, "1d": 86400, "1w": 604800,
-      };
-      const tfSec = tfSecMap[tf] || 60;
-      const newest = bars[bars.length - 1]?.time || 0;
-      const nowSec = Math.floor(Date.now() / 1000);
-      if (!gapRefetchingRef.current && nowSec - newest > tfSec * 20 && limit < 5000) {
-        gapRefetchingRef.current = true;
-        const nextLimit = Math.min(5000, Math.max(limit + 400, 1200));
-        await loadFull(sym, tf, nextLimit, fit);
-        gapRefetchingRef.current = false;
-        return;
-      }
-
       setStatus("ok");
     } catch {
       setStatus("error");
@@ -486,22 +469,9 @@ export function ChartWidget({
       setLastPrice(bars[bars.length - 1].close);
       setIsLive(true);
 
-      // If there's a large hole between cached last bar and newest fetched bar, reload fuller history.
-      const tfSecMap: Record<string, number> = {
-        "1s": 1, "5s": 5, "1m": 60, "5m": 300, "15m": 900, "30m": 1800,
-        "1h": 3600, "4h": 14400, "1d": 86400, "1w": 604800,
-      };
-      const tfSec = tfSecMap[tf] || 60;
-      const times = Array.from(cacheRef.current.keys()).sort((a, b) => a - b);
-      const newest = times[times.length - 1] || 0;
-      const oldestRecent = bars[0]?.time || newest;
-      if (!gapRefetchingRef.current && newest - oldestRecent > tfSec * 20) {
-        gapRefetchingRef.current = true;
-        const nextLimit = Math.min(1000, Math.max(historyLimitRef.current || 0, 400) + 200);
-        loadFull(sym, tf, nextLimit, false).finally(() => { gapRefetchingRef.current = false; });
-      }
+
     } catch { /* silent — don't flicker status on transient errors */ }
-  }, [theme.bull, theme.bear, drawIndicators, loadFull]);
+  }, [theme.bull, theme.bear, drawIndicators]);
 
   const fetchOlder = useCallback(async () => {
     if (!seriesRef.current || loadingMoreRef.current) return;
@@ -563,8 +533,7 @@ export function ChartWidget({
 
     loadFull(symbol, timeframe).then(() => {
       if (!alive) return;
-      // Kick off polling and do an immediate incremental pass
-      pollUpdate(symbol, timeframe);
+      // Kick off polling
       pollRef.current = setInterval(() => pollUpdate(symbol, timeframe), pollMs);
     });
 

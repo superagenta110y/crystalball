@@ -34,6 +34,8 @@ export function ScreenerWidget() {
 
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isVisible, setIsVisible] = useState(true);
+  const rootRef = useRef<HTMLDivElement>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [sortKey, setSortKey] = useState<Field | "">("");
   const [sortDir, setSortDir] = useState<0 | 1 | -1>(0);
@@ -92,10 +94,25 @@ export function ScreenerWidget() {
   };
 
   useEffect(() => {
-    fetchAll();
-    const t = setInterval(fetchAll, 30000);
-    return () => clearInterval(t);
+    const io = new IntersectionObserver((entries) => {
+      setIsVisible(entries[0]?.isIntersecting ?? true);
+    }, { threshold: 0.05 });
+    if (rootRef.current) io.observe(rootRef.current);
+    return () => io.disconnect();
   }, []);
+
+  useEffect(() => {
+    const run = () => {
+      if (document.visibilityState !== "visible") return;
+      if (!isVisible) return;
+      fetchAll();
+    };
+    run();
+    const t = setInterval(run, 30000);
+    const onVis = () => run();
+    document.addEventListener("visibilitychange", onVis);
+    return () => { clearInterval(t); document.removeEventListener("visibilitychange", onVis); };
+  }, [isVisible]);
 
   const sectors = useMemo(() => Array.from(new Set(rows.map(r=>r.sector))).sort(), [rows]);
 
@@ -154,7 +171,7 @@ export function ScreenerWidget() {
   const rowBorder = themeMode === "dark" ? "border-neutral-800/80" : "border-surface-border/60";
 
   return (
-    <div className="h-full w-full flex flex-col">
+    <div ref={rootRef} className="h-full w-full flex flex-col">
       <div className="px-2 py-1.5 border-b border-surface-border flex items-center gap-2 text-xs relative" ref={popRef}>
         <button onClick={() => setShowFilters(v=>!v)} className="inline-flex items-center gap-1 px-2 py-1 rounded border border-surface-border hover:bg-surface-overlay">
           <FilterIcon size={12} /> Filters ({conds.length})
