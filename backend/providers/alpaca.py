@@ -276,7 +276,12 @@ class AlpacaProvider(BaseProvider):
             if r.status_code != 200:
                 return []
             trades = r.json().get("trades", [])
-            return [{"price": float(t.get("p", 0)), "size": int(t.get("s", 0)), "timestamp": t.get("t", "")} for t in trades]
+            return [{
+                "price": float(t.get("p", 0)),
+                "size": int(t.get("s", 0)),
+                "timestamp": t.get("t", ""),
+                "conditions": t.get("c", []) or [],
+            } for t in trades]
 
     async def get_news(self, symbols: list[str], limit: int = 20) -> list[dict[str, Any]]:
         async with httpx.AsyncClient(timeout=10.0) as c:

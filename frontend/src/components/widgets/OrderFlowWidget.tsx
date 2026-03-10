@@ -75,11 +75,13 @@ export function OrderFlowWidget({ symbol = "SPY", isGlobalOverride, onConfigChan
       const mid = Number((quote?.bid_price ?? 0) + (quote?.ask_price ?? 0)) / 2 || Number(quote?.last_price || 0);
 
       if (!Array.isArray(trades)) throw new Error("bad trades");
+      const orderedTrades = [...trades].sort((a: any, b: any) => Date.parse(a?.timestamp || "") - Date.parse(b?.timestamp || ""));
 
       const bySec = new Map<number, { buy: number; sell: number }>();
       let maxSeen = lastSeenTradeSecRef.current;
+      let prevTradePrice = 0;
 
-      for (const t of trades) {
+      for (const t of orderedTrades) {
         const ts = t?.timestamp ? Date.parse(t.timestamp) : NaN;
         if (!isFinite(ts)) continue;
         const sec = Math.floor(ts / 1000);
@@ -90,13 +92,32 @@ export function OrderFlowWidget({ symbol = "SPY", isGlobalOverride, onConfigChan
         if (!price || !size) continue;
 
         const row = bySec.get(sec) || { buy: 0, sell: 0 };
-        if (mid > 0) {
+        const conds: string[] = Array.isArray((t as any)?.conditions) ? (t as any).conditions : [];
+        const isAfterHoursTypeT = conds.includes("T");
+
+        if (isAfterHoursTypeT) {
+          // Explicitly include aftermarket trade type T (4pm+)
+          if (prevTradePrice > 0) {
+            if (price > prevTradePrice) row.buy += size;
+            else if (price < prevTradePrice) row.sell += size;
+            else { row.buy += size / 2; row.sell += size / 2; }
+          } else {
+            row.buy += size / 2; row.sell += size / 2;
+          }
+        } else if (mid > 0) {
           if (price > mid) row.buy += size;
           else if (price < mid) row.sell += size;
           else { row.buy += size / 2; row.sell += size / 2; }
         } else {
-          row.buy += size / 2; row.sell += size / 2;
+          if (prevTradePrice > 0) {
+            if (price > prevTradePrice) row.buy += size;
+            else if (price < prevTradePrice) row.sell += size;
+            else { row.buy += size / 2; row.sell += size / 2; }
+          } else {
+            row.buy += size / 2; row.sell += size / 2;
+          }
         }
+        prevTradePrice = price;
         bySec.set(sec, row);
         if (sec > maxSeen) maxSeen = sec;
       }

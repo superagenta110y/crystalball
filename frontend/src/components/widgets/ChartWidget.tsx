@@ -150,8 +150,10 @@ export function ChartWidget({
 
   const [symItems, setSymItems] = useState<{ symbol: string; name?: string }[]>([]);
   const [chartReady, setChartReady] = useState(false);
+  const [tfOpen, setTfOpen] = useState(false);
   const [symOpen, setSymOpen] = useState(false);
   const symRef = useRef<HTMLDivElement>(null);
+  const tfRef = useRef<HTMLDivElement>(null);
   const pollRef      = useRef<ReturnType<typeof setInterval> | null>(null);
   const wsRef        = useRef<WebSocket | null>(null);
   const loadFullRef  = useRef<any>(null);
@@ -226,10 +228,11 @@ export function ChartWidget({
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
       if (symRef.current && !symRef.current.contains(e.target as Node)) setSymOpen(false);
+      if (tfRef.current && !tfRef.current.contains(e.target as Node)) setTfOpen(false);
     };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
-  }, []);
+  }, [symbol]);
 
   // Build chart once on mount
   useEffect(() => {
@@ -900,16 +903,17 @@ export function ChartWidget({
         </div>
 
         {/* Timeframes */}
-        <div className="flex items-center gap-0.5 flex-wrap">
-          {TIMEFRAMES.map(tf => (
-            <button key={tf} onClick={() => setTF(tf)}
-              className={`px-1.5 py-0.5 rounded text-xs font-mono transition ${
-                tf === timeframe
-                  ? "bg-accent/20 text-accent font-semibold"
-                  : "text-neutral-500 hover:text-white hover:bg-surface-overlay"}`}>
-              {tf}
-            </button>
-          ))}
+        <div ref={tfRef} className="relative">
+          <button onClick={() => setTfOpen(v => !v)} className="px-1.5 py-0.5 rounded text-xs font-mono text-neutral-300 hover:text-white hover:bg-surface-overlay inline-flex items-center gap-1">
+            <span>{timeframe}</span>
+          </button>
+          {tfOpen && (
+            <div className="absolute left-0 top-6 z-40 rounded-md bg-surface-raised shadow-xl p-1 pop-in min-w-[52px]">
+              {TIMEFRAMES.filter(tf => tf !== timeframe).map(tf => (
+                <button key={tf} onClick={() => { setTF(tf); setTfOpen(false); }} className="w-full text-left px-2 py-1 rounded text-xs font-mono text-neutral-400 hover:text-white hover:bg-surface-overlay">{tf}</button>
+              ))}
+            </div>
+          )}
         </div>
 
         <details className="relative">
