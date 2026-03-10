@@ -133,6 +133,7 @@ export function ChartWidget({
   const chartRef      = useRef<any>(null);
   const seriesRef     = useRef<any>(null);
   const volumeRef     = useRef<any>(null);
+  const extShadeRef   = useRef<any>(null);
   const cacheRef      = useRef<Map<number, Bar>>(new Map());
   const indicatorSeriesRef = useRef<any[]>([]);
   const levelLinesRef = useRef<any[]>([]);
@@ -143,11 +144,12 @@ export function ChartWidget({
 
   const [symItems, setSymItems] = useState<{ symbol: string; name?: string }[]>([]);
   const [chartReady, setChartReady] = useState(false);
-  const [sessionShades, setSessionShades] = useState<Array<{ left: number; width: number }>>([]);
   const [symOpen, setSymOpen] = useState(false);
   const symRef = useRef<HTMLDivElement>(null);
   const pollRef      = useRef<ReturnType<typeof setInterval> | null>(null);
   const wsRef        = useRef<WebSocket | null>(null);
+  const loadFullRef  = useRef<any>(null);
+  const pollUpdateRef = useRef<any>(null);
 
   // Subscribe to theme — update chart colours whenever bull/bear/mode changes
   const theme = useDashboardStore(s => s.theme);
@@ -176,6 +178,12 @@ export function ChartWidget({
           color: b.close >= b.open ? toRgba(bull, 0.5) : toRgba(bear, 0.5),
         }))
       );
+    }
+    if (extShadeRef.current) {
+      extShadeRef.current.applyOptions({
+        topColor: theme.mode === "light" ? "rgba(115,115,115,0.16)" : "rgba(64,64,64,0.22)",
+        bottomColor: "rgba(0,0,0,0)",
+      });
     }
     chartRef.current.applyOptions({
       grid: { vertLines: { color: gridLine }, horzLines: { color: gridLine } },
@@ -243,10 +251,24 @@ export function ChartWidget({
         priceLineVisible: false,
         lastValueVisible: false,
       });
+      const extShadeSeries = chart.addAreaSeries({
+        priceScaleId: "session-bg",
+        lineColor: "transparent",
+        lineWidth: 1,
+        topColor: theme.mode === "light" ? "rgba(115,115,115,0.16)" : "rgba(64,64,64,0.22)",
+        bottomColor: "rgba(0,0,0,0)",
+        priceLineVisible: false,
+        lastValueVisible: false,
+      });
+      chart.priceScale("session-bg").applyOptions({
+        visible: false,
+        scaleMargins: { top: 0, bottom: 0 },
+      });
       volumeSeries.priceScale().applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
       chartRef.current = chart;
       seriesRef.current = series;
       volumeRef.current = volumeSeries;
+      extShadeRef.current = extShadeSeries;
       setChartReady(true);
 
       const ro = new ResizeObserver(() => {
@@ -267,6 +289,7 @@ export function ChartWidget({
       chartRef.current = null;
       seriesRef.current = null;
       volumeRef.current = null;
+      extShadeRef.current = null;
       indicatorSeriesRef.current = [];
       levelLinesRef.current = [];
     };
@@ -403,45 +426,31 @@ export function ChartWidget({
   }, [clearIndicators, timeframe, vwapAnchor, vpAnchor, indSMA, indEMA, indVWAP, indBB, indLevels, indVP, smaFastPeriod, smaFastColor, smaFastWidth, smaSlowPeriod, smaSlowColor, smaSlowWidth, emaFastPeriod, emaFastColor, emaFastWidth, emaSlowPeriod, emaSlowColor, emaSlowWidth, vwapColor, vwapWidth, bbPeriod, bbStd, bbColor, bbWidth, levelColor, levelWidth, showPrevClose, showDayHighLow, showPremarketHighLow, vpColor, vpWidth]);
 
   const updateSessionShading = useCallback(() => {
-    if (!chartRef.current || !seriesRef.current) { setSessionShades([]); return; }
-    if (timeframe === "1d" || timeframe === "1w") { setSessionShades([]); return; }
+    if (!extShadeRef.current) return;
+    if (timeframe === "1d" || timeframe === "1w") { extShadeRef.current.setData([]); return; }
 
     const bars = Array.from(cacheRef.current.values()).sort((a, b) => a.time - b.time);
-    if (!bars.length) { setSessionShades([]); return; }
+    if (!bars.length) { extShadeRef.current.setData([]); return; }
 
-    const ts = chartRef.current.timeScale();
-    const vr = ts.getVisibleRange?.();
-    const from = vr?.from ? Math.floor(new Date(vr.from as any).getTime() / 1000) : bars[0].time;
-    const to = vr?.to ? Math.floor(new Date(vr.to as any).getTime() / 1000) : bars[bars.length - 1].time;
-
-    const visible = bars.filter(b => b.time >= from && b.time <= to);
+    const fmt = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      hour12: false,
+      hour: "2-digit",
+      minute: "2-digit",
+    });
     const isExt = (t: number) => {
-      const d = new Date(t * 1000).toLocaleString("en-US", { timeZone: "America/New_York" });
-      const dt = new Date(d);
-      const m = dt.getHours() * 60 + dt.getMinutes();
-      const pre = m >= 240 && m < 570;   // 4:00-9:30 ET
-      const post = m >= 960 && m < 1200; // 16:00-20:00 ET
+      const parts = fmt.formatToParts(new Date(t * 1000));
+      const h = Number(parts.find(p => p.type === "hour")?.value || "0");
+      const m = Number(parts.find(p => p.type === "minute")?.value || "0");
+      const mins = h * 60 + m;
+      const pre = mins >= 240 && mins < 570;   // 4:00-9:30 ET
+      const post = mins >= 960 && mins < 1200; // 16:00-20:00 ET
       return pre || post;
     };
 
-    const segments: Array<{ left: number; width: number }> = [];
-    let startX: number | null = null;
-    let prevX: number | null = null;
-
-    for (const b of visible) {
-      const x = ts.timeToCoordinate?.(b.time as any);
-      if (x == null) continue;
-      if (isExt(b.time)) {
-        if (startX == null) startX = x;
-        prevX = x;
-      } else if (startX != null && prevX != null) {
-        segments.push({ left: Math.max(0, startX), width: Math.max(2, prevX - startX + 2) });
-        startX = null;
-        prevX = null;
-      }
-    }
-    if (startX != null && prevX != null) segments.push({ left: Math.max(0, startX), width: Math.max(2, prevX - startX + 2) });
-    setSessionShades(segments);
+    extShadeRef.current.setData(
+      bars.map((b) => ({ time: b.time, value: isExt(b.time) ? 1 : 0 }))
+    );
   }, [timeframe]);
 
   useEffect(() => {
@@ -567,6 +576,9 @@ export function ChartWidget({
     } catch { /* silent — don't flicker status on transient errors */ }
   }, [theme.bull, theme.bear, drawIndicators, updateSessionShading]);
 
+  useEffect(() => { loadFullRef.current = loadFull; }, [loadFull]);
+  useEffect(() => { pollUpdateRef.current = pollUpdate; }, [pollUpdate]);
+
   const fetchOlder = useCallback(async () => {
     if (!seriesRef.current || loadingMoreRef.current) return;
     const times = Array.from(cacheRef.current.keys()).sort((a, b) => a - b);
@@ -630,17 +642,17 @@ export function ChartWidget({
     const pollMs   = POLL_MS[alpacaTF] || 15000;
     let alive = true;
 
-    loadFull(symbol, timeframe).then(() => {
+    loadFullRef.current?.(symbol, timeframe).then(() => {
       if (!alive) return;
       // Kick off polling
-      pollRef.current = setInterval(() => pollUpdate(symbol, timeframe), pollMs);
+      pollRef.current = setInterval(() => pollUpdateRef.current?.(symbol, timeframe), pollMs);
     });
 
     return () => {
       alive = false;
       if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
     };
-  }, [symbol, timeframe, loadFull, pollUpdate]);
+  }, [symbol, timeframe]);
 
   // WebSocket — live price overlay (updates lastPrice + last bar close in real time)
   useEffect(() => {
@@ -823,17 +835,6 @@ export function ChartWidget({
       </div>
 
       <div className="relative flex-1 w-full min-h-0">
-        {(timeframe !== "1d" && timeframe !== "1w") && (
-          <div className="absolute inset-0 z-[8] pointer-events-none">
-            {sessionShades.map((s, i) => (
-              <div
-                key={i}
-                className={theme.mode === "light" ? "absolute top-0 bottom-0 bg-neutral-200/35" : "absolute top-0 bottom-0 bg-neutral-800/35"}
-                style={{ left: `${s.left}px`, width: `${s.width}px` }}
-              />
-            ))}
-          </div>
-        )}
         <div className="absolute left-2 top-1 z-10 text-[10px] font-mono text-neutral-300 pointer-events-none">
           {barStatus || (status === "loading" ? "Loading…" : status === "error" ? "Error" : "")}
           {lastPrice != null && <span className="ml-2 text-white">${lastPrice.toFixed(2)}</span>}

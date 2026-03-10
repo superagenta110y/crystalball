@@ -79,13 +79,15 @@ class AlpacaProvider(BaseProvider):
         end_iso = end or end_dt.isoformat().replace("+00:00", "Z")
 
         async with httpx.AsyncClient() as c:
+            # SIP includes full-market coverage incl. extended hours for supported symbols.
+            feed = "sip"
             # Primary path: ask for latest bars ending at end_iso.
             primary = {
                 "timeframe": tf,
                 "limit": limit,
                 "adjustment": "raw",
                 "end": end_iso,
-                "feed": self._feed,
+                "feed": feed,
                 "sort": "desc",
             }
             if start:
@@ -115,7 +117,7 @@ class AlpacaProvider(BaseProvider):
                     "adjustment": "raw",
                     "start": start_dt.isoformat().replace("+00:00", "Z"),
                     "end": end_iso,
-                    "feed": self._feed,
+                    "feed": feed,
                     "sort": "desc",
                 }
                 rr = await c.get(
