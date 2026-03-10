@@ -93,6 +93,7 @@ export function ChartWidget({
   const [status, setStatus] = useState<"loading"|"ok"|"error">("loading");
   const [lastPrice, setLastPrice] = useState<number|null>(null);
   const [isLive, setIsLive] = useState(false);
+  const [barStatus, setBarStatus] = useState<string>("");
   const [indicatorModal, setIndicatorModal] = useState<null | "sma" | "ema" | "bb" | "levels" | "vp" | "vwap">(null);
   const [indSMA, setIndSMA] = useState(false);
   const [indEMA, setIndEMA] = useState(false);
@@ -402,6 +403,10 @@ export function ChartWidget({
         }))
       );
       drawIndicators(bars);
+      const lb = bars[bars.length - 1];
+      if (lb) {
+        setBarStatus(`O ${lb.open.toFixed(2)} H ${lb.high.toFixed(2)} L ${lb.low.toFixed(2)} C ${lb.close.toFixed(2)} V ${Math.round(lb.volume || 0).toLocaleString()}`);
+      }
 
       const pr = pendingRangeRef.current;
       if (pr && pr.targetTf === tf && chartRef.current?.timeScale) {
@@ -473,6 +478,10 @@ export function ChartWidget({
         }
       }
       drawIndicators(Array.from(cacheRef.current.values()).sort((a,b)=>a.time-b.time));
+      const lb = bars[bars.length - 1];
+      if (lb) {
+        setBarStatus(`O ${lb.open.toFixed(2)} H ${lb.high.toFixed(2)} L ${lb.low.toFixed(2)} C ${lb.close.toFixed(2)} V ${Math.round(lb.volume || 0).toLocaleString()}`);
+      }
       setLastPrice(bars[bars.length - 1].close);
       setIsLive(true);
 
@@ -607,6 +616,7 @@ export function ChartWidget({
               color: updated.close >= updated.open ? toRgba(bull, 0.5) : toRgba(bear, 0.5),
             });
             drawIndicators(Array.from(cacheRef.current.values()).sort((a,b)=>a.time-b.time));
+            setBarStatus(`O ${updated.open.toFixed(2)} H ${updated.high.toFixed(2)} L ${updated.low.toFixed(2)} C ${updated.close.toFixed(2)} V ${Math.round(updated.volume || 0).toLocaleString()}`);
           }
         } catch { /* ignore parse errors */ }
       };
@@ -732,16 +742,17 @@ export function ChartWidget({
           </div>
         </details>
 
-        {/* Status */}
-        <div className="ml-auto flex items-center gap-2">
-          {isLive && <span className="w-1.5 h-1.5 rounded-full bg-bull animate-pulse" title="Live updates active" />}
-          {lastPrice && <span className="text-xs font-mono text-white">${lastPrice.toFixed(2)}</span>}
-          {status === "loading" && <span className="text-xs text-neutral-600 animate-pulse">Loading…</span>}
-          {status === "error"   && <span className="text-xs text-bear">Error</span>}
-        </div>
+
       </div>
 
-      <div ref={containerRef} className="flex-1 w-full min-h-0" />
+      <div className="relative flex-1 w-full min-h-0">
+        <div className="absolute left-2 top-1 z-10 text-[10px] font-mono text-neutral-300 pointer-events-none">
+          {barStatus || (status === "loading" ? "Loading…" : status === "error" ? "Error" : "")}
+          {lastPrice != null && <span className="ml-2 text-white">${lastPrice.toFixed(2)}</span>}
+          {isLive && <span className="ml-1 inline-block w-1.5 h-1.5 rounded-full bg-bull animate-pulse" />}
+        </div>
+        <div ref={containerRef} className="h-full w-full" />
+      </div>
 
       {indicatorModal && (
         <div className="absolute inset-0 z-30 bg-black/50 flex items-center justify-center p-3">
