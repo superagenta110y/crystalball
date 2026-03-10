@@ -59,7 +59,9 @@ async def history(
         req_start = start
         if not req_start:
             step = _tf_sec(timeframe)
-            lookback_bars = max(limit * 3, 400)
+            # Keep window close to requested size so providers that honor start+limit
+            # return the most recent slice instead of very old bars.
+            lookback_bars = max(int(limit * 1.5), 400)
             start_ts = max(0, end_ts - step * lookback_bars)
             req_start = _ts_to_iso(start_ts)
 

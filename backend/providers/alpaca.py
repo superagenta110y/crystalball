@@ -86,6 +86,7 @@ class AlpacaProvider(BaseProvider):
                 "adjustment": "raw",
                 "end": end_iso,
                 "feed": self._feed,
+                "sort": "desc",
             }
             if start:
                 primary["start"] = start
@@ -115,6 +116,7 @@ class AlpacaProvider(BaseProvider):
                     "start": start_dt.isoformat().replace("+00:00", "Z"),
                     "end": end_iso,
                     "feed": self._feed,
+                    "sort": "desc",
                 }
                 rr = await c.get(
                     f"{self._data_url}/v2/stocks/{symbol}/bars",
@@ -124,7 +126,10 @@ class AlpacaProvider(BaseProvider):
                 rr.raise_for_status()
                 bars = rr.json().get("bars") or []
 
-            # Guard against APIs returning oldest slice for a wide start window.
+            # Ensure chronological order for consumers.
+            bars = sorted(bars, key=lambda x: x.get("t", ""))
+
+            # Guard against oversized responses.
             if len(bars) > limit:
                 bars = bars[-limit:]
 
