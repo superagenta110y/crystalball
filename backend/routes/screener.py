@@ -32,6 +32,15 @@ UNIVERSE = {
     "MSTR": {"sec": "Technology", "mc": 40, "logo": "microstrategy.com"},
 }
 
+EXTRA_SYMBOLS = [
+    "DIA","SMH","XLF","XLK","XLE","XLI","XLV","XLY","XLP","XLC",
+    "AVGO","ORCL","ADBE","CRM","INTC","CSCO","QCOM","MU","AMAT","LRCX",
+    "WMT","COST","HD","LOW","NKE","SBUX","MCD","DIS","UBER","ABNB",
+    "V","MA","AXP","PYPL","SCHW","MS","C","WFC","BLK","SPGI",
+    "JNJ","LLY","MRK","TMO","ISRG","ABT","DHR","BMY","VRTX","MDT",
+    "GE","CAT","DE","BA","HON","ETN","UPS","FDX","RTX","LMT",
+]
+
 
 def _close(arr: list[dict], idx_from_end: int) -> float:
     if not arr:
@@ -50,6 +59,7 @@ def _matches(row: dict, cond: dict) -> bool:
     op = str(cond.get("op") or "=")
     v = cond.get("v")
     raw = row.get(f)
+
     if f in {"sec", "s"}:
         vals = [x.strip() for x in str(v or "").split(",") if x.strip()]
         if op == "in":
@@ -61,6 +71,22 @@ def _matches(row: dict, cond: dict) -> bool:
         if op == "!=":
             return str(raw) != str(v)
         return True
+
+    if f == "mc" and isinstance(v, str) and v.startswith("bucket:"):
+        mc = float(raw or 0)
+        bucket = v.split(":", 1)[1]
+        if bucket == "lt10m":
+            return mc < 0.01
+        if bucket == "10m_99m":
+            return 0.01 <= mc < 0.1
+        if bucket == "100m_999m":
+            return 0.1 <= mc < 1
+        if bucket == "1b_99b":
+            return 1 <= mc < 100
+        if bucket == "100b_999b":
+            return 100 <= mc < 1000
+        if bucket == "1t_plus":
+            return mc >= 1000
 
     try:
         a = float(raw)
@@ -92,7 +118,10 @@ async def screener(
     filters: str | None = Query(None, description="JSON array of compact conditions [{f,op,v}]"),
     provider: BaseProvider = Depends(get_provider),
 ):
-    syms = [s.strip().upper() for s in symbols.split(",")] if symbols else list(UNIVERSE.keys())
+    if symbols:
+        syms = [s.strip().upper() for s in symbols.split(",") if s.strip()]
+    else:
+        syms = list(dict.fromkeys(list(UNIVERSE.keys()) + EXTRA_SYMBOLS))
 
     rows: list[dict] = []
     for sym in syms:
@@ -105,11 +134,12 @@ async def screener(
             vol_now = sum(float(x.get("volume") or x.get("v") or 0) for x in h1)
             dd30 = dd[-30:]
             vol_avg = (sum(float(x.get("volume") or x.get("v") or 0) for x in dd30) / max(1, len(dd30))) if dd30 else 0
+            meta = UNIVERSE.get(sym) or {}
             rows.append({
                 "s": sym,
                 "p": p,
-                "sec": (UNIVERSE.get(sym) or {}).get("sec", "Unknown"),
-                "mc": float((UNIVERSE.get(sym) or {}).get("mc", 0)),
+                "sec": meta.get("sec", "Unknown"),
+                "mc": float(meta.get("mc", 0)),
                 "rv": (vol_now / vol_avg) if vol_avg else 0,
                 "c1m": _pct(p, _close(h1, 1)),
                 "c1h": _pct(p, _close(hh, 1)),
@@ -118,7 +148,7 @@ async def screener(
                 "c1mo": _pct(p, _close(dd, 21)),
                 "c1y": _pct(p, _close(dd, 252)),
                 "ytd": _pct(p, _close(dd, min(max(0, len(dd)-1), 60))),
-                "lg": (UNIVERSE.get(sym) or {}).get("logo", ""),
+                "lg": meta.get("logo", ""),
             })
         except Exception:
             continue

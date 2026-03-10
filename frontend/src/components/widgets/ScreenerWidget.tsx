@@ -27,6 +27,29 @@ type Op = "=" | ">" | "<" | "!=" | ">=" | "<=" | "in" | "not-in";
 type Cond = { id: string; field: Field; op: Op; value: string };
 
 const ENUM_FIELDS: Field[] = ["sector", "symbol"];
+const FIELD_LABEL: Record<Field, string> = {
+  symbol: "Ticker",
+  sector: "Sector",
+  marketCapB: "Market Cap",
+  price: "Price",
+  relVol: "Relative Volume",
+  c1m: "%1M Change",
+  c1h: "%1H Change",
+  c1d: "%1D Change",
+  c1w: "%1W Change",
+  c1mth: "%1Mo Change",
+  c1y: "%1Y Change",
+  cytd: "%YTD Change",
+  logo: "Logo",
+};
+const MC_BUCKETS = [
+  { value: "bucket:lt10m", label: "<10M" },
+  { value: "bucket:10m_99m", label: "10M-99M" },
+  { value: "bucket:100m_999m", label: "100M-999M" },
+  { value: "bucket:1b_99b", label: "1B-99B" },
+  { value: "bucket:100b_999b", label: "100B-999B" },
+  { value: "bucket:1t_plus", label: "1T+" },
+];
 const SORT_FIELD_TO_API: Record<Field, string> = {
   symbol: "s",
   price: "p",
@@ -73,9 +96,7 @@ export function ScreenerWidget() {
   const [pageSize] = useState(50);
   const [total, setTotal] = useState(0);
   const [conds, setConds] = useState<Cond[]>([
-    { id: crypto.randomUUID(), field: "marketCapB", op: ">", value: "5" },
     { id: crypto.randomUUID(), field: "c1d", op: ">", value: "1" },
-    { id: crypto.randomUUID(), field: "relVol", op: ">", value: "1.2" },
   ]);
   const popRef = useRef<HTMLDivElement>(null);
 
@@ -171,6 +192,9 @@ export function ScreenerWidget() {
   return (
     <div className="h-full w-full flex flex-col">
       <div className="px-2 py-1.5 border-b border-surface-border flex items-center gap-2 text-xs relative" ref={popRef}>
+        <div className="widget-drag-handle cursor-grab active:cursor-grabbing select-none inline-flex items-center gap-1.5 text-neutral-500">
+          <span className="text-xs uppercase tracking-wide">Screener</span>
+        </div>
         <button onClick={() => setShowFilters((v) => !v)} className="inline-flex items-center gap-1 px-2 py-1 rounded border border-surface-border hover:bg-surface-overlay">
           <FilterIcon size={12} /> Filters ({conds.length})
         </button>
@@ -190,15 +214,16 @@ export function ScreenerWidget() {
                 <div key={c.id} className="grid grid-cols-[1fr_auto_1fr_auto] gap-1 items-center">
                   <select
                     value={c.field}
-                    onChange={(e) => setConds((prev) => prev.map((x) => x.id === c.id ? { ...x, field: e.target.value as Field, op: ENUM_FIELDS.includes(e.target.value as Field) ? "=" : ">" } : x))}
+                    onChange={(e) => setConds((prev) => prev.map((x) => x.id === c.id ? { ...x, field: e.target.value as Field, op: (ENUM_FIELDS.includes(e.target.value as Field) || e.target.value === "marketCapB") ? "=" : ">", value: e.target.value === "marketCapB" ? "bucket:1b_99b" : x.value } : x))}
                     className="bg-surface-overlay border border-surface-border rounded px-1 py-1"
                   >
-                    {(["symbol", "sector", "marketCapB", "price", "relVol", "c1m", "c1h", "c1d", "c1w", "c1mth", "c1y", "cytd"] as Field[]).map((f) => <option key={f} value={f}>{f}</option>)}
+                    {(["symbol", "sector", "marketCapB", "price", "relVol", "c1m", "c1h", "c1d", "c1w", "c1mth", "c1y", "cytd"] as Field[]).map((f) => <option key={f} value={f}>{FIELD_LABEL[f]}</option>)}
                   </select>
                   <select
                     value={c.op}
                     onChange={(e) => setConds((prev) => prev.map((x) => x.id === c.id ? { ...x, op: e.target.value as Op } : x))}
                     className="bg-surface-overlay border border-surface-border rounded px-1 py-1"
+                    disabled={c.field === "marketCapB"}
                   >
                     {enumField ? (
                       <>
@@ -206,18 +231,28 @@ export function ScreenerWidget() {
                         <option value="in">is one of</option>
                         <option value="not-in">is none of</option>
                       </>
+                    ) : c.field === "marketCapB" ? (
+                      <>
+                        <option value="=">is</option>
+                      </>
                     ) : (
                       <>
                         <option value="=">=</option><option value=">">&gt;</option><option value="<">&lt;</option><option value="!=">!=</option><option value=">=">&gt;=</option><option value="<=">&lt;=</option>
                       </>
                     )}
                   </select>
-                  <input value={c.value} onChange={(e) => setConds((prev) => prev.map((x) => x.id === c.id ? { ...x, value: e.target.value } : x))} placeholder={enumField ? "A,B,C" : "value"} className="bg-surface-overlay border border-surface-border rounded px-2 py-1" />
+                  {c.field === "marketCapB" ? (
+                    <select value={c.value} onChange={(e) => setConds((prev) => prev.map((x) => x.id === c.id ? { ...x, value: e.target.value } : x))} className="bg-surface-overlay border border-surface-border rounded px-2 py-1">
+                      {MC_BUCKETS.map((b) => <option key={b.value} value={b.value}>{b.label}</option>)}
+                    </select>
+                  ) : (
+                    <input value={c.value} onChange={(e) => setConds((prev) => prev.map((x) => x.id === c.id ? { ...x, value: e.target.value } : x))} placeholder={enumField ? "A,B,C" : "value"} className="bg-surface-overlay border border-surface-border rounded px-2 py-1" />
+                  )}
                   <button onClick={() => { setPage(1); setConds((prev) => prev.filter((x) => x.id !== c.id)); }} className="p-1 rounded hover:bg-surface-overlay"><X size={12} /></button>
                 </div>
               );
             })}
-            <button onClick={() => { setPage(1); setConds((prev) => [...prev, { id: crypto.randomUUID(), field: "marketCapB", op: ">", value: "0" }]); }} className="inline-flex items-center gap-1 px-2 py-1 rounded border border-surface-border hover:bg-surface-overlay"><Plus size={12} /> Add condition</button>
+            <button onClick={() => { setPage(1); setConds((prev) => [...prev, { id: crypto.randomUUID(), field: "c1d", op: ">", value: "1" }]); }} className="inline-flex items-center gap-1 px-2 py-1 rounded border border-surface-border hover:bg-surface-overlay"><Plus size={12} /> Add condition</button>
             <div className="text-[10px] text-neutral-500">Sectors on page: {sectors.join(", ") || "-"}</div>
           </div>
         )}
