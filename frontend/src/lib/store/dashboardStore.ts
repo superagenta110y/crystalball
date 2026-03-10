@@ -162,18 +162,30 @@ export const useDashboardStore = create<DashboardState>()(
             const collides = (cand: Layout, layout: Layout[]) =>
               layout.some((o) => !(cand.x + cand.w <= o.x || o.x + o.w <= cand.x || cand.y + cand.h <= o.y || o.y + o.h <= cand.y));
 
-            // 1) Try to place in an existing gap first.
+            // 1) Try to place in the largest existing gap first (fill full gap, not partial).
             const maxY = t.layout.reduce((m, l) => Math.max(m, l.y + l.h), 0);
-            const trySizes: Array<[number, number]> = [[6, 8], [4, 8], [3, 6], [2, 4]];
-            for (const [gw, gh] of trySizes) {
-              for (let y = 0; y <= maxY + 6; y++) {
-                for (let x = 0; x <= 12 - gw; x++) {
-                  const cand: Layout = { i: w.id, x, y, w: gw, h: gh };
-                  if (!collides(cand, t.layout)) {
-                    return { ...t, widgets: [...t.widgets, w], layout: [...t.layout, cand] };
+            let best: Layout | null = null;
+            let bestArea = 0;
+            const yLimit = Math.max(12, maxY + 8);
+            for (let y = 0; y <= yLimit; y++) {
+              for (let x = 0; x < 12; x++) {
+                // skip covered origins
+                if (collides({ i: w.id, x, y, w: 1, h: 1 }, t.layout)) continue;
+                for (let gw = 12 - x; gw >= 2; gw--) {
+                  let gh = 1;
+                  while (y + gh <= yLimit && !collides({ i: w.id, x, y, w: gw, h: gh }, t.layout)) gh++;
+                  gh = gh - 1;
+                  if (gh < 3) continue;
+                  const area = gw * gh;
+                  if (area > bestArea) {
+                    bestArea = area;
+                    best = { i: w.id, x, y, w: gw, h: gh };
                   }
                 }
               }
+            }
+            if (best) {
+              return { ...t, widgets: [...t.widgets, w], layout: [...t.layout, best] };
             }
 
             // 2) No gap: split the smallest element in half (orientation by larger side).

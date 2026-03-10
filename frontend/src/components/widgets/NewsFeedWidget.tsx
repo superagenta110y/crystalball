@@ -102,32 +102,29 @@ export function NewsFeedWidget({ globalSymbol = "SPY", config, onConfigChange }:
   };
 
   return (
-    <div className="h-full w-full overflow-hidden flex flex-col">
-      <div className="px-2 py-1.5 border-b border-surface-border text-xs flex items-center gap-2">
-        <span className="text-neutral-500 uppercase tracking-wide">News</span>
-        <div ref={symRef} className="relative">
-          <input
-            value={draft}
-            onChange={(e) => { setDraft(e.target.value.toUpperCase()); setSymOpen(true); }}
-            onFocus={() => setSymOpen(true)}
-            placeholder="All symbols"
-            className="bg-surface-overlay border border-surface-border rounded px-2 py-0.5 text-xs font-mono w-24"
-          />
-          {symOpen && symItems.length > 0 && (
-            <div className="absolute left-0 top-6 z-50 w-56 rounded-md border border-surface-border bg-surface-raised shadow-xl max-h-64 overflow-auto">
-              {symItems.map((it) => (
-                <button key={it.symbol} onClick={() => selectSymbol(it.symbol)} className="w-full text-left px-2 py-1.5 hover:bg-surface-overlay">
-                  <div className="text-xs font-mono text-white">{it.symbol}</div>
-                  <div className="text-[10px] text-neutral-500 truncate">{it.name || ""}</div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-        {filterSymbol && <button onClick={clearFilter} className="text-neutral-500 hover:text-white">✕</button>}
+    <div className="h-full w-full overflow-hidden flex flex-col relative">
+      <div className="absolute top-1 right-1 z-30 flex items-center gap-1" ref={symRef}>
+        <input
+          value={draft}
+          onChange={(e) => { setDraft(e.target.value.toUpperCase()); setSymOpen(true); }}
+          onFocus={() => setSymOpen(true)}
+          placeholder="All symbols"
+          className="cb-input bg-transparent border border-neutral-500/70 rounded px-2 py-0.5 text-xs font-mono w-24 hover:bg-surface-overlay/40"
+        />
+        {filterSymbol && <button onClick={clearFilter} className="p-1 rounded text-neutral-500 hover:text-white hover:bg-surface-overlay">✕</button>}
+        {symOpen && symItems.length > 0 && (
+          <div className="absolute right-0 top-7 z-50 w-56 rounded-md bg-surface-raised shadow-xl max-h-64 overflow-auto pop-in">
+            {symItems.map((it) => (
+              <button key={it.symbol} onClick={() => selectSymbol(it.symbol)} className="w-full text-left px-2 py-1.5 hover:bg-surface-overlay">
+                <div className="text-xs font-mono text-white">{it.symbol}</div>
+                <div className="text-[10px] text-neutral-500 truncate">{it.name || ""}</div>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      <div className="flex-1 min-h-0 overflow-auto p-2 space-y-2">
+      <div className="flex-1 min-h-0 overflow-auto p-2 pt-8 space-y-2">
         {loading && (
           <div className="text-xs text-neutral-600 animate-pulse">Loading news…</div>
         )}
