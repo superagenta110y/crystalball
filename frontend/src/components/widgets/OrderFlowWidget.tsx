@@ -17,7 +17,7 @@ type Bucket = {
   totalVol: number;
   buyPct: number;
   sellPct: number;
-  y: number; // signed skew in percent
+  y: number;
   fill: string;
   stroke: string;
 };
@@ -33,7 +33,7 @@ export function OrderFlowWidget({ symbol = "SPY", isGlobalOverride, onConfigChan
   const [buckets, setBuckets] = useState<Bucket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const lastSeenTradeSecRef = useRef<number>(0);
+  const wsRef = useRef<WebSocket | null>(null);
 
   const normalizeWindow = (rows: Bucket[]): Bucket[] => {
     const sorted = [...rows].sort((a, b) => a.sec - b.sec).slice(-WINDOW_SEC);
@@ -45,7 +45,7 @@ export function OrderFlowWidget({ symbol = "SPY", isGlobalOverride, onConfigChan
     const buyPct = total > 0 ? buyVol / total : 0.5;
     const sellPct = total > 0 ? sellVol / total : 0.5;
     const dominance = Math.abs(buyPct - sellPct);
-    const neutral = dominance < 0.02; // ~51/49 neutral
+    const neutral = dominance < 0.02;
     const fill = neutral ? "#ffffff" : (buyPct > sellPct ? bull : bear);
 
     return {
@@ -63,96 +63,46 @@ export function OrderFlowWidget({ symbol = "SPY", isGlobalOverride, onConfigChan
     };
   };
 
-  const ingest = async (sym: string) => {
-    try {
-      const [quoteRes, tradesRes] = await Promise.all([
-        fetch(`${API}/api/market/quote/${sym}`),
-        fetch(`${API}/api/market/trades/${sym}?limit=1000`),
-      ]);
-
-      const quote = quoteRes.ok ? await quoteRes.json() : {};
-      const trades = tradesRes.ok ? await tradesRes.json() : [];
-      const mid = Number((quote?.bid_price ?? 0) + (quote?.ask_price ?? 0)) / 2 || Number(quote?.last_price || 0);
-
-      if (!Array.isArray(trades)) throw new Error("bad trades");
-      const orderedTrades = [...trades].sort((a: any, b: any) => Date.parse(a?.timestamp || "") - Date.parse(b?.timestamp || ""));
-
-      const bySec = new Map<number, { buy: number; sell: number }>();
-      let maxSeen = lastSeenTradeSecRef.current;
-      let prevTradePrice = 0;
-
-      for (const t of orderedTrades) {
-        const ts = t?.timestamp ? Date.parse(t.timestamp) : NaN;
-        if (!isFinite(ts)) continue;
-        const sec = Math.floor(ts / 1000);
-        if (sec < lastSeenTradeSecRef.current - 2) continue;
-
-        const price = Number(t?.price || 0);
-        const size = Number(t?.size || 0);
-        if (!price || !size) continue;
-
-        const row = bySec.get(sec) || { buy: 0, sell: 0 };
-        const conds: string[] = Array.isArray((t as any)?.conditions) ? (t as any).conditions : [];
-        const isAfterHoursTypeT = conds.includes("T");
-
-        if (isAfterHoursTypeT) {
-          // Explicitly include aftermarket trade type T (4pm+)
-          if (prevTradePrice > 0) {
-            if (price > prevTradePrice) row.buy += size;
-            else if (price < prevTradePrice) row.sell += size;
-            else { row.buy += size / 2; row.sell += size / 2; }
-          } else {
-            row.buy += size / 2; row.sell += size / 2;
-          }
-        } else if (mid > 0) {
-          if (price > mid) row.buy += size;
-          else if (price < mid) row.sell += size;
-          else { row.buy += size / 2; row.sell += size / 2; }
-        } else {
-          if (prevTradePrice > 0) {
-            if (price > prevTradePrice) row.buy += size;
-            else if (price < prevTradePrice) row.sell += size;
-            else { row.buy += size / 2; row.sell += size / 2; }
-          } else {
-            row.buy += size / 2; row.sell += size / 2;
-          }
-        }
-        prevTradePrice = price;
-        bySec.set(sec, row);
-        if (sec > maxSeen) maxSeen = sec;
-      }
-
-      // ensure current second exists and evolves in realtime
-      const nowSec = Math.floor(Date.now() / 1000);
-      if (!bySec.has(nowSec)) bySec.set(nowSec, { buy: 0, sell: 0 });
-
-      setBuckets((prev) => {
-        const map = new Map(prev.map(p => [p.sec, p]));
-        for (const [sec, v] of bySec.entries()) {
-          map.set(sec, buildBucket(sec, v.buy, v.sell));
-        }
-        const next = normalizeWindow(Array.from(map.values()));
-        return next;
-      });
-
-      lastSeenTradeSecRef.current = Math.max(maxSeen, nowSec);
-      setLoading(false);
-      setError(false);
-    } catch {
-      setError(true);
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    setBuckets([]);
+    let closed = false;
     setLoading(true);
     setError(false);
-    lastSeenTradeSecRef.current = Math.floor(Date.now() / 1000) - 2;
+    setBuckets([]);
 
-    ingest(symbol);
-    const t = setInterval(() => ingest(symbol), 1000);
-    return () => clearInterval(t);
+    const wsBase = (API && API.trim()) ? API.replace(/^http/, "ws") : window.location.origin.replace(/^http/, "ws");
+    const connect = () => {
+      if (closed) return;
+      const ws = new WebSocket(`${wsBase}/api/ws/orderflow/${symbol}`);
+      wsRef.current = ws;
+
+      ws.onmessage = (ev) => {
+        try {
+          const d = JSON.parse(ev.data);
+          if (d?.ping) return;
+          if (d?.type !== "orderflow" || !Array.isArray(d?.buckets)) return;
+          const rows = d.buckets.map((b: any) => buildBucket(Number(b.sec || 0), Number(b.buy || 0), Number(b.sell || 0)));
+          setBuckets(normalizeWindow(rows));
+          setLoading(false);
+          setError(false);
+        } catch {
+          setError(true);
+          setLoading(false);
+        }
+      };
+
+      ws.onclose = () => {
+        wsRef.current = null;
+        if (!closed) setTimeout(connect, 1200);
+      };
+      ws.onerror = () => ws.close();
+    };
+
+    connect();
+    return () => {
+      closed = true;
+      wsRef.current?.close();
+      wsRef.current = null;
+    };
   }, [symbol, bull, bear]);
 
   const maxVol = useMemo(() => Math.max(1, ...buckets.map(b => b.totalVol)), [buckets]);
