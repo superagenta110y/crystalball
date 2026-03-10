@@ -94,8 +94,9 @@ export function ChartWidget({
   const [lastPrice, setLastPrice] = useState<number|null>(null);
   const [isLive, setIsLive] = useState(false);
   const [barStatus, setBarStatus] = useState<string>("");
-  const [crosshairStatus, setCrosshairStatus] = useState<string>("");
   const [crosshairActive, setCrosshairActive] = useState(false);
+  const [hoverBar, setHoverBar] = useState<Bar | null>(null);
+  const [hoverCvd, setHoverCvd] = useState<number | null>(null);
   const [indicatorModal, setIndicatorModal] = useState<null | "sma" | "ema" | "bb" | "levels" | "vp" | "vwap" | "cvd">(null);
   const [indSMA, setIndSMA] = useState(false);
   const [indEMA, setIndEMA] = useState(false);
@@ -139,6 +140,7 @@ export function ChartWidget({
   const volumeRef     = useRef<any>(null);
   const extShadeRef   = useRef<any>(null);
   const cacheRef      = useRef<Map<number, Bar>>(new Map());
+  const cvdMapRef     = useRef<Map<number, number>>(new Map());
   const indicatorSeriesRef = useRef<any[]>([]);
   const levelLinesRef = useRef<any[]>([]);
   const historyLimitRef = useRef<number>(0);
@@ -282,12 +284,16 @@ export function ChartWidget({
         const p = param?.point;
         if (!p || p.x < 0 || p.y < 0 || !containerRef.current) {
           setCrosshairActive(false);
+          setHoverBar(null);
+          setHoverCvd(null);
           return;
         }
         const w = containerRef.current.clientWidth;
         const h = containerRef.current.clientHeight;
         if (p.x > w || p.y > h) {
           setCrosshairActive(false);
+          setHoverBar(null);
+          setHoverCvd(null);
           return;
         }
 
@@ -307,7 +313,8 @@ export function ChartWidget({
           setCrosshairActive(false);
           return;
         }
-        setCrosshairStatus(`O ${b.open.toFixed(2)} H ${b.high.toFixed(2)} L ${b.low.toFixed(2)} C ${b.close.toFixed(2)} V ${Math.round(b.volume || 0).toLocaleString()}`);
+        setHoverBar(b);
+        setHoverCvd(cvdMapRef.current.get(ts) ?? null);
         setCrosshairActive(true);
       });
 
@@ -347,6 +354,19 @@ export function ChartWidget({
       }))
       .sort((a, b) => a.time - b.time);
   };
+
+  const rebuildCvdMap = useCallback((bars: Bar[]) => {
+    let cvd = 0;
+    const m = new Map<number, number>();
+    for (let i = 0; i < bars.length; i++) {
+      const b = bars[i];
+      const prev = bars[Math.max(0, i - 1)]?.close ?? b.open;
+      const delta = b.close >= prev ? (b.volume || 0) : -(b.volume || 0);
+      cvd += delta;
+      m.set(b.time, cvd);
+    }
+    cvdMapRef.current = m;
+  }, []);
 
   const clearIndicators = useCallback(() => {
     if (!chartRef.current) return;
@@ -530,9 +550,10 @@ export function ChartWidget({
     volumeRef.current?.setData(
       bars.map(b => ({ time: b.time, value: b.volume || 0, color: b.close >= b.open ? toRgba(bull, 0.5) : toRgba(bear, 0.5) }))
     );
+    rebuildCvdMap(bars);
     drawIndicators(bars);
     updateSessionShading();
-  }, [theme.bull, theme.bear, drawIndicators, updateSessionShading, indCVD]);
+  }, [theme.bull, theme.bear, drawIndicators, updateSessionShading, rebuildCvdMap, indCVD]);
 
   // Full load — clears & repopulates everything
   const loadFull = useCallback(async (sym: string, tf: Timeframe, forcedLimit?: number, fit = true) => {
@@ -577,6 +598,7 @@ export function ChartWidget({
           color: b.close >= b.open ? toRgba(bull, 0.5) : toRgba(bear, 0.5),
         }))
       );
+      rebuildCvdMap(bars);
       drawIndicators(bars);
       const lb = bars[bars.length - 1];
       if (lb) {
@@ -609,7 +631,7 @@ export function ChartWidget({
     } catch {
       setStatus("error");
     }
-  }, [theme.bull, theme.bear, indCVD, drawIndicators, updateSessionShading]);
+  }, [theme.bull, theme.bear, indCVD, drawIndicators, updateSessionShading, rebuildCvdMap]);
 
   // Incremental update — fetches last 3 bars and upserts changes
   const pollUpdate = useCallback(async (sym: string, tf: Timeframe) => {
@@ -638,7 +660,11 @@ export function ChartWidget({
           });
         }
       }
-      if (hasNewBar) drawIndicators(Array.from(cacheRef.current.values()).sort((a,b)=>a.time-b.time));
+      if (hasNewBar) {
+        const merged = Array.from(cacheRef.current.values()).sort((a,b)=>a.time-b.time);
+        rebuildCvdMap(merged);
+        drawIndicators(merged);
+      }
       updateSessionShading();
       const lb = bars[bars.length - 1];
       if (lb) {
@@ -649,7 +675,7 @@ export function ChartWidget({
 
 
     } catch { /* silent — don't flicker status on transient errors */ }
-  }, [theme.bull, theme.bear, drawIndicators, updateSessionShading]);
+  }, [theme.bull, theme.bear, drawIndicators, updateSessionShading, rebuildCvdMap]);
 
   useEffect(() => { loadFullRef.current = loadFull; }, [loadFull]);
   useEffect(() => { pollUpdateRef.current = pollUpdate; }, [pollUpdate]);
@@ -676,12 +702,13 @@ export function ChartWidget({
       const bull = theme.bull || getComputedStyle(document.documentElement).getPropertyValue("--bull").trim();
       const bear = theme.bear || getComputedStyle(document.documentElement).getPropertyValue("--bear").trim();
       volumeRef.current?.setData(merged.map(b => ({ time: b.time, value: b.volume || 0, color: b.close >= b.open ? toRgba(bull, 0.5) : toRgba(bear, 0.5) })));
+      rebuildCvdMap(merged);
       drawIndicators(merged);
       updateSessionShading();
     } finally {
       loadingMoreRef.current = false;
     }
-  }, [symbol, timeframe, theme.bull, theme.bear, indCVD, drawIndicators, updateSessionShading]);
+  }, [symbol, timeframe, theme.bull, theme.bear, indCVD, drawIndicators, updateSessionShading, rebuildCvdMap]);
 
   // Auto-backfill older candles when panning to the left edge
   useEffect(() => {
@@ -711,6 +738,7 @@ export function ChartWidget({
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
     setIsLive(false);
     cacheRef.current = new Map();
+    cvdMapRef.current = new Map();
     noMoreOlderRef.current = false;
 
     const alpacaTF = TF_MAP[timeframe] || "5Min";
@@ -911,11 +939,16 @@ export function ChartWidget({
       </div>
 
       <div className="relative flex-1 w-full min-h-0">
-        {crosshairActive && (
-          <div className="absolute left-2 top-1 z-10 text-[12px] font-mono text-neutral-200 pointer-events-none">
-            {crosshairStatus || barStatus || (status === "loading" ? "Loading…" : status === "error" ? "Error" : "")}
-            {lastPrice != null && <span className="ml-2 text-white">${lastPrice.toFixed(2)}</span>}
-            {isLive && <span className="ml-1 inline-block w-1.5 h-1.5 rounded-full bg-bull animate-pulse" />}
+        {crosshairActive && hoverBar && (
+          <div className="absolute left-2 top-1 z-10 text-[12px] font-mono pointer-events-none flex items-center gap-2">
+            <span className="text-neutral-500">O</span><span className="text-neutral-200">{hoverBar.open.toFixed(2)}</span>
+            <span className="text-neutral-500">H</span><span className="text-bull">{hoverBar.high.toFixed(2)}</span>
+            <span className="text-neutral-500">L</span><span className="text-bear">{hoverBar.low.toFixed(2)}</span>
+            <span className="text-neutral-500">C</span><span className={hoverBar.close >= hoverBar.open ? "text-bull" : "text-bear"}>{hoverBar.close.toFixed(2)}</span>
+            <span className="text-neutral-500">V</span><span className="text-neutral-200">{Math.round(hoverBar.volume || 0).toLocaleString()}</span>
+            {hoverCvd != null && (<><span className="text-neutral-500">CVD</span><span className={hoverCvd >= 0 ? "text-bull" : "text-bear"}>{Math.round(hoverCvd).toLocaleString()}</span></>)}
+            {lastPrice != null && <span className="ml-1 text-white">${lastPrice.toFixed(2)}</span>}
+            {isLive && <span className="inline-block w-1.5 h-1.5 rounded-full bg-bull animate-pulse" />}
           </div>
         )}
         <div ref={containerRef} className="h-full w-full relative z-[5]" />

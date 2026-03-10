@@ -85,7 +85,6 @@ const FILTER_FIELD_TO_API: Record<Field, string> = {
 export function ScreenerWidget() {
   const { activeTabId, activeTab, setGlobalSymbols } = useDashboardStore();
   const globalSymbols = activeTab()?.globalSymbols || [];
-  const themeMode = useDashboardStore((s) => s.theme.mode);
 
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
@@ -158,6 +157,28 @@ export function ScreenerWidget() {
     return () => clearInterval(t);
   }, [page, pageSize, sortKey, sortDir, conds]);
 
+  useEffect(() => {
+    if (!rows.length || typeof window === "undefined") return;
+    const wsBase = (API && API.trim()) ? API.replace(/^http/, "ws") : window.location.origin.replace(/^http/, "ws");
+    const ws = new WebSocket(`${wsBase}/api/ws/screener`);
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ symbols: rows.map(r => r.symbol) }));
+    };
+    ws.onmessage = (ev) => {
+      try {
+        const d = JSON.parse(ev.data);
+        if (d?.type !== "screener" || !Array.isArray(d?.items)) return;
+        const map = new Map<string, any>((d.items || []).map((x: any) => [String(x.s), x]));
+        setRows(prev => prev.map(r => {
+          const x = map.get(r.symbol);
+          if (!x) return r;
+          return { ...r, price: Number(x.p || r.price), relVol: Number(x.rv || r.relVol), c1d: Number(x.c1d || r.c1d) };
+        }));
+      } catch {}
+    };
+    return () => ws.close();
+  }, [rows.map(r => r.symbol).join(",")]);
+
   const sectors = useMemo(() => Array.from(new Set(rows.map((r) => r.sector))).sort(), [rows]);
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
 
@@ -187,27 +208,18 @@ export function ScreenerWidget() {
     else setGlobalSymbols(activeTabId, [...globalSymbols, sym]);
   };
 
-  const rowBorder = themeMode === "dark" ? "border-neutral-800/80" : "border-surface-border/60";
 
   return (
-    <div className="h-full w-full flex flex-col">
-      <div className="px-2 py-1.5 border-b border-surface-border flex items-center gap-2 text-xs relative" ref={popRef}>
-        <div className="widget-drag-handle cursor-grab active:cursor-grabbing select-none inline-flex items-center gap-1.5 text-neutral-500">
-          <span className="text-xs uppercase tracking-wide">Screener</span>
-        </div>
-        <button onClick={() => setShowFilters((v) => !v)} className="inline-flex items-center gap-1 px-2 py-1 rounded border border-surface-border hover:bg-surface-overlay">
-          <FilterIcon size={12} /> Filters ({conds.length})
-        </button>
+    <div className="h-full w-full flex flex-col relative" ref={popRef}>
+      <div className="absolute top-1 right-1 z-30 inline-flex items-center gap-1 text-[11px] text-neutral-500">
+        <button onClick={() => setShowFilters((v) => !v)} className="p-1.5 rounded hover:bg-surface-overlay" title="Filters"><FilterIcon size={13} /></button>
+        <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="p-1 rounded disabled:opacity-40 hover:bg-surface-overlay"><ChevronLeft size={12} /></button>
+        <span>{page}/{pageCount}</span>
+        <button disabled={page >= pageCount} onClick={() => setPage((p) => Math.min(pageCount, p + 1))} className="p-1 rounded disabled:opacity-40 hover:bg-surface-overlay"><ChevronRight size={12} /></button>
+      </div>
 
-        <div className="ml-auto inline-flex items-center gap-1 text-[11px] text-neutral-500">
-          <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="p-1 rounded border border-surface-border disabled:opacity-40 hover:bg-surface-overlay"><ChevronLeft size={12} /></button>
-          <span>{page}/{pageCount}</span>
-          <button disabled={page >= pageCount} onClick={() => setPage((p) => Math.min(pageCount, p + 1))} className="p-1 rounded border border-surface-border disabled:opacity-40 hover:bg-surface-overlay"><ChevronRight size={12} /></button>
-          <span className="ml-2">{total} rows</span>
-        </div>
-
-        {showFilters && (
-          <div className="absolute left-2 top-8 z-40 w-[420px] max-w-[90vw] rounded-lg border border-surface-border bg-surface-raised p-2 shadow-2xl space-y-2">
+      {showFilters && (
+          <div className="absolute right-2 top-8 z-40 w-[420px] max-w-[90vw] rounded-lg bg-surface-raised p-2 shadow-2xl space-y-2 pop-in">
             {conds.map((c) => {
               const enumField = ENUM_FIELDS.includes(c.field);
               return (
@@ -256,7 +268,6 @@ export function ScreenerWidget() {
             <div className="text-[10px] text-neutral-500">Sectors on page: {sectors.join(", ") || "-"}</div>
           </div>
         )}
-      </div>
 
       <div className="flex-1 overflow-auto text-xs">
         {loading && <div className="p-4 text-neutral-500 animate-pulse">Loading screener…</div>}
@@ -278,7 +289,7 @@ export function ScreenerWidget() {
               {rows.map((r) => {
                 const selected = globalSymbols.includes(r.symbol);
                 return (
-                  <tr key={r.symbol} className={`border-b ${rowBorder} hover:bg-surface-overlay/60 ${selected ? "bg-accent/10" : ""}`}>
+                  <tr key={r.symbol} className={`hover:bg-surface-overlay/60 ${selected ? "bg-accent/10" : ""}`}>
                     <td className="px-2 py-1.5 font-mono text-white">
                       <button onClick={() => toggleGlobalSymbol(r.symbol)} className="inline-flex items-center gap-2 hover:underline">
                         {r.logo && <img src={`https://logo.clearbit.com/${r.logo}`} alt="" className="w-4 h-4 rounded-full" onError={(e: any) => { e.currentTarget.style.display = "none"; }} />}
