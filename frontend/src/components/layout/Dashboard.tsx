@@ -68,7 +68,7 @@ function renderWidget({ instance, resolvedSymbol, isGlobalOverride, onConfigChan
     case "openinterest3d":return <OpenInterest3DWidget symbol={resolvedSymbol} isGlobalOverride={isGlobalOverride} config={config} onConfigChange={onConfigChange} />;
     case "gex":          return <GEXWidget symbol={resolvedSymbol} isGlobalOverride={isGlobalOverride} config={config} onConfigChange={onConfigChange} />;
     case "dex":          return <DEXWidget symbol={resolvedSymbol} isGlobalOverride={isGlobalOverride} config={config} onConfigChange={onConfigChange} />;
-    case "newsfeed":     return <NewsFeedWidget globalSymbol={resolvedSymbol} />;
+    case "newsfeed":     return <NewsFeedWidget globalSymbol={resolvedSymbol} config={config} onConfigChange={onConfigChange} />;
     case "bloomberg":    return <BloombergTVWidget />;
     case "ai":           return <div className="p-3 text-xs text-neutral-500">AI Assistant moved to the bottom-right assistant button.</div>;
     case "report":       return <MarketReportWidget symbol={resolvedSymbol} />;
