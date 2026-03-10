@@ -193,7 +193,7 @@ export function Topbar() {
               <div className="px-3 py-2 text-xs text-neutral-500 uppercase tracking-widest border-b border-surface-border">Style</div>
               <div className="py-3 px-3 flex flex-col gap-4">
                 <div className="relative flex items-center justify-between">
-                  <span className="text-xs text-neutral-500">Theme</span>
+                  <span className="text-xs text-neutral-400">Theme</span>
                   <button onClick={() => setShowThemeMenu(v=>!v)} className="inline-flex w-8 h-8 items-center justify-center rounded-full hover:bg-surface-overlay ml-auto">
                     {(() => { const cur = THEME_MODES.find(m => m.id === theme.mode) || THEME_MODES[0]; const Icon = cur.Icon; return <Icon size={15} />; })()}
                   </button>
@@ -229,11 +229,13 @@ export function Topbar() {
           )}
         </div>
 
-        <Link href="/settings" className="p-1.5 rounded-md hover:bg-surface-overlay text-neutral-500 hover:text-white transition" title="Settings">
+        <Link href="/settings" className="p-1.5 rounded-md hover:bg-surface-overlay [color:var(--text-primary)] transition inline-flex items-center gap-1.5" title="Settings">
           <Settings size={15} />
+          <span className="hidden sm:inline text-xs">Settings</span>
         </Link>
-        <button onClick={() => window.dispatchEvent(new Event('assistant:open'))} className="p-1.5 rounded-md hover:bg-surface-overlay text-neutral-500 hover:text-white transition" title="Chat">
+        <button onClick={() => window.dispatchEvent(new Event('assistant:open'))} className="p-1.5 rounded-md hover:bg-surface-overlay [color:var(--text-primary)] transition inline-flex items-center gap-1.5" title="Chat">
           <MessageCircle size={15} />
+          <span className="hidden sm:inline text-xs">Chat</span>
         </button>
       </div>
     </header>
