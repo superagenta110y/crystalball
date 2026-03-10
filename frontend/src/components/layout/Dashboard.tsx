@@ -149,13 +149,22 @@ function computeRowHeight(windowH: number, layout: Layout[]): number {
 // ─── Main dashboard ──────────────────────────────────────────────────────────
 
 export default function Dashboard() {
-  const { activeTabId, activeTab, updateLayout, removeWidget, updateWidgetConfig, resolveSymbol, theme, setTheme } = useDashboardStore();
+  const { activeTabId, setActiveTab, activeTab, updateLayout, removeWidget, updateWidgetConfig, resolveSymbol, theme, setTheme } = useDashboardStore();
   const { width, height } = useWindowSize();
   const tab      = activeTab();
   const layout   = tab?.layout ?? [];
   const widgets  = tab?.widgets ?? [];
   const isMobile = (width ?? 0) < 768;
   const [zoomedWidgetId, setZoomedWidgetId] = useState<string | null>(null);
+
+  // Hydrate tab/zoom from URL
+  useEffect(() => {
+    const u = new URL(window.location.href);
+    const tabQ = u.searchParams.get("tab");
+    const zoomQ = u.searchParams.get("zoomed");
+    if (tabQ) setActiveTab(tabQ);
+    if (zoomQ) setZoomedWidgetId(zoomQ);
+  }, [setActiveTab]);
 
   // Apply theme to <html> element whenever it changes
   useEffect(() => {
@@ -218,6 +227,17 @@ export default function Dashboard() {
       setZoomedWidgetId(null);
     }
   }, [zoomedWidgetId, widgets]);
+
+  // Sync URL with active tab + zoomed widget
+  useEffect(() => {
+    const u = new URL(window.location.href);
+    if (activeTabId) u.searchParams.set("tab", activeTabId);
+    else u.searchParams.delete("tab");
+    if (zoomedWidgetId) u.searchParams.set("zoomed", zoomedWidgetId);
+    else u.searchParams.delete("zoomed");
+    const q = u.searchParams.toString();
+    window.history.replaceState({}, "", q ? `${u.pathname}?${q}` : u.pathname);
+  }, [activeTabId, zoomedWidgetId]);
 
   const gridWidth = Math.max(width ?? 1200, 400);
 
