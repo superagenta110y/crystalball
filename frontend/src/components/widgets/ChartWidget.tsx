@@ -136,6 +136,7 @@ export function ChartWidget({
   const levelLinesRef = useRef<any[]>([]);
   const historyLimitRef = useRef<number>(0);
   const loadingMoreRef = useRef<boolean>(false);
+  const noMoreOlderRef = useRef<boolean>(false);
   const gapRefetchingRef = useRef<boolean>(false);
   const pendingRangeRef = useRef<{ from: number; to: number; targetTf: Timeframe } | null>(null);
 
@@ -516,7 +517,7 @@ export function ChartWidget({
       if (!r.ok) return;
       const payload = await r.json();
       const older = parseBars(payload).filter(b => b.time < oldest);
-      if (!older.length) return;
+      if (!older.length) { noMoreOlderRef.current = true; return; }
 
       for (const b of older) cacheRef.current.set(b.time, b);
       const merged = Array.from(cacheRef.current.values()).sort((a, b) => a.time - b.time);
@@ -536,9 +537,12 @@ export function ChartWidget({
     const ts = chartRef.current.timeScale();
 
     const onRange = (range: any) => {
-      if (!range || loadingMoreRef.current) return;
-      if (range.from > 20) return;
-      fetchOlder();
+      if (!range || loadingMoreRef.current || noMoreOlderRef.current || !seriesRef.current) return;
+      const info = seriesRef.current.barsInLogicalRange?.(range);
+      // Fetch more whenever user approaches the left edge of loaded data.
+      if (!info || typeof info.barsBefore !== "number" || info.barsBefore < 80) {
+        fetchOlder();
+      }
     };
 
     ts.subscribeVisibleLogicalRangeChange(onRange);
@@ -551,6 +555,7 @@ export function ChartWidget({
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
     setIsLive(false);
     cacheRef.current = new Map();
+    noMoreOlderRef.current = false;
 
     const alpacaTF = TF_MAP[timeframe] || "5Min";
     const pollMs   = POLL_MS[alpacaTF] || 15000;
