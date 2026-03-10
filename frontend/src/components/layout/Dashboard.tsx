@@ -334,6 +334,57 @@ export default function Dashboard() {
     updateLayout(activeTabId, l);
   }, [activeTabId, updateLayout, snapZone, height]);
 
+  const handleResizeStop = useCallback((newLayout: Layout[], oldItem: Layout, newItem: Layout) => {
+    const l = newLayout.map(it => ({ ...it }));
+    const idx = l.findIndex(it => it.i === newItem.i);
+    if (idx < 0) return updateLayout(activeTabId, newLayout);
+
+    const item = l[idx];
+    const overlapY = (a: Layout, b: Layout) => Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+
+    // Prefer a "pair" widget in the same horizontal row band.
+    const peers = l
+      .map((it, i) => ({ it, i }))
+      .filter(({ i, it }) => i !== idx && overlapY(it, item) >= Math.max(1, Math.min(it.h, item.h) - 1));
+
+    let pair = peers[0];
+    if (peers.length > 1) {
+      pair = peers.sort((a, b) => {
+        const da = Math.min(Math.abs(a.it.x - (item.x + item.w)), Math.abs((a.it.x + a.it.w) - item.x));
+        const db = Math.min(Math.abs(b.it.x - (item.x + item.w)), Math.abs((b.it.x + b.it.w) - item.x));
+        return da - db;
+      })[0];
+    }
+
+    if (pair) {
+      const p = l[pair.i];
+      // Keep paired row equal height and aligned vertically.
+      p.y = item.y;
+      p.h = item.h;
+
+      // Fill horizontal gap so pair expands/contracts with resized item.
+      if (p.x > item.x) {
+        p.x = item.x + item.w;
+        p.w = Math.max(2, 12 - p.x);
+      } else {
+        p.w = Math.max(2, item.x - p.x);
+      }
+
+      // Shift rows below when pair-row height changes to avoid vertical gaps.
+      const oldBottom = oldItem.y + oldItem.h;
+      const newBottom = item.y + item.h;
+      const delta = newBottom - oldBottom;
+      if (delta !== 0) {
+        for (let i = 0; i < l.length; i++) {
+          if (i === idx || i === pair.i) continue;
+          if (l[i].y >= oldBottom) l[i].y += delta;
+        }
+      }
+    }
+
+    updateLayout(activeTabId, l);
+  }, [activeTabId, updateLayout]);
+
   const isGlobalOverride = (tab?.globalSymbols?.length ?? 0) > 0;
 
   const resolvedSymbols = useMemo(
@@ -437,6 +488,7 @@ export default function Dashboard() {
                 onLayoutChange={handleLayoutChange}
                 onDrag={handleDrag as any}
                 onDragStop={handleDragStop}
+                onResizeStop={handleResizeStop as any}
                 draggableHandle=".widget-drag-handle"
                 margin={[MARGIN, MARGIN]}
                 containerPadding={[PADDING, PADDING]}
