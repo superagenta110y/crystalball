@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import { X, GripHorizontal, Maximize2, Minimize2 } from "lucide-react";
+import { X, GripHorizontal, Maximize2, Minimize2, Filter } from "lucide-react";
 import type { WidgetInstance } from "@/lib/store/dashboardStore";
 
 const WIDGET_LABELS: Record<string, { full: string; mobile: string }> = {
@@ -40,6 +40,9 @@ export function WidgetWrapper({ instance, onRemove, onToggleZoom, isZoomed, chil
           <div className="flex items-center gap-1.5">
             <GripHorizontal size={11} className="opacity-30" />
             <span className="hidden sm:inline">{label.full}</span><span className="sm:hidden">{label.mobile}</span>
+            {instance.type === "screener" && (
+              <button onMouseDown={(e) => e.stopPropagation()} onClick={() => window.dispatchEvent(new Event("screener:toggle-filters"))} className="opacity-100 sm:opacity-0 sm:group-hover/widget:opacity-100 transition p-1 rounded hover:bg-surface-overlay" title="Filters"><Filter size={12} /></button>
+            )}
             {instance.config.symbol && (
               <span className="text-neutral-600 font-mono">{instance.config.symbol}</span>
             )}

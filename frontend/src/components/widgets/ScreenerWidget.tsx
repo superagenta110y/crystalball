@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Filter as FilterIcon, Plus, X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { useDashboardStore } from "@/lib/store/dashboardStore";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "";
@@ -105,8 +105,13 @@ export function ScreenerWidget() {
     const onDoc = (e: MouseEvent) => {
       if (popRef.current && !popRef.current.contains(e.target as Node)) setShowFilters(false);
     };
+    const onToggle = () => setShowFilters(v => !v);
     document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
+    window.addEventListener("screener:toggle-filters", onToggle as EventListener);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      window.removeEventListener("screener:toggle-filters", onToggle as EventListener);
+    };
   }, []);
 
   const fetchPage = async () => {
@@ -227,18 +232,8 @@ export function ScreenerWidget() {
 
   return (
     <div className="h-full w-full flex flex-col relative" ref={popRef}>
-      <div className="absolute top-1 left-1 z-30 inline-flex items-center gap-1 text-[11px] text-neutral-500">
-        <button
-          onClick={() => setShowFilters((v) => !v)}
-          className="p-1.5 rounded hover:bg-surface-overlay text-neutral-500 hover:text-white opacity-100 sm:opacity-0 sm:group-hover/widget:opacity-100 transition"
-          title="Filters"
-        >
-          <FilterIcon size={13} />
-        </button>
-      </div>
-
       {showFilters && (
-          <div className="absolute right-2 top-8 z-40 w-[420px] max-w-[90vw] rounded-lg bg-surface-raised p-2 shadow-2xl space-y-2 pop-in">
+          <div className="absolute left-2 top-8 z-40 w-[420px] max-w-[90vw] rounded-lg bg-surface-raised p-2 shadow-2xl space-y-2 pop-in">
             {conds.map((c) => {
               const enumField = ENUM_FIELDS.includes(c.field);
               return (

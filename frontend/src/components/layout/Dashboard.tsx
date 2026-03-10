@@ -208,6 +208,19 @@ export default function Dashboard() {
     [activeTabId, updateLayout]
   );
 
+  const handleDrag = useCallback((layout: Layout[], oldItem: Layout, newItem: Layout, _placeholder: Layout, e: MouseEvent) => {
+    // If dragging a full-width widget and pointer moves far left/right, snap to half during drag.
+    if (oldItem.w === 12 && newItem.w === 12 && width) {
+      const leftThreshold = width * 0.275;
+      const rightThreshold = width * 0.725;
+      if (e.clientX <= leftThreshold) {
+        newItem.w = 6; newItem.x = 0;
+      } else if (e.clientX >= rightThreshold) {
+        newItem.w = 6; newItem.x = 6;
+      }
+    }
+  }, [width]);
+
   const handleDragStop = useCallback((newLayout: Layout[], oldItem: Layout, newItem: Layout) => {
     const topSnap = newItem.y <= 1;
     if (!topSnap) return updateLayout(activeTabId, newLayout);
@@ -217,7 +230,6 @@ export default function Dashboard() {
     if (idx < 0) return updateLayout(activeTabId, newLayout);
 
     const center = newItem.x + newItem.w / 2;
-    // Windows-like snap zones on top edge.
     if (center >= 4 && center <= 8) {
       l[idx].x = 0; l[idx].w = 12; l[idx].y = 0;
     } else if (center > 8) {
@@ -319,6 +331,7 @@ export default function Dashboard() {
               rowHeight={rowHeight}
               width={gridWidth}
               onLayoutChange={handleLayoutChange}
+              onDrag={handleDrag as any}
               onDragStop={handleDragStop}
               draggableHandle=".widget-drag-handle"
               margin={[MARGIN, MARGIN]}
