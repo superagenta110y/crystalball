@@ -16,6 +16,7 @@ export function OptionsLightHistogram({ rows, valueFormat, statusRender }: {
   const seriesRef = useRef<any>(null);
   const strikeByTimeRef = useRef<Map<number, number>>(new Map());
   const rowByTimeRef = useRef<Map<number, Row>>(new Map());
+  const latestRowsRef = useRef<Row[]>([]);
   const [status, setStatus] = useState<string>("");
   const [portrait, setPortrait] = useState(false);
 
@@ -76,6 +77,16 @@ export function OptionsLightHistogram({ rows, valueFormat, statusRender }: {
 
       chartRef.current = chart;
       seriesRef.current = series;
+
+      const rows0 = latestRowsRef.current || [];
+      const data0 = rows0.map((r, i) => {
+        const time = i + 1;
+        strikeByTimeRef.current.set(time, r.strike);
+        rowByTimeRef.current.set(time, r);
+        return { time: time as any, value: r.value, color: r.color };
+      });
+      series.setData(data0);
+      chart.timeScale().fitContent();
     })();
 
     return () => {
@@ -89,12 +100,13 @@ export function OptionsLightHistogram({ rows, valueFormat, statusRender }: {
   }, [valueFormat, statusRender, portrait]);
 
   useEffect(() => {
+    latestRowsRef.current = rows;
     if (!seriesRef.current) return;
     const data = rows.map((r, i) => {
       const time = i + 1;
       strikeByTimeRef.current.set(time, r.strike);
       rowByTimeRef.current.set(time, r);
-      return { time, value: r.value, color: r.color };
+      return { time: time as any, value: r.value, color: r.color };
     });
     seriesRef.current.setData(data);
     chartRef.current?.timeScale().fitContent();

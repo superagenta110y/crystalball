@@ -42,16 +42,16 @@ export function WidgetWrapper({ instance, onRemove, onToggleZoom, isZoomed, chil
             )}
           </div>
           <div className="flex items-center gap-1">
-            <button onMouseDown={(e) => e.stopPropagation()} onClick={onToggleZoom} className="opacity-0 group-hover/widget:opacity-50 hover:!opacity-100 transition p-0.5 rounded" aria-label={isZoomed ? "Zoom out" : "Zoom in"} title={isZoomed ? "Zoom out" : "Zoom in"}>{isZoomed ? <Minimize2 size={11} /> : <Maximize2 size={11} />}</button>
-            <button onMouseDown={(e) => e.stopPropagation()} onClick={onRemove} className="opacity-0 group-hover/widget:opacity-50 hover:!opacity-100 transition p-0.5 rounded hover:text-red-400" aria-label="Remove widget"><X size={11} /></button>
+            <button onMouseDown={(e) => e.stopPropagation()} onClick={onToggleZoom} className="opacity-0 group-hover/widget:opacity-100 transition p-1 rounded hover:bg-surface-overlay" aria-label={isZoomed ? "Zoom out" : "Zoom in"} title={isZoomed ? "Zoom out" : "Zoom in"}>{isZoomed ? <Minimize2 size={13} /> : <Maximize2 size={13} />}</button>
+            <button onMouseDown={(e) => e.stopPropagation()} onClick={onRemove} className="opacity-0 group-hover/widget:opacity-100 transition p-1 rounded hover:bg-surface-overlay hover:text-red-400" aria-label="Remove widget"><X size={13} /></button>
           </div>
         </div>
       )}
       <div className="flex-1 overflow-hidden relative">
         {useInlineHeader && (
           <div className="absolute top-1 right-1 z-30 flex items-center gap-1">
-            <button onMouseDown={(e) => e.stopPropagation()} onClick={onToggleZoom} className="opacity-30 hover:opacity-100 transition p-0.5 rounded" aria-label={isZoomed ? "Zoom out" : "Zoom in"}>{isZoomed ? <Minimize2 size={11} /> : <Maximize2 size={11} />}</button>
-            <button onMouseDown={(e) => e.stopPropagation()} onClick={onRemove} className="opacity-30 hover:opacity-100 transition p-0.5 rounded hover:text-red-400" aria-label="Remove widget"><X size={11} /></button>
+            <button onMouseDown={(e) => e.stopPropagation()} onClick={onToggleZoom} className="opacity-0 group-hover/widget:opacity-100 transition p-1 rounded hover:bg-surface-overlay" aria-label={isZoomed ? "Zoom out" : "Zoom in"}>{isZoomed ? <Minimize2 size={13} /> : <Maximize2 size={13} />}</button>
+            <button onMouseDown={(e) => e.stopPropagation()} onClick={onRemove} className="opacity-0 group-hover/widget:opacity-100 transition p-1 rounded hover:bg-surface-overlay hover:text-red-400" aria-label="Remove widget"><X size={13} /></button>
           </div>
         )}
         {children}
