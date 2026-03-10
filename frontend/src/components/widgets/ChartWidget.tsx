@@ -94,6 +94,8 @@ export function ChartWidget({
   const [lastPrice, setLastPrice] = useState<number|null>(null);
   const [isLive, setIsLive] = useState(false);
   const [barStatus, setBarStatus] = useState<string>("");
+  const [crosshairStatus, setCrosshairStatus] = useState<string>("");
+  const [crosshairActive, setCrosshairActive] = useState(false);
   const [indicatorModal, setIndicatorModal] = useState<null | "sma" | "ema" | "bb" | "levels" | "vp" | "vwap">(null);
   const [indSMA, setIndSMA] = useState(false);
   const [indEMA, setIndEMA] = useState(false);
@@ -270,6 +272,39 @@ export function ChartWidget({
       volumeRef.current = volumeSeries;
       extShadeRef.current = extShadeSeries;
       setChartReady(true);
+
+      chart.subscribeCrosshairMove((param: any) => {
+        const p = param?.point;
+        if (!p || p.x < 0 || p.y < 0 || !containerRef.current) {
+          setCrosshairActive(false);
+          return;
+        }
+        const w = containerRef.current.clientWidth;
+        const h = containerRef.current.clientHeight;
+        if (p.x > w || p.y > h) {
+          setCrosshairActive(false);
+          return;
+        }
+
+        const t = param?.time;
+        let ts = 0;
+        if (typeof t === "number") ts = t;
+        else if (t && typeof t === "object" && "year" in t) {
+          ts = Math.floor(Date.UTC(t.year, (t.month || 1) - 1, t.day || 1) / 1000);
+        }
+        if (!ts) {
+          setCrosshairActive(false);
+          return;
+        }
+
+        const b = cacheRef.current.get(ts);
+        if (!b) {
+          setCrosshairActive(false);
+          return;
+        }
+        setCrosshairStatus(`O ${b.open.toFixed(2)} H ${b.high.toFixed(2)} L ${b.low.toFixed(2)} C ${b.close.toFixed(2)} V ${Math.round(b.volume || 0).toLocaleString()}`);
+        setCrosshairActive(true);
+      });
 
       const ro = new ResizeObserver(() => {
         if (containerRef.current && chartRef.current) {
@@ -835,11 +870,13 @@ export function ChartWidget({
       </div>
 
       <div className="relative flex-1 w-full min-h-0">
-        <div className="absolute left-2 top-1 z-10 text-[10px] font-mono text-neutral-300 pointer-events-none">
-          {barStatus || (status === "loading" ? "Loading…" : status === "error" ? "Error" : "")}
-          {lastPrice != null && <span className="ml-2 text-white">${lastPrice.toFixed(2)}</span>}
-          {isLive && <span className="ml-1 inline-block w-1.5 h-1.5 rounded-full bg-bull animate-pulse" />}
-        </div>
+        {crosshairActive && (
+          <div className="absolute left-2 top-1 z-10 text-[12px] font-mono text-neutral-200 pointer-events-none">
+            {crosshairStatus || barStatus || (status === "loading" ? "Loading…" : status === "error" ? "Error" : "")}
+            {lastPrice != null && <span className="ml-2 text-white">${lastPrice.toFixed(2)}</span>}
+            {isLive && <span className="ml-1 inline-block w-1.5 h-1.5 rounded-full bg-bull animate-pulse" />}
+          </div>
+        )}
         <div ref={containerRef} className="h-full w-full relative z-[5]" />
       </div>
 
