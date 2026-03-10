@@ -156,14 +156,14 @@ export function Topbar() {
         <div ref={addRef} className="relative">
           <button
             onClick={() => { setShowAddWidget((v) => !v); setShowStyle(false); }}
-            className="topbar-btn flex items-center gap-1.5 px-2 py-1.5 sm:px-2.5 sm:py-1 sm:bg-surface-overlay sm:hover:bg-surface-border sm:border sm:border-surface-border rounded-md text-xs text-neutral-500 sm:text-neutral-300 hover:text-white transition"
+            className="topbar-btn flex items-center gap-1.5 px-2 py-1.5 sm:px-2.5 sm:py-1 rounded-md text-xs text-neutral-500 sm:text-neutral-300 hover:text-white hover:bg-surface-overlay transition"
           >
             <Plus size={13} />
             <span className="hidden sm:inline">Add Widget</span>
             <ChevronDown size={11} className={`hidden sm:inline transition-transform ${showAddWidget ? "rotate-180" : ""}`} />
           </button>
           {showAddWidget && (
-            <div className="absolute right-0 top-full mt-1 w-52 bg-surface-raised border border-surface-border rounded-xl shadow-2xl z-50 overflow-hidden">
+            <div className="absolute right-0 top-full mt-1 w-52 bg-surface-raised rounded-xl shadow-2xl z-50 overflow-hidden pop-in">
               <div className="px-3 py-2 text-xs text-neutral-500 uppercase tracking-widest border-b border-surface-border">Add Widget</div>
               <div className="py-1 max-h-80 overflow-y-auto">
                 {WIDGET_LIST.map(({ id, label }) => (
@@ -179,23 +179,23 @@ export function Topbar() {
         <div ref={styleRef} className="relative">
           <button
             onClick={() => { setShowStyle((v) => !v); setShowAddWidget(false); }}
-            className="topbar-btn flex items-center gap-1.5 px-2 py-1.5 sm:px-2.5 sm:py-1 sm:bg-surface-overlay sm:hover:bg-surface-border sm:border sm:border-surface-border rounded-md text-xs text-neutral-500 sm:text-neutral-300 hover:text-white transition"
+            className="topbar-btn flex items-center gap-1.5 px-2 py-1.5 sm:px-2.5 sm:py-1 rounded-md text-xs text-neutral-500 sm:text-neutral-300 hover:text-white hover:bg-surface-overlay transition"
           >
             <Palette size={13} />
             <span className="hidden sm:inline">Style</span>
           </button>
           {showStyle && (
-            <div className="absolute right-0 top-full mt-1 w-56 bg-surface-raised border border-surface-border rounded-xl shadow-2xl z-50 overflow-visible">
+            <div className="absolute right-0 top-full mt-1 w-56 bg-surface-raised rounded-xl shadow-2xl z-50 overflow-visible pop-in">
               <div className="px-3 py-2 text-xs text-neutral-500 uppercase tracking-widest border-b border-surface-border">Style</div>
               <div className="py-3 px-3 flex flex-col gap-4">
                 <div className="flex flex-col gap-1.5 relative">
                   <span className="text-xs text-neutral-500">Theme</span>
-                  <button onClick={() => setShowThemeMenu(v=>!v)} className="w-full flex items-center justify-between px-2 py-2 rounded-lg border border-surface-border hover:bg-surface-overlay">
+                  <button onClick={() => setShowThemeMenu(v=>!v)} className="inline-flex w-auto min-w-[56px] items-center justify-between gap-2 px-2 py-2 rounded-lg hover:bg-surface-overlay">
                     {(() => { const cur = THEME_MODES.find(m => m.id === theme.mode) || THEME_MODES[0]; const Icon = cur.Icon; return <Icon size={15} />; })()}
                     <ChevronDown size={12} className={`transition ${showThemeMenu ? "rotate-180" : ""}`} />
                   </button>
                   {showThemeMenu && (
-                    <div className="absolute left-0 right-0 top-[56px] z-20 rounded-lg border border-surface-border bg-surface-overlay shadow-xl p-1">
+                    <div className="absolute left-0 top-[56px] z-20 rounded-lg bg-surface-overlay shadow-xl p-1 pop-in">
                       {THEME_MODES.filter(m => m.id !== theme.mode).map(({ id, Icon }) => (
                         <button key={id} onClick={() => { setTheme({ mode: id }); setShowThemeMenu(false); }} className="w-full flex items-center justify-center py-2 rounded hover:bg-surface-border text-neutral-300 hover:text-white">
                           <Icon size={15} />

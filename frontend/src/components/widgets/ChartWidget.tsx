@@ -886,7 +886,7 @@ export function ChartWidget({
             <SlidersHorizontal size={13} />
             {enabledCount > 0 && <span className="absolute -top-1 -right-2 text-[9px] leading-none px-1 py-0.5 rounded-full bg-accent !text-white border border-accent">{enabledCount}</span>}
           </summary>
-          <div className="absolute z-20 mt-1 w-64 rounded border border-surface-border bg-surface p-2 shadow-xl text-xs space-y-1">
+          <div className="absolute z-20 mt-1 w-64 rounded bg-surface p-2 shadow-xl text-xs space-y-1 pop-in">
             {[
               { key: 'sma', label: 'SMA', enabled: indSMA, set: setIndSMA },
               { key: 'ema', label: 'EMA', enabled: indEMA, set: setIndEMA },
@@ -898,7 +898,7 @@ export function ChartWidget({
             ].map((it:any) => (
               <div key={it.key} className="flex items-center justify-between gap-2 py-1">
                 <label className="flex items-center gap-2"><input type="checkbox" checked={it.enabled} onChange={e=>it.set(e.target.checked)} /><span>{it.label}</span></label>
-                {it.enabled && <button onClick={() => setIndicatorModal(it.key)} className="p-0.5 rounded border border-surface-border hover:border-accent/50"><Settings2 size={12} /></button>}
+                {it.enabled && <button onClick={() => setIndicatorModal(it.key)} className="p-0.5 rounded hover:bg-surface-overlay"><Settings2 size={12} /></button>}
               </div>
             ))}
           </div>
@@ -920,7 +920,7 @@ export function ChartWidget({
 
       {indicatorModal && (
         <div className="absolute inset-0 z-30 bg-black/50 flex items-center justify-center p-3">
-          <div className="w-full max-w-sm rounded-xl border border-surface-border bg-surface-raised p-3 text-xs space-y-3">
+          <div className="w-full max-w-sm rounded-xl bg-surface-raised p-3 text-xs space-y-3 pop-in">
             <div className="flex items-center justify-between text-sm text-white">
               <span className="capitalize">{indicatorModal} settings</span>
               <button onClick={() => setIndicatorModal(null)}><X size={14} /></button>
