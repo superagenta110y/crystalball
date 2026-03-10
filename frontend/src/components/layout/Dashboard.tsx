@@ -259,30 +259,31 @@ export default function Dashboard() {
     const idx = l.findIndex(it => it.i === newItem.i);
     if (idx < 0) return updateLayout(activeTabId, newLayout);
 
-    const maxRow = Math.max(8, ...l.map(it => it.y + it.h));
-    const halfH = Math.max(4, Math.floor(maxRow / 2));
+    const availablePx = Math.max(120, (height ?? 900) - TOPBAR_H - TABBAR_H - PADDING * 2);
+    const minRowPx = 6;
+    const maxRowsAllowed = Math.max(6, Math.floor((availablePx - MARGIN) / (minRowPx + MARGIN)));
+    const halfH = Math.max(3, Math.floor(maxRowsAllowed / 2));
 
     if (snapZone) {
-      if (snapZone === "left")      { l[idx].x = 0; l[idx].y = 0; l[idx].w = 6; l[idx].h = maxRow; }
-      if (snapZone === "right")     { l[idx].x = 6; l[idx].y = 0; l[idx].w = 6; l[idx].h = maxRow; }
+      if (snapZone === "left")      { l[idx].x = 0; l[idx].y = 0; l[idx].w = 6; l[idx].h = maxRowsAllowed; }
+      if (snapZone === "right")     { l[idx].x = 6; l[idx].y = 0; l[idx].w = 6; l[idx].h = maxRowsAllowed; }
       if (snapZone === "top")       { l[idx].x = 0; l[idx].y = 0; l[idx].w = 12; l[idx].h = halfH; }
-      if (snapZone === "bottom")    { l[idx].x = 0; l[idx].y = maxRow - halfH; l[idx].w = 12; l[idx].h = halfH; }
+      if (snapZone === "bottom")    { l[idx].x = 0; l[idx].y = maxRowsAllowed - halfH; l[idx].w = 12; l[idx].h = halfH; }
       if (snapZone === "top-left")  { l[idx].x = 0; l[idx].y = 0; l[idx].w = 6; l[idx].h = halfH; }
       if (snapZone === "top-right") { l[idx].x = 6; l[idx].y = 0; l[idx].w = 6; l[idx].h = halfH; }
 
-      // Reallocate remaining widgets into free space after snap-drop.
       const freeRects: Array<{x:number;y:number;w:number;h:number}> = [];
-      if (snapZone === "left") freeRects.push({ x: 6, y: 0, w: 6, h: maxRow });
-      if (snapZone === "right") freeRects.push({ x: 0, y: 0, w: 6, h: maxRow });
-      if (snapZone === "top") freeRects.push({ x: 0, y: halfH, w: 12, h: Math.max(2, maxRow - halfH) });
-      if (snapZone === "bottom") freeRects.push({ x: 0, y: 0, w: 12, h: Math.max(2, maxRow - halfH) });
+      if (snapZone === "left") freeRects.push({ x: 6, y: 0, w: 6, h: maxRowsAllowed });
+      if (snapZone === "right") freeRects.push({ x: 0, y: 0, w: 6, h: maxRowsAllowed });
+      if (snapZone === "top") freeRects.push({ x: 0, y: halfH, w: 12, h: Math.max(2, maxRowsAllowed - halfH) });
+      if (snapZone === "bottom") freeRects.push({ x: 0, y: 0, w: 12, h: Math.max(2, maxRowsAllowed - halfH) });
       if (snapZone === "top-left") {
         freeRects.push({ x: 6, y: 0, w: 6, h: halfH });
-        freeRects.push({ x: 0, y: halfH, w: 12, h: Math.max(2, maxRow - halfH) });
+        freeRects.push({ x: 0, y: halfH, w: 12, h: Math.max(2, maxRowsAllowed - halfH) });
       }
       if (snapZone === "top-right") {
         freeRects.push({ x: 0, y: 0, w: 6, h: halfH });
-        freeRects.push({ x: 0, y: halfH, w: 12, h: Math.max(2, maxRow - halfH) });
+        freeRects.push({ x: 0, y: halfH, w: 12, h: Math.max(2, maxRowsAllowed - halfH) });
       }
 
       const others = l.filter((_, i) => i !== idx);
@@ -297,7 +298,6 @@ export default function Dashboard() {
         const chunk = others.slice(start, start + take);
         start += take;
 
-        // Even distribution inside this free rectangle.
         const n = chunk.length;
         const aspect = fr.w / Math.max(1, fr.h);
         const cols = Math.max(1, Math.min(n, Math.ceil(Math.sqrt(n * aspect))));
@@ -314,52 +314,19 @@ export default function Dashboard() {
           it.h = (r === rows - 1) ? Math.max(3, fr.y + fr.h - it.y) : cellH;
         });
       }
+    } else {
+      // no anchor zone: keep dragged widget size/position from drop, only clamp to viewport rows
+      const t = l[idx];
+      if (t.y + t.h > maxRowsAllowed) t.y = Math.max(0, maxRowsAllowed - t.h);
     }
 
-    const overlaps = (a: Layout, b: Layout) => !(a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y);
-    const collides = (cand: Layout, ignoreIdx?: number) => l.some((o, i) => i !== ignoreIdx && overlaps(cand, o));
-
-    // Reflow around moved widget.
-    for (let i = 0; i < l.length; i++) {
-      if (i === idx) continue;
-      while (overlaps(l[i], l[idx])) l[i].y += 1;
-    }
-
-    // Fill available space: moved first, then others; bounded iterations to avoid loops.
-    const order = [l[idx].i, ...l.filter((_, i) => i !== idx).map(it => it.i)];
-    const byId = (id: string) => l.findIndex(it => it.i === id);
-
-    for (const id of order) {
-      const i = byId(id); if (i < 0) continue;
-      for (let iter = 0; iter < 64; iter++) {
-        const t = l[i];
-        let did = false;
-        // priority 1: left->dragright
-        if (t.x + t.w < 12 && !collides({ ...t, w: t.w + 1 }, i)) { t.w += 1; did = true; }
-        // priority 2: bottom->dragdown
-        else if (!collides({ ...t, h: t.h + 1 }, i)) { t.h += 1; did = true; }
-        // priority 3: top->dragup
-        else if (t.y > 0 && !collides({ ...t, y: t.y - 1, h: t.h + 1 }, i)) { t.y -= 1; t.h += 1; did = true; }
-        // priority 4: right->dragleft
-        else if (t.x > 0 && !collides({ ...t, x: t.x - 1, w: t.w + 1 }, i)) { t.x -= 1; t.w += 1; did = true; }
-        if (!did) break;
-      }
-    }
-
-    // Ensure all widgets remain fully visible in viewport by compressing vertical mosaic if needed.
-    if (height) {
-      const availablePx = Math.max(120, height - TOPBAR_H - TABBAR_H - PADDING * 2);
-      const minRowPx = 6;
-      const maxRowsAllowed = Math.max(4, Math.floor((availablePx - MARGIN) / (minRowPx + MARGIN)));
-      const currentMax = Math.max(1, ...l.map(it => it.y + it.h));
-      if (currentMax > maxRowsAllowed) {
-        const scale = maxRowsAllowed / currentMax;
-        for (const it of l) {
-          it.y = Math.max(0, Math.floor(it.y * scale));
-          it.h = Math.max(3, Math.floor(it.h * scale));
-          if (it.y + it.h > maxRowsAllowed) it.y = Math.max(0, maxRowsAllowed - it.h);
-        }
-      }
+    // final safety clamp (nothing offscreen)
+    for (const it of l) {
+      if (it.h > maxRowsAllowed) it.h = maxRowsAllowed;
+      if (it.y < 0) it.y = 0;
+      if (it.y + it.h > maxRowsAllowed) it.y = Math.max(0, maxRowsAllowed - it.h);
+      if (it.x < 0) it.x = 0;
+      if (it.x + it.w > 12) it.x = Math.max(0, 12 - it.w);
     }
 
     lastZoneRef.current = null;
