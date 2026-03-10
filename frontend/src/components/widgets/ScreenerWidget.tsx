@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { useDashboardStore } from "@/lib/store/dashboardStore";
+import { AppDropdown } from "@/components/ui/AppDropdown";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -238,39 +239,28 @@ export function ScreenerWidget() {
               const enumField = ENUM_FIELDS.includes(c.field);
               return (
                 <div key={c.id} className="grid grid-cols-[1fr_auto_1fr_auto] gap-1 items-center">
-                  <select
+                  <AppDropdown
                     value={c.field}
-                    onChange={(e) => setConds((prev) => prev.map((x) => x.id === c.id ? { ...x, field: e.target.value as Field, op: (ENUM_FIELDS.includes(e.target.value as Field) || e.target.value === "marketCapB") ? "=" : ">", value: e.target.value === "marketCapB" ? "bucket:1b_99b" : x.value } : x))}
-                    className="bg-surface-overlay border border-surface-border rounded px-1 py-1"
-                  >
-                    {(["symbol", "sector", "marketCapB", "price", "relVol", "c1m", "c1h", "c1d", "c1w", "c1mth", "c1y", "cytd"] as Field[]).map((f) => <option key={f} value={f}>{FIELD_LABEL[f]}</option>)}
-                  </select>
-                  <select
-                    value={c.op}
-                    onChange={(e) => setConds((prev) => prev.map((x) => x.id === c.id ? { ...x, op: e.target.value as Op } : x))}
-                    className="bg-surface-overlay border border-surface-border rounded px-1 py-1"
-                    disabled={c.field === "marketCapB"}
-                  >
-                    {enumField ? (
-                      <>
-                        <option value="=">=</option>
-                        <option value="in">is one of</option>
-                        <option value="not-in">is none of</option>
-                      </>
-                    ) : c.field === "marketCapB" ? (
-                      <>
-                        <option value="=">is</option>
-                      </>
-                    ) : (
-                      <>
-                        <option value="=">=</option><option value=">">&gt;</option><option value="<">&lt;</option><option value="!=">!=</option><option value=">=">&gt;=</option><option value="<=">&lt;=</option>
-                      </>
-                    )}
-                  </select>
+                    onChange={(v) => setConds((prev) => prev.map((x) => x.id === c.id ? { ...x, field: v as Field, op: (ENUM_FIELDS.includes(v as Field) || v === "marketCapB") ? "=" : ">", value: v === "marketCapB" ? "bucket:1b_99b" : x.value } : x))}
+                    options={(["symbol", "sector", "marketCapB", "price", "relVol", "c1m", "c1h", "c1d", "c1w", "c1mth", "c1y", "cytd"] as Field[]).map((f) => ({ value: f, label: FIELD_LABEL[f] }))}
+                  />
                   {c.field === "marketCapB" ? (
-                    <select value={c.value} onChange={(e) => setConds((prev) => prev.map((x) => x.id === c.id ? { ...x, value: e.target.value } : x))} className="bg-surface-overlay border border-surface-border rounded px-2 py-1">
-                      {MC_BUCKETS.map((b) => <option key={b.value} value={b.value}>{b.label}</option>)}
-                    </select>
+                    <span className="px-2 py-1 text-xs text-neutral-500">is</span>
+                  ) : (
+                    <AppDropdown
+                      value={c.op}
+                      onChange={(v) => setConds((prev) => prev.map((x) => x.id === c.id ? { ...x, op: v as Op } : x))}
+                      options={enumField ? [
+                        { value: "=", label: "=" },
+                        { value: "in", label: "is one of" },
+                        { value: "not-in", label: "is none of" },
+                      ] : [
+                        { value: "=", label: "=" }, { value: ">", label: ">" }, { value: "<", label: "<" }, { value: "!=", label: "!=" }, { value: ">=", label: ">=" }, { value: "<=", label: "<=" },
+                      ]}
+                    />
+                  )}
+                  {c.field === "marketCapB" ? (
+                    <AppDropdown value={c.value} onChange={(v) => setConds((prev) => prev.map((x) => x.id === c.id ? { ...x, value: v } : x))} options={MC_BUCKETS.map((b) => ({ value: b.value, label: b.label }))} />
                   ) : (
                     <input value={c.value} onChange={(e) => setConds((prev) => prev.map((x) => x.id === c.id ? { ...x, value: e.target.value } : x))} placeholder={enumField ? "A,B,C" : "value"} className="bg-surface-overlay border border-surface-border rounded px-2 py-1" />
                   )}

@@ -76,6 +76,15 @@ html, body {
   min-height: 100vh;
 }
 
+/* Input borders: stronger in dark, softer in light */
+.cb-input {
+  border-color: rgba(163, 163, 163, 0.55) !important;
+}
+html[data-theme="light"] .cb-input {
+  border-color: rgba(148, 163, 184, 0.4) !important;
+  border-width: 1px !important;
+}
+
 /* Dropdowns: borderless + button-like hover */
 select {
   border-color: transparent !important;

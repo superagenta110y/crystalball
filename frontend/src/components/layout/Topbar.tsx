@@ -118,7 +118,7 @@ export function Topbar() {
 
       {/* Global symbol override */}
       <div ref={overrideRef} className="relative w-auto">
-        <div className={`min-h-8 inline-flex items-center gap-1 px-2 py-1 rounded-full border bg-transparent transition ${hasOverride ? "border-accent/70" : "border-neutral-500/70"}`}>
+        <div className={`cb-input min-h-8 inline-flex items-center gap-1 px-2 py-1 rounded-full border bg-transparent transition ${hasOverride ? "border-accent/70" : "border-neutral-500/70"}`}>
           {globalSymbols.map(sym => (
             <span key={sym} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[11px] font-mono bg-neutral-700/35 text-neutral-200">
               {sym}

@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState, useCallback, useMemo } from "react"
 import { SlidersHorizontal, Settings2, CircleHelp, X, GripHorizontal } from "lucide-react";
 import { useDashboardStore } from "@/lib/store/dashboardStore";
 import { AppColorPicker } from "@/components/ui/AppColorPicker";
+import { AppDropdown } from "@/components/ui/AppDropdown";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -884,10 +885,10 @@ export function ChartWidget({
             onFocus={() => setSymOpen(true)}
             disabled={isGlobalOverride}
             title={isGlobalOverride ? "Controlled by global override" : "Select symbol"}
-            className={`border rounded px-2 py-0.5 text-xs font-mono w-20 focus:outline-none text-white transition
+            className={`cb-input border rounded px-2 py-0.5 text-xs font-mono w-20 focus:outline-none text-white transition
               ${isGlobalOverride
                 ? "bg-surface-overlay border-accent/70 text-accent cursor-not-allowed shadow-[0_0_0_1px_rgba(0,212,170,0.25)]"
-                : "bg-surface-overlay border-surface-border focus:border-accent/60"}`}
+                : "bg-transparent border-neutral-500/70 hover:bg-surface-overlay/40 focus:border-accent/60"}`}
           />
           {isGlobalOverride && <span className="text-neutral-700 text-xs">⬡</span>}
           {symOpen && !isGlobalOverride && symItems.length > 0 && (
@@ -1011,9 +1012,7 @@ export function ChartWidget({
               {indicatorModal === "vwap" && (
                 <div className="space-y-2">
                   <label className="flex items-center justify-between"><LabelWithHelp label="Anchor" help="Auto: day for intraday, month for 1D, year for 1W." />
-                    <select value={vwapAnchor} onChange={e=>setVwapAnchor(e.target.value as any)} className="w-24 bg-surface-overlay border border-surface-border rounded px-2 py-1">
-                      <option value="auto">Auto</option><option value="day">Day</option><option value="week">Week</option><option value="month">Month</option><option value="year">Year</option>
-                    </select>
+                    <AppDropdown value={vwapAnchor} onChange={(v)=>setVwapAnchor(v as any)} options={[{value:"auto",label:"Auto"},{value:"day",label:"Day"},{value:"week",label:"Week"},{value:"month",label:"Month"},{value:"year",label:"Year"}]} />
                   </label>
                   <label className="flex items-center justify-between"><LabelWithHelp label="Line Color" help="Display color for VWAP line." /><AppColorPicker value={vwapColor} onChange={setVwapColor} /></label>
                   <label className="flex items-center justify-between"><LabelWithHelp label="Line Thickness" help="Pixel width for VWAP line." /><input type="number" min={1} max={6} value={vwapWidth} onChange={e=>setVwapWidth(Number(e.target.value)||1)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
@@ -1022,9 +1021,7 @@ export function ChartWidget({
               {indicatorModal === "vp" && (
                 <div className="space-y-2">
                   <label className="flex items-center justify-between"><LabelWithHelp label="Anchor" help="Auto: day for intraday, month for 1D, year for 1W." />
-                    <select value={vpAnchor} onChange={e=>setVpAnchor(e.target.value as any)} className="w-24 bg-surface-overlay border border-surface-border rounded px-2 py-1">
-                      <option value="auto">Auto</option><option value="day">Day</option><option value="week">Week</option><option value="month">Month</option><option value="year">Year</option>
-                    </select>
+                    <AppDropdown value={vpAnchor} onChange={(v)=>setVpAnchor(v as any)} options={[{value:"auto",label:"Auto"},{value:"day",label:"Day"},{value:"week",label:"Week"},{value:"month",label:"Month"},{value:"year",label:"Year"}]} />
                   </label>
                   <label className="flex items-center justify-between"><LabelWithHelp label="Line Color" help="Display color for POC line." /><AppColorPicker value={vpColor} onChange={setVpColor} /></label>
                   <label className="flex items-center justify-between"><LabelWithHelp label="Line Thickness" help="Pixel width for POC line." /><input type="number" min={1} max={6} value={vpWidth} onChange={e=>setVpWidth(Number(e.target.value)||2)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
@@ -1033,9 +1030,7 @@ export function ChartWidget({
               {indicatorModal === "cvd" && (
                 <div className="space-y-2">
                   <label className="flex items-center justify-between"><LabelWithHelp label="Anchor" help="Reset point for cumulative delta." />
-                    <select value={cvdAnchor} onChange={e=>setCvdAnchor(e.target.value as any)} className="w-24 bg-surface-overlay border border-surface-border rounded px-2 py-1">
-                      <option value="auto">Auto</option><option value="day">Day</option><option value="week">Week</option><option value="month">Month</option><option value="year">Year</option>
-                    </select>
+                    <AppDropdown value={cvdAnchor} onChange={(v)=>setCvdAnchor(v as any)} options={[{value:"auto",label:"Auto"},{value:"day",label:"Day"},{value:"week",label:"Week"},{value:"month",label:"Month"},{value:"year",label:"Year"}]} />
                   </label>
                   <div className="text-[11px] text-neutral-500">Colors inherit Bull/Bear theme.</div>
                 </div>

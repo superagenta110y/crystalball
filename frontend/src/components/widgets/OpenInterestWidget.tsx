@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { SymbolBar } from "./SymbolBar";
 import { useDashboardStore } from "@/lib/store/dashboardStore";
 import { OptionsLightHistogram } from "./OptionsLightHistogram";
+import { AppDropdown } from "@/components/ui/AppDropdown";
 
 interface OpenInterestWidgetProps {
   symbol?: string;
@@ -151,20 +152,19 @@ export function OpenInterestWidget({ symbol = "SPY", isGlobalOverride, config, o
                 )}
               </div>
             </details>
-            <select
+            <AppDropdown
               value={strikeRange}
-              onChange={(e) => { setStrikeRange(e.target.value); onConfigChange?.({ strikeRange: e.target.value }); }}
-              className="text-xs border border-surface-border bg-surface-overlay rounded px-1.5 py-1"
-              title="Strike filter"
-            >
-              <option value="all">All Strikes</option>
-              <option value="1">± 1%</option>
-              <option value="2">± 2%</option>
-              <option value="5">± 5%</option>
-              <option value="10">± 10%</option>
-              <option value="20">± 20%</option>
-              <option value="50">± 50%</option>
-            </select>
+              onChange={(v) => { setStrikeRange(v); onConfigChange?.({ strikeRange: v }); }}
+              options={[
+                { value: "all", label: "All Strikes" },
+                { value: "1", label: "± 1%" },
+                { value: "2", label: "± 2%" },
+                { value: "5", label: "± 5%" },
+                { value: "10", label: "± 10%" },
+                { value: "20", label: "± 20%" },
+                { value: "50", label: "± 50%" },
+              ]}
+            />
           </>
         }
       />
