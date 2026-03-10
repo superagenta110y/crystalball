@@ -28,7 +28,7 @@ interface WidgetWrapperProps {
 export function WidgetWrapper({ instance, onRemove, onToggleZoom, isZoomed, children }: WidgetWrapperProps) {
   const label = WIDGET_LABELS[instance.type] ?? { full: instance.type, mobile: instance.type.slice(0, 5) };
   const inlineHeaderTypes = new Set(["chart", "gex", "dex", "openinterest", "openinterest3d", "orderflow"]);
-  const disableZoomTypes = new Set(["gex", "openinterest"]);
+  const disableZoomTypes = new Set(["openinterest"]);
   const isChart = instance.type === "chart";
   const useInlineHeader = inlineHeaderTypes.has(instance.type);
   const canZoom = !disableZoomTypes.has(instance.type);

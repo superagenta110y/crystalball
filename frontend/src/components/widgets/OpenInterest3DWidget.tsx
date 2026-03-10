@@ -108,6 +108,7 @@ export function OpenInterest3DWidget({ symbol = "SPY", isGlobalOverride, config,
   const yLabelEvery = Math.max(1, Math.ceil(filteredStrikes.length / Math.max(2, Math.floor((size.h - 42) / 18))));
 
   const cellBg = (d: CellData) => {
+    if (!d.total || d.total <= 0) return "transparent";
     const abs = Math.min(1, Math.abs(d.skew));
     if (abs < 0.04) return "#f3f4f6";
     // dark -> bright as skew increases
@@ -167,7 +168,7 @@ export function OpenInterest3DWidget({ symbol = "SPY", isGlobalOverride, config,
         {!loading && !error && exps.length > 0 && filteredStrikes.length > 0 && (
           <div className="h-full w-full">
             <div className="text-[10px] text-neutral-500 mb-1">OI Grid (net skew = calls - puts)</div>
-            <div className="grid h-[calc(100%-14px)] w-full gap-0" style={{ gridTemplateColumns: `56px repeat(${exps.length}, minmax(0, 1fr))`, gridTemplateRows: `18px repeat(${filteredStrikes.length}, minmax(0, 1fr))` }}>
+            <div className="grid h-[calc(100%-14px)] w-full gap-[1px]" style={{ gridTemplateColumns: `56px repeat(${exps.length}, minmax(0, 1fr))`, gridTemplateRows: `18px repeat(${filteredStrikes.length}, minmax(0, 1fr))` }}>
               <div className="text-[9px] text-neutral-500 flex items-center">Strike</div>
               {exps.map((exp, i) => <div key={exp} className="text-[9px] text-neutral-500 font-mono truncate flex items-center justify-center px-1">{i % xLabelEvery === 0 ? exp : ""}</div>)}
 
