@@ -145,7 +145,7 @@ function computeRowHeight(windowH: number, layout: Layout[]): number {
   if (!layout.length) return 30;
   const maxRow = layout.reduce((m, l) => Math.max(m, l.y + l.h), 1);
   const available = windowH - TOPBAR_H - TABBAR_H - PADDING * 2 - MARGIN * (maxRow + 1);
-  return Math.max(10, Math.floor(available / maxRow));
+  return Math.max(6, Math.floor(available / maxRow));
 }
 
 // ─── Main dashboard ──────────────────────────────────────────────────────────
@@ -206,8 +206,19 @@ export default function Dashboard() {
   }, [theme]);
 
   const handleLayoutChange = useCallback(
-    (newLayout: Layout[]) => updateLayout(activeTabId, newLayout),
-    [activeTabId, updateLayout]
+    (newLayout: Layout[]) => {
+      if (!height) return updateLayout(activeTabId, newLayout);
+      const availablePx = Math.max(120, height - TOPBAR_H - TABBAR_H - PADDING * 2);
+      const minRowPx = 6;
+      const maxRowsAllowed = Math.max(4, Math.floor((availablePx - MARGIN) / (minRowPx + MARGIN)));
+      const fixed = newLayout.map(it => ({ ...it }));
+      for (const it of fixed) {
+        if (it.h > maxRowsAllowed) it.h = maxRowsAllowed;
+        if (it.y + it.h > maxRowsAllowed) it.y = Math.max(0, maxRowsAllowed - it.h);
+      }
+      updateLayout(activeTabId, fixed);
+    },
+    [activeTabId, updateLayout, height]
   );
 
   const [snapZone, setSnapZone] = useState<SnapZone>(null);
@@ -290,10 +301,26 @@ export default function Dashboard() {
       }
     }
 
+    // Ensure all widgets remain fully visible in viewport by compressing vertical mosaic if needed.
+    if (height) {
+      const availablePx = Math.max(120, height - TOPBAR_H - TABBAR_H - PADDING * 2);
+      const minRowPx = 6;
+      const maxRowsAllowed = Math.max(4, Math.floor((availablePx - MARGIN) / (minRowPx + MARGIN)));
+      const currentMax = Math.max(1, ...l.map(it => it.y + it.h));
+      if (currentMax > maxRowsAllowed) {
+        const scale = maxRowsAllowed / currentMax;
+        for (const it of l) {
+          it.y = Math.max(0, Math.floor(it.y * scale));
+          it.h = Math.max(3, Math.floor(it.h * scale));
+          if (it.y + it.h > maxRowsAllowed) it.y = Math.max(0, maxRowsAllowed - it.h);
+        }
+      }
+    }
+
     lastZoneRef.current = null;
     setSnapZone(null);
     updateLayout(activeTabId, l);
-  }, [activeTabId, updateLayout, snapZone]);
+  }, [activeTabId, updateLayout, snapZone, height]);
 
   const isGlobalOverride = (tab?.globalSymbols?.length ?? 0) > 0;
 

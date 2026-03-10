@@ -36,7 +36,7 @@ export function WidgetWrapper({ instance, onRemove, onToggleZoom, isZoomed, chil
   return (
     <div className="flex flex-col h-full group/widget">
       {!useInlineHeader && (
-        <div className="widget-header widget-drag-handle cursor-grab active:cursor-grabbing select-none" onDoubleClick={() => { if (canZoom) onToggleZoom?.(); }}>
+        <div className="widget-header widget-drag-handle cursor-grab active:cursor-grabbing select-none">
           <div className="flex items-center gap-1.5">
             <GripHorizontal size={11} className="opacity-30" />
             <span className="hidden sm:inline">{label.full}</span><span className="sm:hidden">{label.mobile}</span>
