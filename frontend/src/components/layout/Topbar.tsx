@@ -38,6 +38,7 @@ export function Topbar() {
 
   const [draft, setDraft] = useState("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [recentSymbols, setRecentSymbols] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
   const addRef = useRef<HTMLDivElement>(null);
@@ -48,10 +49,17 @@ export function Topbar() {
   const hasOverride = globalSymbols.length > 0;
 
   useEffect(() => {
-    setDraft("");
+    setDraft(tab?.globalSymbols?.[0] || "");
     setSuggestions([]);
     setShowSuggestions(false);
-  }, [activeTabId]);
+  }, [activeTabId, tab?.globalSymbols]);
+
+  useEffect(() => {
+    try {
+      const r = JSON.parse(localStorage.getItem("crystalball-recent-symbols") || "[]");
+      if (Array.isArray(r)) setRecentSymbols(r.slice(0, 12));
+    } catch {}
+  }, []);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -66,7 +74,7 @@ export function Topbar() {
   useEffect(() => {
     const q = draft.trim().toUpperCase();
     if (!q) {
-      setSuggestions([]);
+      setSuggestions(recentSymbols.filter(s => !globalSymbols.includes(s)).slice(0, 8));
       return;
     }
     const t = setTimeout(() => {
@@ -79,20 +87,19 @@ export function Topbar() {
         .catch(() => setSuggestions([]));
     }, 120);
     return () => clearTimeout(t);
-  }, [draft, activeTabId, globalSymbols.join(",")]);
+  }, [draft, activeTabId, globalSymbols.join(","), recentSymbols.join(",")]);
 
   const addSymbol = (sym: string) => {
     const s = sym.trim().toUpperCase();
     if (!s) return;
-    if (globalSymbols.includes(s)) return;
-    setGlobalSymbols(activeTabId, [...globalSymbols, s]);
-    setDraft("");
+    setGlobalSymbols(activeTabId, [s]);
+    setDraft(s);
     setShowSuggestions(false);
+    const next = [s, ...recentSymbols.filter(x => x !== s)].slice(0, 12);
+    setRecentSymbols(next);
+    try { localStorage.setItem("crystalball-recent-symbols", JSON.stringify(next)); } catch {}
   };
 
-  const removeSymbol = (sym: string) => {
-    setGlobalSymbols(activeTabId, globalSymbols.filter(x => x !== sym));
-  };
 
   return (
     <header className="flex items-center gap-3 px-4 py-2 bg-surface-raised border-b border-surface-border shrink-0 h-12">
@@ -103,21 +110,9 @@ export function Topbar() {
 
       <div className="w-px h-5 bg-surface-border hidden sm:block" />
 
-      {/* Global symbol override chips + autocomplete */}
-      <div ref={overrideRef} className="relative min-w-[230px] max-w-[420px] w-[34vw]">
-        <div
-          className={`min-h-[28px] flex items-center gap-1 flex-wrap px-2 py-1 rounded-md border bg-surface-overlay transition ${
-            hasOverride
-              ? "border-accent/70 shadow-[0_0_0_1px_rgba(0,212,170,0.25)]"
-              : "border-surface-border"
-          }`}
-        >
-          {globalSymbols.map(sym => (
-            <span key={sym} className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-mono ${hasOverride ? "bg-accent/15 text-accent border border-accent/30" : "bg-surface-border text-neutral-300"}`}>
-              {sym}
-              <button onClick={() => removeSymbol(sym)} className="opacity-70 hover:opacity-100"><X size={10} /></button>
-            </span>
-          ))}
+      {/* Global symbol override */}
+      <div ref={overrideRef} className="relative w-auto">
+        <div className={`h-8 inline-flex items-center gap-1 px-2 py-1 rounded-full border bg-transparent transition ${hasOverride ? "border-accent/70" : "border-surface-border"}`}>
           <input
             value={draft}
             onChange={(e) => { setDraft(e.target.value.toUpperCase()); setShowSuggestions(true); }}
@@ -128,19 +123,16 @@ export function Topbar() {
                 if (suggestions.length) addSymbol(suggestions[0]);
                 else if (draft.trim()) addSymbol(draft);
               }
-              if (e.key === "Backspace" && !draft && globalSymbols.length) {
-                removeSymbol(globalSymbols[globalSymbols.length - 1]);
-              }
             }}
-            placeholder={globalSymbols.length ? "Add symbol…" : "SPY, QQQ…"}
-            className="flex-1 min-w-[90px] bg-transparent outline-none text-xs font-mono text-white placeholder-neutral-700"
+            placeholder="SPY"
+            className="w-16 sm:w-20 bg-transparent outline-none text-xs font-mono text-white placeholder-neutral-500 hover:bg-surface-overlay/40 rounded px-1"
           />
           {hasOverride && (
-            <button onClick={() => setGlobalSymbols(activeTabId, [])} className="text-neutral-500 hover:text-white text-xs" title="Clear all overrides">✕</button>
+            <button onClick={() => { setGlobalSymbols(activeTabId, []); setDraft(""); }} className="text-neutral-500 hover:text-white text-xs" title="Clear override">✕</button>
           )}
         </div>
         {showSuggestions && suggestions.length > 0 && (
-          <div className="absolute z-50 mt-1 w-full bg-surface-raised border border-surface-border rounded-md shadow-xl max-h-56 overflow-y-auto">
+          <div className="absolute z-50 mt-1 w-36 bg-surface-raised rounded-md shadow-xl max-h-56 overflow-y-auto pop-in">
             {suggestions.map(s => (
               <button key={s} onClick={() => addSymbol(s)} className="w-full text-left px-2.5 py-1.5 text-xs font-mono text-neutral-300 hover:text-white hover:bg-surface-overlay">
                 {s}

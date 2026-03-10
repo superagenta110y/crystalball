@@ -68,8 +68,8 @@ export function SymbolBar({ symbol, isGlobalOverride, onSymbolChange, extra, lab
           title={isGlobalOverride ? "Controlled by global override in the header" : "Select symbol"}
           className={`border rounded px-2 py-0.5 text-xs font-mono w-20 focus:outline-none text-white transition
             ${isGlobalOverride
-              ? "bg-surface-overlay border-accent/70 text-accent cursor-not-allowed shadow-[0_0_0_1px_rgba(0,212,170,0.25)]"
-              : "bg-surface-overlay border-surface-border focus:border-accent/60"}`}
+              ? "bg-transparent border-accent/70 text-accent cursor-not-allowed shadow-[0_0_0_1px_rgba(0,212,170,0.25)]"
+              : "bg-transparent border-surface-border hover:bg-surface-overlay/40 focus:border-accent/60"}`}
         />
         {open && !isGlobalOverride && items.length > 0 && (
           <div className="absolute left-0 top-7 z-40 w-56 rounded-md border border-surface-border bg-surface-raised shadow-xl max-h-64 overflow-auto">
