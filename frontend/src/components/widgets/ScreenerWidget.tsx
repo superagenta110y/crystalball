@@ -211,15 +211,22 @@ export function ScreenerWidget() {
 
   return (
     <div className="h-full w-full flex flex-col relative" ref={popRef}>
-      <div className="absolute top-1 right-1 z-30 inline-flex items-center gap-1 text-[11px] text-neutral-500">
-        <button onClick={() => setShowFilters((v) => !v)} className="p-1.5 rounded hover:bg-surface-overlay" title="Filters"><FilterIcon size={13} /></button>
-        <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="p-1 rounded disabled:opacity-40 hover:bg-surface-overlay"><ChevronLeft size={12} /></button>
-        <span>{page}/{pageCount}</span>
-        <button disabled={page >= pageCount} onClick={() => setPage((p) => Math.min(pageCount, p + 1))} className="p-1 rounded disabled:opacity-40 hover:bg-surface-overlay"><ChevronRight size={12} /></button>
+      <div className="px-2 py-1.5 border-b border-surface-border flex items-center gap-2 text-xs">
+        <div className="widget-drag-handle cursor-grab active:cursor-grabbing select-none inline-flex items-center gap-1.5 text-neutral-500">
+          <span className="text-xs uppercase tracking-wide">Screener</span>
+        </div>
+        <button onClick={() => setShowFilters((v) => !v)} className="p-1.5 rounded hover:bg-surface-overlay text-neutral-500 hover:text-white" title="Filters">
+          <FilterIcon size={13} />
+        </button>
+        <div className="ml-auto inline-flex items-center gap-1 text-[11px] text-neutral-500">
+          <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="p-1 rounded disabled:opacity-40 hover:bg-surface-overlay"><ChevronLeft size={12} /></button>
+          <span>{page}/{pageCount}</span>
+          <button disabled={page >= pageCount} onClick={() => setPage((p) => Math.min(pageCount, p + 1))} className="p-1 rounded disabled:opacity-40 hover:bg-surface-overlay"><ChevronRight size={12} /></button>
+        </div>
       </div>
 
       {showFilters && (
-          <div className="absolute right-2 top-8 z-40 w-[420px] max-w-[90vw] rounded-lg bg-surface-raised p-2 shadow-2xl space-y-2 pop-in">
+          <div className="absolute right-2 top-10 z-40 w-[420px] max-w-[90vw] rounded-lg bg-surface-raised p-2 shadow-2xl space-y-2 pop-in">
             {conds.map((c) => {
               const enumField = ENUM_FIELDS.includes(c.field);
               return (
@@ -260,7 +267,9 @@ export function ScreenerWidget() {
                   ) : (
                     <input value={c.value} onChange={(e) => setConds((prev) => prev.map((x) => x.id === c.id ? { ...x, value: e.target.value } : x))} placeholder={enumField ? "A,B,C" : "value"} className="bg-surface-overlay border border-surface-border rounded px-2 py-1" />
                   )}
-                  <button onClick={() => { setPage(1); setConds((prev) => prev.filter((x) => x.id !== c.id)); }} className="p-1 rounded hover:bg-surface-overlay"><X size={12} /></button>
+                  <button onClick={() => { setPage(1); setConds((prev) => prev.filter((x) => x.id !== c.id)); }} className="px-1.5 py-1 rounded hover:bg-surface-overlay text-neutral-400 hover:text-white" title="Remove condition">
+                    <X size={12} />
+                  </button>
                 </div>
               );
             })}

@@ -76,6 +76,19 @@ html, body {
   min-height: 100vh;
 }
 
+/* Dropdowns: borderless + button-like hover */
+select {
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+select:hover {
+  background: var(--surface-overlay) !important;
+}
+select:focus {
+  outline: none;
+  border-color: transparent !important;
+}
+
 /* ─── Scrollbars ────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
