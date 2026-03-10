@@ -16,15 +16,15 @@ const TF_MAP: Record<string, string> = {
   "1d":"1Day","1w":"1Week",
 };
 const BAR_LIMIT: Record<string, number> = {
-  // default windows by timeframe (larger by default for better panning continuity)
-  "1Min":780,   // ~2 trading days
-  "5Min":780,   // ~10 trading days
-  "15Min":600,
+  // keep enough intraday bars to include full pre/post sessions around current day
+  "1Min":1600,
+  "5Min":1200,
+  "15Min":700,
   "30Min":500,
   "1Hour":500,
   "4Hour":300,
-  "1Day":756,   // ~3 years
-  "1Week":260,  // ~5 years
+  "1Day":756,
+  "1Week":260,
 };
 // Poll interval per Alpaca TF (ms)
 const POLL_MS: Record<string, number> = {
@@ -126,6 +126,8 @@ export function ChartWidget({
   const [showPremarketHighLow, setShowPremarketHighLow] = useState(false);
   const [vpColor, setVpColor] = useState("#e879f9");
   const [vpWidth, setVpWidth] = useState(2);
+  const [vwapAnchor, setVwapAnchor] = useState<"auto"|"day"|"week"|"month"|"year">("auto");
+  const [vpAnchor, setVpAnchor] = useState<"auto"|"day"|"week"|"month"|"year">("auto");
 
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef      = useRef<any>(null);
@@ -307,6 +309,34 @@ export function ChartWidget({
   const drawIndicators = useCallback((bars: Bar[]) => {
     if (!chartRef.current) return;
     clearIndicators();
+
+    const resolveAnchor = (a: "auto"|"day"|"week"|"month"|"year") => {
+      if (a !== "auto") return a;
+      if (timeframe === "1d") return "month";
+      if (timeframe === "1w") return "year";
+      return "day";
+    };
+    const anchorBars = (src: Bar[], a: "auto"|"day"|"week"|"month"|"year") => {
+      const mode = resolveAnchor(a);
+      const last = src[src.length - 1];
+      if (!last) return src;
+      const d = new Date(last.time * 1000);
+      let start = 0;
+      if (mode === "day") {
+        start = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) / 1000;
+      } else if (mode === "week") {
+        const w = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+        const day = (w.getUTCDay() + 6) % 7;
+        w.setUTCDate(w.getUTCDate() - day);
+        start = w.getTime() / 1000;
+      } else if (mode === "month") {
+        start = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1) / 1000;
+      } else {
+        start = Date.UTC(d.getUTCFullYear(), 0, 1) / 1000;
+      }
+      const anchored = src.filter(b => b.time >= start);
+      return anchored.length ? anchored : src;
+    };
     const addLine = (data:any[], color:string, width=1, dashed=false) => {
       const s = chartRef.current.addLineSeries({ color, lineWidth: width, lineStyle: dashed ? 2 : 0, priceLineVisible: false, lastValueVisible: false });
       s.setData(data); indicatorSeriesRef.current.push(s);
@@ -321,8 +351,9 @@ export function ChartWidget({
       addLine(computeEMA(bars, Math.max(2, emaSlowPeriod)), emaSlowColor, Math.max(1, emaSlowWidth));
     }
     if (indVWAP) {
+      const src = anchorBars(bars, vwapAnchor);
       let pv = 0, vv = 0;
-      const d = bars.map(b => { pv += ((b.high+b.low+b.close)/3)*(b.volume||0); vv += (b.volume||0); return { time:b.time, value: vv? pv/vv : b.close }; });
+      const d = src.map(b => { pv += ((b.high+b.low+b.close)/3)*(b.volume||0); vv += (b.volume||0); return { time:b.time, value: vv? pv/vv : b.close }; });
       addLine(d, vwapColor, Math.max(1, vwapWidth));
     }
     if (indBB) {
@@ -363,12 +394,13 @@ export function ChartWidget({
       });
     }
     if (indVP && bars.length) {
-      const poc = bars.reduce((best, b) => (b.volume||0) > (best.volume||0) ? b : best, bars[0]).close;
+      const src = anchorBars(bars, vpAnchor);
+      const poc = src.reduce((best, b) => (b.volume||0) > (best.volume||0) ? b : best, src[0]).close;
       const s = chartRef.current.addLineSeries({ color: vpColor, lineWidth: Math.max(1, vpWidth), lineStyle: 2, priceLineVisible: false, lastValueVisible: false });
-      s.setData([{ time: bars[0].time, value: poc }, { time: bars[bars.length - 1].time, value: poc }]);
+      s.setData([{ time: src[0].time, value: poc }, { time: src[src.length - 1].time, value: poc }]);
       levelLinesRef.current.push(s);
     }
-  }, [clearIndicators, indSMA, indEMA, indVWAP, indBB, indLevels, indVP, smaFastPeriod, smaFastColor, smaFastWidth, smaSlowPeriod, smaSlowColor, smaSlowWidth, emaFastPeriod, emaFastColor, emaFastWidth, emaSlowPeriod, emaSlowColor, emaSlowWidth, vwapColor, vwapWidth, bbPeriod, bbStd, bbColor, bbWidth, levelColor, levelWidth, showPrevClose, showDayHighLow, showPremarketHighLow, vpColor, vpWidth]);
+  }, [clearIndicators, timeframe, vwapAnchor, vpAnchor, indSMA, indEMA, indVWAP, indBB, indLevels, indVP, smaFastPeriod, smaFastColor, smaFastWidth, smaSlowPeriod, smaSlowColor, smaSlowWidth, emaFastPeriod, emaFastColor, emaFastWidth, emaSlowPeriod, emaSlowColor, emaSlowWidth, vwapColor, vwapWidth, bbPeriod, bbStd, bbColor, bbWidth, levelColor, levelWidth, showPrevClose, showDayHighLow, showPremarketHighLow, vpColor, vpWidth]);
 
   const updateSessionShading = useCallback(() => {
     if (!chartRef.current || !seriesRef.current) { setSessionShades([]); return; }
@@ -387,7 +419,9 @@ export function ChartWidget({
       const d = new Date(t * 1000).toLocaleString("en-US", { timeZone: "America/New_York" });
       const dt = new Date(d);
       const m = dt.getHours() * 60 + dt.getMinutes();
-      return m < 570 || m >= 960;
+      const pre = m >= 240 && m < 570;   // 4:00-9:30 ET
+      const post = m >= 960 && m < 1200; // 16:00-20:00 ET
+      return pre || post;
     };
 
     const segments: Array<{ left: number; width: number }> = [];
@@ -504,9 +538,11 @@ export function ChartWidget({
       const bars = parseBars(payload);
       if (!bars.length || !seriesRef.current) return;
 
+      let hasNewBar = false;
       for (const bar of bars) {
         const cached = cacheRef.current.get(bar.time);
         if (!cached || cached.close !== bar.close || cached.high !== bar.high || cached.low !== bar.low) {
+          if (!cached) hasNewBar = true;
           cacheRef.current.set(bar.time, bar);
           seriesRef.current.update(bar);   // lightweight-charts upserts by time
           const bull = getComputedStyle(document.documentElement).getPropertyValue("--bull").trim() || theme.bull;
@@ -518,7 +554,7 @@ export function ChartWidget({
           });
         }
       }
-      drawIndicators(Array.from(cacheRef.current.values()).sort((a,b)=>a.time-b.time));
+      if (hasNewBar) drawIndicators(Array.from(cacheRef.current.values()).sort((a,b)=>a.time-b.time));
       updateSessionShading();
       const lb = bars[bars.length - 1];
       if (lb) {
@@ -652,7 +688,6 @@ export function ChartWidget({
               value: updated.volume || 0,
               color: updated.close >= updated.open ? toRgba(bull, 0.5) : toRgba(bear, 0.5),
             });
-            drawIndicators(Array.from(cacheRef.current.values()).sort((a,b)=>a.time-b.time));
             setBarStatus(`O ${updated.open.toFixed(2)} H ${updated.high.toFixed(2)} L ${updated.low.toFixed(2)} C ${updated.close.toFixed(2)} V ${Math.round(updated.volume || 0).toLocaleString()}`);
           }
         } catch { /* ignore parse errors */ }
@@ -789,7 +824,7 @@ export function ChartWidget({
 
       <div className="relative flex-1 w-full min-h-0">
         {(timeframe !== "1d" && timeframe !== "1w") && (
-          <div className="absolute inset-0 z-[1] pointer-events-none">
+          <div className="absolute inset-0 z-[8] pointer-events-none">
             {sessionShades.map((s, i) => (
               <div
                 key={i}
@@ -804,7 +839,7 @@ export function ChartWidget({
           {lastPrice != null && <span className="ml-2 text-white">${lastPrice.toFixed(2)}</span>}
           {isLive && <span className="ml-1 inline-block w-1.5 h-1.5 rounded-full bg-bull animate-pulse" />}
         </div>
-        <div ref={containerRef} className="h-full w-full" />
+        <div ref={containerRef} className="h-full w-full relative z-[5]" />
       </div>
 
       {indicatorModal && (
@@ -859,12 +894,22 @@ export function ChartWidget({
               )}
               {indicatorModal === "vwap" && (
                 <div className="space-y-2">
+                  <label className="flex items-center justify-between"><LabelWithHelp label="Anchor" help="Auto: day for intraday, month for 1D, year for 1W." />
+                    <select value={vwapAnchor} onChange={e=>setVwapAnchor(e.target.value as any)} className="w-24 bg-surface-overlay border border-surface-border rounded px-2 py-1">
+                      <option value="auto">Auto</option><option value="day">Day</option><option value="week">Week</option><option value="month">Month</option><option value="year">Year</option>
+                    </select>
+                  </label>
                   <label className="flex items-center justify-between"><LabelWithHelp label="Line Color" help="Display color for VWAP line." /><AppColorPicker value={vwapColor} onChange={setVwapColor} /></label>
                   <label className="flex items-center justify-between"><LabelWithHelp label="Line Thickness" help="Pixel width for VWAP line." /><input type="number" min={1} max={6} value={vwapWidth} onChange={e=>setVwapWidth(Number(e.target.value)||1)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
                 </div>
               )}
               {indicatorModal === "vp" && (
                 <div className="space-y-2">
+                  <label className="flex items-center justify-between"><LabelWithHelp label="Anchor" help="Auto: day for intraday, month for 1D, year for 1W." />
+                    <select value={vpAnchor} onChange={e=>setVpAnchor(e.target.value as any)} className="w-24 bg-surface-overlay border border-surface-border rounded px-2 py-1">
+                      <option value="auto">Auto</option><option value="day">Day</option><option value="week">Week</option><option value="month">Month</option><option value="year">Year</option>
+                    </select>
+                  </label>
                   <label className="flex items-center justify-between"><LabelWithHelp label="Line Color" help="Display color for POC line." /><AppColorPicker value={vpColor} onChange={setVpColor} /></label>
                   <label className="flex items-center justify-between"><LabelWithHelp label="Line Thickness" help="Pixel width for POC line." /><input type="number" min={1} max={6} value={vpWidth} onChange={e=>setVpWidth(Number(e.target.value)||2)} className="w-20 bg-surface-overlay border border-surface-border rounded px-2 py-1" /></label>
                 </div>
