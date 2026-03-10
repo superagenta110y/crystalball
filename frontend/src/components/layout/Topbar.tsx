@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Plus, Palette, ChevronDown, Settings, Moon, Sun, Monitor, X } from "lucide-react";
+import { Plus, Palette, ChevronDown, Settings, MessageCircle, Moon, Sun, Monitor, X } from "lucide-react";
 import Link from "next/link";
 import { useDashboardStore, type WidgetType, type ThemeMode, DEFAULT_THEME } from "@/lib/store/dashboardStore";
 import { AppColorPicker } from "@/components/ui/AppColorPicker";
@@ -222,6 +222,9 @@ export function Topbar() {
         <Link href="/settings" className="p-1.5 rounded-md hover:bg-surface-overlay text-neutral-500 hover:text-white transition" title="Settings">
           <Settings size={15} />
         </Link>
+        <button onClick={() => window.dispatchEvent(new Event('assistant:open'))} className="p-1.5 rounded-md hover:bg-surface-overlay text-neutral-500 hover:text-white transition" title="Chat">
+          <MessageCircle size={15} />
+        </button>
       </div>
     </header>
   );
