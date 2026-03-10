@@ -222,24 +222,37 @@ export default function Dashboard() {
   }, [width]);
 
   const handleDragStop = useCallback((newLayout: Layout[], oldItem: Layout, newItem: Layout) => {
-    const topSnap = newItem.y <= 1;
-    if (!topSnap) return updateLayout(activeTabId, newLayout);
-
     const l = newLayout.map(it => ({ ...it }));
     const idx = l.findIndex(it => it.i === newItem.i);
     if (idx < 0) return updateLayout(activeTabId, newLayout);
 
-    const center = newItem.x + newItem.w / 2;
-    if (center >= 4 && center <= 8) {
-      l[idx].x = 0; l[idx].w = 12; l[idx].y = 0;
-    } else if (center > 8) {
-      l[idx].x = 6; l[idx].w = 6; l[idx].y = 0;
-    } else {
-      l[idx].x = 0; l[idx].w = 6; l[idx].y = 0;
+    const topSnap = newItem.y <= 1;
+    if (topSnap) {
+      const center = newItem.x + newItem.w / 2;
+      if (center >= 4 && center <= 8) {
+        l[idx].x = 0; l[idx].w = 12; l[idx].y = 0;
+      } else if (center > 8) {
+        l[idx].x = 6; l[idx].w = 6; l[idx].y = 0;
+      } else {
+        l[idx].x = 0; l[idx].w = 6; l[idx].y = 0;
+      }
     }
 
+    // If dragged high/low out of viewport, cut height in half.
+    const vh = height ?? 900;
+    const rh = 24;
+    if (newItem.y <= 0 || (newItem.y * rh) > (vh - 180)) {
+      l[idx].h = Math.max(4, Math.ceil(oldItem.h / 2));
+    }
+
+    // Auto-expand into empty right/bottom space after small drag.
+    const target = l[idx];
+    const collides = (cand: Layout) => l.some((o, i) => i !== idx && !(cand.x + cand.w <= o.x || o.x + o.w <= cand.x || cand.y + cand.h <= o.y || o.y + o.h <= cand.y));
+    while (target.x + target.w < 12 && !collides({ ...target, w: target.w + 1 })) target.w += 1;
+    while (target.h < 24 && !collides({ ...target, h: target.h + 1 })) target.h += 1;
+
     updateLayout(activeTabId, l);
-  }, [activeTabId, updateLayout]);
+  }, [activeTabId, updateLayout, height]);
 
   const isGlobalOverride = (tab?.globalSymbols?.length ?? 0) > 0;
 

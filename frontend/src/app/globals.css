@@ -124,10 +124,12 @@ select:focus {
 .react-resizable-handle {
   opacity: 0;
   transition: opacity 0.2s;
+  z-index: 90 !important;
+  pointer-events: auto !important;
 }
 
 .react-grid-item:hover .react-resizable-handle {
-  opacity: 0.5;
+  opacity: 0.6;
 }
 
 /* ─── TradingView / lightweight-charts watermark ────────────── */

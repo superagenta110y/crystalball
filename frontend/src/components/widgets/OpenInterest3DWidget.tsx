@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { SymbolBar } from "./SymbolBar";
 import { AppDropdown } from "@/components/ui/AppDropdown";
+import { useDashboardStore } from "@/lib/store/dashboardStore";
 
 interface OpenInterest3DWidgetProps {
   symbol?: string;
@@ -19,6 +20,7 @@ const fmtCompact = (n: number) => n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)
 
 export function OpenInterest3DWidget({ symbol = "SPY", isGlobalOverride, config, onConfigChange }: OpenInterest3DWidgetProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
+  const { bull, bear } = useDashboardStore(s => s.theme);
   const [size, setSize] = useState({ w: 700, h: 380 });
 
   const [expLoading, setExpLoading] = useState(true);
@@ -112,13 +114,11 @@ export function OpenInterest3DWidget({ symbol = "SPY", isGlobalOverride, config,
     if (!d.total || d.total <= 0) return "transparent";
     const abs = Math.min(1, Math.abs(d.skew));
     if (abs < 0.04) return "#f3f4f6";
-    // dark -> bright as skew increases
-    if (d.skew > 0) {
-      const light = 30 + abs * 28; // dark green to bright green
-      return `hsl(155 78% ${light}%)`;
-    }
-    const light = 30 + abs * 28; // dark red to bright red
-    return `hsl(352 78% ${light}%)`;
+    const hex = d.skew > 0 ? bull : bear;
+    const c = hex.replace('#','');
+    const r = parseInt(c.slice(0,2),16), g = parseInt(c.slice(2,4),16), b = parseInt(c.slice(4,6),16);
+    const a = 0.25 + abs * 0.55;
+    return `rgba(${r}, ${g}, ${b}, ${a})`;
   };
 
   const toggleExpiration = (exp: string, checked: boolean) => {
@@ -146,7 +146,7 @@ export function OpenInterest3DWidget({ symbol = "SPY", isGlobalOverride, config,
           <>
             <details className="relative">
               <summary className="list-none cursor-pointer text-xs text-neutral-300 relative">
-                <span className="relative inline-flex items-center">📅{expBadge > 0 && <span className="absolute -top-2 -right-2 text-[9px] w-4 h-4 inline-flex items-center justify-center rounded-full bg-[#7c3aed] text-white">{expBadge}</span>}</span>
+                <span className="relative inline-flex items-center">📅{expBadge > 0 && <span className="absolute -top-2 -right-2 text-[9px] w-4 h-4 inline-flex items-center justify-center rounded-full bg-accent text-white border border-accent">{expBadge}</span>}</span>
               </summary>
               <div className="absolute left-0 mt-1 z-20 w-52 max-h-64 overflow-auto rounded border border-surface-border bg-surface p-2 shadow-xl text-neutral-200">
                 <label className="flex items-center gap-2 text-xs py-1 border-b border-surface-border mb-1"><input type="checkbox" checked={allSelected} onChange={(e) => toggleAll(e.target.checked)} /><span>All</span></label>
