@@ -141,6 +141,7 @@ export function ChartWidget({
 
   const [symItems, setSymItems] = useState<{ symbol: string; name?: string }[]>([]);
   const [chartReady, setChartReady] = useState(false);
+  const [sessionShades, setSessionShades] = useState<Array<{ left: number; width: number }>>([]);
   const [symOpen, setSymOpen] = useState(false);
   const symRef = useRef<HTMLDivElement>(null);
   const pollRef      = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -177,6 +178,8 @@ export function ChartWidget({
     chartRef.current.applyOptions({
       grid: { vertLines: { color: gridLine }, horzLines: { color: gridLine } },
       layout: { textColor: axisText },
+      rightPriceScale: { borderColor: "transparent" },
+      timeScale: { borderColor: "transparent" },
     });
   }, [theme.bull, theme.bear, theme.mode]);
 
@@ -218,8 +221,8 @@ export function ChartWidget({
         layout: { background: { color: "transparent" }, textColor: "#8b8fa8" },
         grid:   { vertLines: { color: "transparent" }, horzLines: { color: "transparent" } },
         crosshair: { mode: CrosshairMode.Normal },
-        rightPriceScale: { borderColor: "#2a2a2a" },
-        timeScale: { borderColor: "#2a2a2a", timeVisible: true, secondsVisible: false },
+        rightPriceScale: { borderColor: "transparent" },
+        timeScale: { borderColor: "transparent", timeVisible: true, secondsVisible: false },
         width:  containerRef.current.clientWidth,
         height: containerRef.current.clientHeight,
       });
@@ -367,10 +370,51 @@ export function ChartWidget({
     }
   }, [clearIndicators, indSMA, indEMA, indVWAP, indBB, indLevels, indVP, smaFastPeriod, smaFastColor, smaFastWidth, smaSlowPeriod, smaSlowColor, smaSlowWidth, emaFastPeriod, emaFastColor, emaFastWidth, emaSlowPeriod, emaSlowColor, emaSlowWidth, vwapColor, vwapWidth, bbPeriod, bbStd, bbColor, bbWidth, levelColor, levelWidth, showPrevClose, showDayHighLow, showPremarketHighLow, vpColor, vpWidth]);
 
+  const updateSessionShading = useCallback(() => {
+    if (!chartRef.current || !seriesRef.current) { setSessionShades([]); return; }
+    if (timeframe === "1d" || timeframe === "1w") { setSessionShades([]); return; }
+
+    const bars = Array.from(cacheRef.current.values()).sort((a, b) => a.time - b.time);
+    if (!bars.length) { setSessionShades([]); return; }
+
+    const ts = chartRef.current.timeScale();
+    const vr = ts.getVisibleRange?.();
+    const from = vr?.from ? Math.floor(new Date(vr.from as any).getTime() / 1000) : bars[0].time;
+    const to = vr?.to ? Math.floor(new Date(vr.to as any).getTime() / 1000) : bars[bars.length - 1].time;
+
+    const visible = bars.filter(b => b.time >= from && b.time <= to);
+    const isExt = (t: number) => {
+      const d = new Date(t * 1000).toLocaleString("en-US", { timeZone: "America/New_York" });
+      const dt = new Date(d);
+      const m = dt.getHours() * 60 + dt.getMinutes();
+      return m < 570 || m >= 960;
+    };
+
+    const segments: Array<{ left: number; width: number }> = [];
+    let startX: number | null = null;
+    let prevX: number | null = null;
+
+    for (const b of visible) {
+      const x = ts.timeToCoordinate?.(b.time as any);
+      if (x == null) continue;
+      if (isExt(b.time)) {
+        if (startX == null) startX = x;
+        prevX = x;
+      } else if (startX != null && prevX != null) {
+        segments.push({ left: Math.max(0, startX), width: Math.max(2, prevX - startX + 2) });
+        startX = null;
+        prevX = null;
+      }
+    }
+    if (startX != null && prevX != null) segments.push({ left: Math.max(0, startX), width: Math.max(2, prevX - startX + 2) });
+    setSessionShades(segments);
+  }, [timeframe]);
+
   useEffect(() => {
     const bars = Array.from(cacheRef.current.values()).sort((a,b)=>a.time-b.time);
     if (bars.length) drawIndicators(bars);
-  }, [drawIndicators]);
+    updateSessionShading();
+  }, [drawIndicators, updateSessionShading]);
 
   // Full load — clears & repopulates everything
   const loadFull = useCallback(async (sym: string, tf: Timeframe, forcedLimit?: number, fit = true) => {
@@ -441,12 +485,13 @@ export function ChartWidget({
       }
 
       setLastPrice(bars[bars.length - 1].close);
+      updateSessionShading();
 
       setStatus("ok");
     } catch {
       setStatus("error");
     }
-  }, [theme.bull, theme.bear, drawIndicators]);
+  }, [theme.bull, theme.bear, drawIndicators, updateSessionShading]);
 
   // Incremental update — fetches last 3 bars and upserts changes
   const pollUpdate = useCallback(async (sym: string, tf: Timeframe) => {
@@ -474,6 +519,7 @@ export function ChartWidget({
         }
       }
       drawIndicators(Array.from(cacheRef.current.values()).sort((a,b)=>a.time-b.time));
+      updateSessionShading();
       const lb = bars[bars.length - 1];
       if (lb) {
         setBarStatus(`O ${lb.open.toFixed(2)} H ${lb.high.toFixed(2)} L ${lb.low.toFixed(2)} C ${lb.close.toFixed(2)} V ${Math.round(lb.volume || 0).toLocaleString()}`);
@@ -483,7 +529,7 @@ export function ChartWidget({
 
 
     } catch { /* silent — don't flicker status on transient errors */ }
-  }, [theme.bull, theme.bear, drawIndicators]);
+  }, [theme.bull, theme.bear, drawIndicators, updateSessionShading]);
 
   const fetchOlder = useCallback(async () => {
     if (!seriesRef.current || loadingMoreRef.current) return;
@@ -508,10 +554,11 @@ export function ChartWidget({
       const bear = getComputedStyle(document.documentElement).getPropertyValue("--bear").trim() || theme.bear;
       volumeRef.current?.setData(merged.map(b => ({ time: b.time, value: b.volume || 0, color: b.close >= b.open ? toRgba(bull, 0.5) : toRgba(bear, 0.5) })));
       drawIndicators(merged);
+      updateSessionShading();
     } finally {
       loadingMoreRef.current = false;
     }
-  }, [symbol, timeframe, theme.bull, theme.bear, drawIndicators]);
+  }, [symbol, timeframe, theme.bull, theme.bear, drawIndicators, updateSessionShading]);
 
   // Auto-backfill older candles when panning to the left edge
   useEffect(() => {
@@ -519,7 +566,9 @@ export function ChartWidget({
     const ts = chartRef.current.timeScale();
 
     const onRange = (range: any) => {
-      if (!range || loadingMoreRef.current || noMoreOlderRef.current || !seriesRef.current) return;
+      if (!range || !seriesRef.current) return;
+      updateSessionShading();
+      if (loadingMoreRef.current || noMoreOlderRef.current) return;
       const info = seriesRef.current.barsInLogicalRange?.(range);
       // Fetch more whenever user approaches the left edge of loaded data.
       if (!info || typeof info.barsBefore !== "number" || info.barsBefore < 80) {
@@ -531,7 +580,7 @@ export function ChartWidget({
     const vr = ts.getVisibleLogicalRange?.();
     if (vr) onRange(vr);
     return () => ts.unsubscribeVisibleLogicalRangeChange(onRange);
-  }, [chartReady, fetchOlder]);
+  }, [chartReady, fetchOlder, updateSessionShading]);
 
   // Main effect: full load then polling
   useEffect(() => {
@@ -739,6 +788,17 @@ export function ChartWidget({
       </div>
 
       <div className="relative flex-1 w-full min-h-0">
+        {(timeframe !== "1d" && timeframe !== "1w") && (
+          <div className="absolute inset-0 z-[1] pointer-events-none">
+            {sessionShades.map((s, i) => (
+              <div
+                key={i}
+                className={theme.mode === "light" ? "absolute top-0 bottom-0 bg-neutral-200/35" : "absolute top-0 bottom-0 bg-neutral-800/35"}
+                style={{ left: `${s.left}px`, width: `${s.width}px` }}
+              />
+            ))}
+          </div>
+        )}
         <div className="absolute left-2 top-1 z-10 text-[10px] font-mono text-neutral-300 pointer-events-none">
           {barStatus || (status === "loading" ? "Loading…" : status === "error" ? "Error" : "")}
           {lastPrice != null && <span className="ml-2 text-white">${lastPrice.toFixed(2)}</span>}
