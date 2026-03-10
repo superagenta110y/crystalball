@@ -286,15 +286,33 @@ export default function Dashboard() {
       }
 
       const others = l.filter((_, i) => i !== idx);
-      let r = 0;
-      for (const it of others) {
-        const fr = freeRects[Math.min(r, freeRects.length - 1)];
-        if (!fr) break;
-        it.x = fr.x;
-        it.w = Math.min(Math.max(2, it.w), fr.w);
-        it.h = Math.min(Math.max(3, it.h), fr.h);
-        it.y = fr.y;
-        if (it.w < fr.w && r < freeRects.length - 1) r += 1;
+      const totalArea = freeRects.reduce((s, r) => s + (r.w * r.h), 0) || 1;
+      let start = 0;
+      for (let ri = 0; ri < freeRects.length; ri++) {
+        const fr = freeRects[ri];
+        const remaining = others.length - start;
+        if (remaining <= 0) break;
+        const rawTake = Math.round((fr.w * fr.h / totalArea) * others.length);
+        const take = Math.max(ri === freeRects.length - 1 ? remaining : 1, Math.min(remaining, rawTake || 1));
+        const chunk = others.slice(start, start + take);
+        start += take;
+
+        // Even distribution inside this free rectangle.
+        const n = chunk.length;
+        const aspect = fr.w / Math.max(1, fr.h);
+        const cols = Math.max(1, Math.min(n, Math.ceil(Math.sqrt(n * aspect))));
+        const rows = Math.max(1, Math.ceil(n / cols));
+        const cellW = Math.max(2, Math.floor(fr.w / cols));
+        const cellH = Math.max(3, Math.floor(fr.h / rows));
+
+        chunk.forEach((it, i2) => {
+          const c = i2 % cols;
+          const r = Math.floor(i2 / cols);
+          it.x = fr.x + c * cellW;
+          it.y = fr.y + r * cellH;
+          it.w = (c === cols - 1) ? Math.max(2, fr.x + fr.w - it.x) : cellW;
+          it.h = (r === rows - 1) ? Math.max(3, fr.y + fr.h - it.y) : cellH;
+        });
       }
     }
 
