@@ -20,9 +20,9 @@ async def _build_provider() -> BaseProvider:
     if not provider_type:
         provider_type = settings.provider
 
-    if provider_type == "hoodwink":
-        from providers.hoodwink import HoodwinkProvider
-        return HoodwinkProvider(config or {})
+    if provider_type == "hoodlink":
+        from providers.hoodlink import HoodlinkProvider
+        return HoodlinkProvider(config or {})
 
     from providers.alpaca import AlpacaProvider
     return AlpacaProvider(config or {})

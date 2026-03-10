@@ -11,7 +11,7 @@ from routes.deps import invalidate_provider_cache
 
 router = APIRouter(prefix="/providers", tags=["providers"])
 
-SUPPORTED_TYPES = {"alpaca", "hoodwink", "openai", "gemini", "claude"}
+SUPPORTED_TYPES = {"alpaca", "hoodlink", "openai", "gemini", "claude"}
 
 
 class ProviderBody(BaseModel):

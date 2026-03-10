@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     )
 
     # ── Provider ─────────────────────────────────────────────────────────────
-    provider: str = "alpaca"  # "alpaca" | "hoodwink"
+    provider: str = "alpaca"  # "alpaca" | "hoodlink"
 
     # ── Alpaca ────────────────────────────────────────────────────────────────
     alpaca_api_key: str = ""
@@ -37,9 +37,9 @@ class Settings(BaseSettings):
     alpaca_data_url: str = "https://data.alpaca.markets"
     alpaca_feed: str = "iex"  # iex (free) | sip
 
-    # ── Hoodwink ──────────────────────────────────────────────────────────────
-    hoodwink_url: str = "http://127.0.0.1:7878"
-    hoodwink_api_key: str = "changeme"
+    # ── Hoodlink ──────────────────────────────────────────────────────────────
+    hoodlink_url: str = "http://127.0.0.1:7878"
+    hoodlink_api_key: str = "changeme"
 
     # ── App ───────────────────────────────────────────────────────────────────
     app_host: str = "0.0.0.0"

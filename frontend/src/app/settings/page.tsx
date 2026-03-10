@@ -12,7 +12,7 @@ const API = process.env.NEXT_PUBLIC_API_URL || "";
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 type TabId = "general" | "providers";
 
-type ProviderType = "alpaca" | "hoodwink" | "openai" | "gemini" | "claude";
+type ProviderType = "alpaca" | "hoodlink" | "openai" | "gemini" | "claude";
 
 interface Provider {
   id: string;
@@ -49,9 +49,9 @@ const PROVIDER_DEFS: ProviderDef[] = [
     ],
   },
   {
-    type: "hoodwink", label: "Hoodwink", role: "data", icon: <Link2 size={16} />,
+    type: "hoodlink", label: "Hoodlink", role: "data", icon: <Link2 size={16} />,
     fields: [
-      { key: "url", label: "Hoodwink URL", placeholder: "http://127.0.0.1:7878" },
+      { key: "url", label: "Hoodlink URL", placeholder: "http://127.0.0.1:7878" },
       { key: "api_key", label: "API Key", type: "password", placeholder: "••••••••" },
     ],
   },
@@ -237,7 +237,7 @@ function ProvidersTab() {
   };
 
   const byRole = useMemo(() => ({
-    data: state.providers.filter(p => ["alpaca", "hoodwink"].includes(p.type)),
+    data: state.providers.filter(p => ["alpaca", "hoodlink"].includes(p.type)),
     ai: state.providers.filter(p => ["openai", "gemini", "claude"].includes(p.type)),
   }), [state.providers]);
 

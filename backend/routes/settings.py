@@ -15,13 +15,13 @@ class AlpacaConfig(BaseModel):
     data_url: str = "https://data.alpaca.markets"
 
 
-class HoodwinkConfig(BaseModel):
+class HoodlinkConfig(BaseModel):
     url: str = "http://127.0.0.1:7878"
     api_key: str = "changeme"
 
 
 class ActiveProviderBody(BaseModel):
-    provider: str  # "alpaca" | "hoodwink"
+    provider: str  # "alpaca" | "hoodlink"
 
 
 class UIThemeBody(BaseModel):
@@ -34,14 +34,14 @@ class UIThemeBody(BaseModel):
 @router.get("")
 async def get_settings():
     alpaca = await get_provider_config("alpaca")
-    hoodwink = await get_provider_config("hoodwink")
+    hoodlink = await get_provider_config("hoodlink")
     active = await get_active_provider() or "alpaca"
     # Mask secrets
     if alpaca.get("secret_key"):
         alpaca["secret_key"] = "••••••••" + alpaca["secret_key"][-4:]
-    if hoodwink.get("api_key"):
-        hoodwink["api_key"] = "••••••••" + hoodwink["api_key"][-4:]
-    return {"active_provider": active, "alpaca": alpaca, "hoodwink": hoodwink}
+    if hoodlink.get("api_key"):
+        hoodlink["api_key"] = "••••••••" + hoodlink["api_key"][-4:]
+    return {"active_provider": active, "alpaca": alpaca, "hoodlink": hoodlink}
 
 
 @router.put("/alpaca")
@@ -61,20 +61,20 @@ async def save_alpaca(cfg: AlpacaConfig):
     return {"ok": True}
 
 
-@router.put("/hoodwink")
-async def save_hoodwink(cfg: HoodwinkConfig):
-    existing = await get_provider_config("hoodwink")
+@router.put("/hoodlink")
+async def save_hoodlink(cfg: HoodlinkConfig):
+    existing = await get_provider_config("hoodlink")
     api_key = cfg.api_key
     if api_key.startswith("••••••••"):
         api_key = existing.get("api_key", "")
-    await set_provider_config("hoodwink", {"url": cfg.url, "api_key": api_key})
+    await set_provider_config("hoodlink", {"url": cfg.url, "api_key": api_key})
     invalidate_provider_cache()
     return {"ok": True}
 
 
 @router.put("/active-provider")
 async def update_active_provider(body: ActiveProviderBody):
-    if body.provider not in ("alpaca", "hoodwink"):
+    if body.provider not in ("alpaca", "hoodlink"):
         raise HTTPException(400, "Invalid provider")
     await set_active_provider(body.provider)
     invalidate_provider_cache()

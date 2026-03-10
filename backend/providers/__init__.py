@@ -10,9 +10,9 @@ from providers.base import BaseProvider
 
 def get_provider() -> BaseProvider:
     settings = get_settings()
-    if settings.provider == "hoodwink":
-        from providers.hoodwink import HoodwinkProvider
-        return HoodwinkProvider()
+    if settings.provider == "hoodlink":
+        from providers.hoodlink import HoodlinkProvider
+        return HoodlinkProvider()
     # default
     from providers.alpaca import AlpacaProvider
     return AlpacaProvider()

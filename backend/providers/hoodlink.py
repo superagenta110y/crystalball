@@ -1,6 +1,6 @@
 """
-Hoodwink provider — bridges CrystalBall to Robinhood via the local
-Hoodwink server (FastAPI + Chrome extension). Hoodwink must be running
+Hoodlink provider — bridges CrystalBall to Robinhood via the local
+Hoodlink server (FastAPI + Chrome extension). Hoodlink must be running
 on the configured host before this provider can be used.
 """
 from __future__ import annotations
@@ -10,12 +10,12 @@ from .base import BaseProvider
 from config import get_settings
 
 
-class HoodwinkProvider(BaseProvider):
+class HoodlinkProvider(BaseProvider):
     def __init__(self, config: dict | None = None):
         s = get_settings()
         cfg = config or {}
-        url     = cfg.get("url")     or s.hoodwink_url
-        api_key = cfg.get("api_key") or s.hoodwink_api_key
+        url     = cfg.get("url")     or s.hoodlink_url
+        api_key = cfg.get("api_key") or s.hoodlink_api_key
         self._base    = url.rstrip("/") + "/api/v1"
         self._headers = {"X-API-Key": api_key}
 
@@ -48,7 +48,7 @@ class HoodwinkProvider(BaseProvider):
         }
 
     async def get_history(self, symbol: str, timeframe: str = "1Day", limit: int = 252, start: str | None = None, end: str | None = None) -> list[dict[str, Any]]:
-        # Map CrystalBall timeframe → Hoodwink interval/span
+        # Map CrystalBall timeframe → Hoodlink interval/span
         interval_map = {
             "1Min": ("5minute", "day"),
             "5Min": ("5minute", "week"),
