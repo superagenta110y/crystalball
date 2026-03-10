@@ -875,14 +875,14 @@ export function ChartWidget({
               className={`px-1.5 py-0.5 rounded text-xs font-mono transition ${
                 tf === timeframe
                   ? "bg-accent/20 text-accent font-semibold"
-                  : "text-neutral-500 hover:text-white"}`}>
+                  : "text-neutral-500 hover:text-white hover:bg-surface-overlay"}`}>
               {tf}
             </button>
           ))}
         </div>
 
         <details className="relative">
-          <summary className="list-none cursor-pointer px-1 py-0.5 text-xs text-neutral-500 hover:text-white relative">
+          <summary className="list-none cursor-pointer px-1 py-0.5 text-xs text-neutral-500 hover:text-white hover:bg-surface-overlay rounded relative">
             <SlidersHorizontal size={13} />
             {enabledCount > 0 && <span className="absolute -top-1 -right-2 text-[9px] leading-none px-1 py-0.5 rounded-full bg-accent !text-white border border-accent">{enabledCount}</span>}
           </summary>

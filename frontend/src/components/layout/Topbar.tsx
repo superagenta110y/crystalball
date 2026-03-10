@@ -188,9 +188,9 @@ export function Topbar() {
             <div className="absolute right-0 top-full mt-1 w-56 bg-surface-raised rounded-xl shadow-2xl z-50 overflow-visible pop-in">
               <div className="px-3 py-2 text-xs text-neutral-500 uppercase tracking-widest border-b border-surface-border">Style</div>
               <div className="py-3 px-3 flex flex-col gap-4">
-                <div className="flex flex-col gap-1.5 relative">
+                <div className="inline-flex flex-col items-start gap-1.5 relative">
                   <span className="text-xs text-neutral-500">Theme</span>
-                  <button onClick={() => setShowThemeMenu(v=>!v)} className="inline-flex w-auto min-w-[56px] items-center justify-between gap-2 px-2 py-2 rounded-lg hover:bg-surface-overlay">
+                  <button onClick={() => setShowThemeMenu(v=>!v)} className="inline-flex w-auto items-center justify-between gap-2 px-2 py-2 rounded-lg hover:bg-surface-overlay">
                     {(() => { const cur = THEME_MODES.find(m => m.id === theme.mode) || THEME_MODES[0]; const Icon = cur.Icon; return <Icon size={15} />; })()}
                     <ChevronDown size={12} className={`transition ${showThemeMenu ? "rotate-180" : ""}`} />
                   </button>
@@ -220,7 +220,7 @@ export function Topbar() {
                   <AppColorPicker value={theme.bear} onChange={(v) => setTheme({ bear: v })} swatchClassName="w-8 h-8" />
                 </div>
 
-                <button onClick={() => setTheme(DEFAULT_THEME)} className="w-full py-1.5 text-xs text-neutral-500 hover:text-white border border-surface-border rounded-lg transition">Reset</button>
+                <button onClick={() => setTheme(DEFAULT_THEME)} className="w-full py-1.5 text-xs text-neutral-500 hover:text-white hover:bg-surface-overlay rounded-lg transition">Reset</button>
               </div>
             </div>
           )}
