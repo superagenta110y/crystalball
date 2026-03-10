@@ -21,10 +21,10 @@ const WIDGET_LIST: { id: WidgetType; label: string }[] = [
   { id: "screener",       label: "Screener" },
 ];
 
-const THEME_MODES: { id: ThemeMode; label: string; Icon: React.ElementType }[] = [
-  { id: "dark",  label: "Dark",  Icon: Moon    },
-  { id: "light", label: "Light", Icon: Sun     },
-  { id: "auto",  label: "Auto",  Icon: Monitor },
+const THEME_MODES: { id: ThemeMode; Icon: React.ElementType }[] = [
+  { id: "dark",  Icon: Moon    },
+  { id: "light", Icon: Sun     },
+  { id: "auto",  Icon: Monitor },
 ];
 
 
@@ -190,26 +190,26 @@ export function Topbar() {
                 <div className="flex flex-col gap-1.5">
                   <span className="text-xs text-neutral-500">Theme</span>
                   <div className="flex gap-1.5">
-                    {THEME_MODES.map(({ id, label, Icon }) => (
-                      <button key={id} onClick={() => setTheme({ mode: id })} className={`flex-1 flex flex-col items-center gap-1 py-2.5 rounded-lg border text-xs transition ${theme.mode === id ? "border-accent/60 bg-accent/10 text-accent" : "border-surface-border text-neutral-500 hover:text-white hover:border-neutral-500"}`}>
-                        <Icon size={14} /><span>{label}</span>
+                    {THEME_MODES.map(({ id, Icon }) => (
+                      <button key={id} onClick={() => setTheme({ mode: id })} className={`flex-1 flex items-center justify-center py-2.5 rounded-lg border text-xs transition ${theme.mode === id ? "border-accent/60 bg-accent/10 text-accent" : "border-surface-border text-neutral-500 hover:text-white hover:border-neutral-500"}`}>
+                        <Icon size={15} />
                       </button>
                     ))}
                   </div>
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <div className="flex flex-col gap-0.5"><span className="text-xs text-neutral-400">Accent</span><span className="text-xs font-mono text-neutral-600">{theme.accent}</span></div>
+                  <div className="flex flex-col gap-0.5"><span className="text-xs text-neutral-400">Accent</span></div>
                   <AppColorPicker value={theme.accent} onChange={(v) => setTheme({ accent: v })} swatchClassName="w-8 h-8" />
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <div className="flex flex-col gap-0.5"><span className="text-xs text-neutral-400">Bull / Calls</span><span className="text-xs font-mono text-neutral-600">{theme.bull}</span></div>
+                  <div className="flex flex-col gap-0.5"><span className="text-xs text-neutral-400">Bull</span></div>
                   <AppColorPicker value={theme.bull} onChange={(v) => setTheme({ bull: v })} swatchClassName="w-8 h-8" />
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <div className="flex flex-col gap-0.5"><span className="text-xs text-neutral-400">Bear / Puts</span><span className="text-xs font-mono text-neutral-600">{theme.bear}</span></div>
+                  <div className="flex flex-col gap-0.5"><span className="text-xs text-neutral-400">Bear</span></div>
                   <AppColorPicker value={theme.bear} onChange={(v) => setTheme({ bear: v })} swatchClassName="w-8 h-8" />
                 </div>
 

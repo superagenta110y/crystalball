@@ -181,7 +181,7 @@ export function ChartWidget({
     }
     if (extShadeRef.current) {
       extShadeRef.current.applyOptions({
-        topColor: theme.mode === "light" ? "rgba(115,115,115,0.16)" : "rgba(64,64,64,0.22)",
+        topColor: theme.mode === "light" ? "rgba(115,115,115,0.18)" : "rgba(120,120,120,0.34)",
         bottomColor: "rgba(0,0,0,0)",
       });
     }
@@ -255,7 +255,7 @@ export function ChartWidget({
         priceScaleId: "session-bg",
         lineColor: "transparent",
         lineWidth: 1,
-        topColor: theme.mode === "light" ? "rgba(115,115,115,0.16)" : "rgba(64,64,64,0.22)",
+        topColor: theme.mode === "light" ? "rgba(115,115,115,0.18)" : "rgba(120,120,120,0.34)",
         bottomColor: "rgba(0,0,0,0)",
         priceLineVisible: false,
         lastValueVisible: false,
