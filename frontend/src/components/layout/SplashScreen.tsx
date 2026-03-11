@@ -7,16 +7,7 @@ export function SplashScreen() {
   const [phase, setPhase] = useState<"in" | "visible" | "out" | "gone">("in");
 
   useEffect(() => {
-    const key = "crystalball-splash-seen";
-    try {
-      if (sessionStorage.getItem(key) === "1") {
-        setPhase("gone");
-        return;
-      }
-      sessionStorage.setItem(key, "1");
-    } catch {
-      // If sessionStorage is unavailable, fall back to normal behavior
-    }
+    // Always show on app load (restored legacy behavior)
 
     // Fade in complete → mark visible
     const t1 = setTimeout(() => setPhase("visible"), 50);
