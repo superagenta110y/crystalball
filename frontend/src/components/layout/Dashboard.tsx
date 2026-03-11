@@ -277,7 +277,7 @@ export default function Dashboard() {
     return Array.from(uniq.values()).sort((a, b) => b.area - a.area).slice(0, 6).map(({ area, ...r }) => r);
   }, []);
 
-  const handleDrag = useCallback((layout: Layout[], _oldItem: Layout, _newItem: Layout, _placeholder: Layout, e: MouseEvent) => {
+  const handleDrag = useCallback((layout: Layout[], _oldItem: Layout, newItem: Layout, _placeholder: Layout, e: MouseEvent) => {
     if (!width || !height) return;
     const zone = detectSnapZone(
       e.clientX,
@@ -297,16 +297,18 @@ export default function Dashboard() {
       setActiveGapId(hit?.id || null);
     }
 
-    // Side-split target preview: drop into left/right half of wide tile.
-    const wideTarget = layout.find(it => it.w >= 10 && gy >= it.y && gy <= (it.y + it.h) && gx >= it.x && gx <= (it.x + it.w));
-    if (wideTarget) {
-      const rel = (gx - wideTarget.x) / Math.max(1, wideTarget.w);
-      if (rel <= 0.45) setSideSplitTarget({ targetId: wideTarget.i, side: "left" });
-      else if (rel >= 0.55) setSideSplitTarget({ targetId: wideTarget.i, side: "right" });
-      else setSideSplitTarget(null);
-    } else {
-      setSideSplitTarget(null);
+    // Side-split target preview: show when cursor aligns with left/right half of wide tile.
+    const wideCandidates = layout.filter(it => it.i !== newItem.i && it.w >= 10);
+    let hit: { targetId: string; side: "left" | "right" } | null = null;
+    for (const t of wideCandidates) {
+      const yNear = gy >= (t.y - 1) && gy <= (t.y + t.h + 1);
+      const xNear = gx >= (t.x - 0.75) && gx <= (t.x + t.w + 0.75);
+      if (!yNear || !xNear) continue;
+      const rel = (gx - t.x) / Math.max(1, t.w);
+      if (rel <= 0.48) { hit = { targetId: t.i, side: "left" }; break; }
+      if (rel >= 0.52) { hit = { targetId: t.i, side: "right" }; break; }
     }
+    setSideSplitTarget(hit);
   }, [width, height, detectSnapZone, gapTargets]);
 
   const handleDragStop = useCallback((newLayout: Layout[], _oldItem: Layout, newItem: Layout) => {

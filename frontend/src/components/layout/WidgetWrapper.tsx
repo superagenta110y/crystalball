@@ -41,6 +41,7 @@ export function WidgetWrapper({ instance, onRemove, onToggleZoom, isZoomed, chil
         <div className="widget-header widget-drag-handle cursor-grab active:cursor-grabbing select-none">
           <div className="flex items-center gap-1.5">
             <GripHorizontal size={11} className="opacity-30" />
+            <span className="hidden sm:inline">{label.full}</span><span className="sm:hidden">{label.mobile}</span>
             {instance.type === "newsfeed" && (
               <input
                 value={instance.config.symbol || ""}
@@ -50,7 +51,6 @@ export function WidgetWrapper({ instance, onRemove, onToggleZoom, isZoomed, chil
                 className="cb-input bg-transparent border border-neutral-500/70 rounded px-2 py-0.5 text-[11px] font-mono w-16 hover:bg-surface-overlay/40"
               />
             )}
-            <span className="hidden sm:inline">{label.full}</span><span className="sm:hidden">{label.mobile}</span>
             {instance.type === "screener" && (
               <button onMouseDown={(e) => e.stopPropagation()} onClick={() => window.dispatchEvent(new Event("screener:toggle-filters"))} className="opacity-100 sm:opacity-0 sm:group-hover/widget:opacity-100 transition p-1 rounded hover:bg-surface-overlay" title="Filters"><Filter size={12} /></button>
             )}
