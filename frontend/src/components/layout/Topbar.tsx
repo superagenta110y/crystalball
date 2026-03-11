@@ -229,10 +229,10 @@ export function Topbar() {
           )}
         </div>
 
-        <Link href="/settings" className="p-1.5 rounded-md hover:bg-surface-overlay [color:var(--text-primary)] transition inline-flex items-center gap-1.5" title="Settings">
+        <button onClick={() => window.dispatchEvent(new Event('settings:open'))} className="p-1.5 rounded-md hover:bg-surface-overlay [color:var(--text-primary)] transition inline-flex items-center gap-1.5" title="Settings">
           <Settings size={15} />
           <span className="hidden sm:inline text-xs">Settings</span>
-        </Link>
+        </button>
         <button onClick={() => window.dispatchEvent(new Event('assistant:open'))} className="p-1.5 rounded-md hover:bg-surface-overlay [color:var(--text-primary)] transition inline-flex items-center gap-1.5" title="Chat">
           <MessageCircle size={15} />
           <span className="hidden sm:inline text-xs">Chat</span>

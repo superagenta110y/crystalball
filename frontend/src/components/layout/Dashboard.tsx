@@ -9,6 +9,7 @@ import { Topbar } from "./Topbar";
 import { WidgetWrapper } from "./WidgetWrapper";
 import { TabBar } from "./TabBar";
 import { AssistantFab } from "./AssistantFab";
+import { SettingsModal } from "./SettingsModal";
 
 import { OrderFlowWidget }     from "@/components/widgets/OrderFlowWidget";
 import { OpenInterestWidget }  from "@/components/widgets/OpenInterestWidget";
@@ -697,6 +698,7 @@ export default function Dashboard() {
         </main>
       )}
       <AssistantFab />
+      <SettingsModal />
     </div>
   );
 }
