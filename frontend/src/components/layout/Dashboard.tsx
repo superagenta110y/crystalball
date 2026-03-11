@@ -18,9 +18,7 @@ import { GEXWidget }           from "@/components/widgets/GEXWidget";
 import { DEXWidget }           from "@/components/widgets/DEXWidget";
 import { ChartWidget }         from "@/components/widgets/ChartWidget";
 import { NewsFeedWidget }      from "@/components/widgets/NewsFeedWidget";
-import { BloombergTVWidget }   from "@/components/widgets/BloombergTVWidget";
-
-import { MarketReportWidget }  from "@/components/widgets/MarketReportWidget";
+import { OptionsLadderWidget } from "@/components/widgets/OptionsLadderWidget";
 import { ScreenerWidget }      from "@/components/widgets/ScreenerWidget";
 
 import { useDashboardStore, type WidgetInstance, type WidgetType } from "@/lib/store/dashboardStore";
@@ -70,9 +68,8 @@ function renderWidget({ instance, resolvedSymbol, isGlobalOverride, onConfigChan
     case "gex":          return <GEXWidget symbol={resolvedSymbol} isGlobalOverride={isGlobalOverride} config={config} onConfigChange={onConfigChange} />;
     case "dex":          return <DEXWidget symbol={resolvedSymbol} isGlobalOverride={isGlobalOverride} config={config} onConfigChange={onConfigChange} />;
     case "newsfeed":     return <NewsFeedWidget globalSymbol={resolvedSymbol} config={config} onConfigChange={onConfigChange} />;
-    case "bloomberg":    return <BloombergTVWidget />;
+    case "optionsladder":return <OptionsLadderWidget symbol={resolvedSymbol} isGlobalOverride={isGlobalOverride} config={config} onConfigChange={onConfigChange} />;
     case "ai":           return <div className="p-3 text-xs text-neutral-500">AI Assistant moved to the bottom-right assistant button.</div>;
-    case "report":       return <MarketReportWidget symbol={resolvedSymbol} />;
     case "screener":     return <ScreenerWidget />;
     default:             return <div className="p-4 text-xs text-neutral-600">Unknown: {type}</div>;
   }
@@ -80,7 +77,7 @@ function renderWidget({ instance, resolvedSymbol, isGlobalOverride, onConfigChan
 
 // Mobile widget type groups
 const MAIN_TYPES: WidgetType[] = ["chart"];
-const SUB_TYPES:  WidgetType[] = ["gex","dex","openinterest","openinterest3d","orderflow","newsfeed","bloomberg","report","screener"];
+const SUB_TYPES:  WidgetType[] = ["gex","dex","openinterest","openinterest3d","orderflow","newsfeed","optionsladder","screener"];
 
 // ─── Mobile swipe layout ─────────────────────────────────────────────────────
 

@@ -6,11 +6,11 @@ import type { Layout } from "react-grid-layout";
 
 export type WidgetType =
   | "chart" | "orderflow" | "openinterest" | "openinterest3d"
-  | "gex" | "dex" | "newsfeed" | "bloomberg" | "ai" | "report" | "screener";
+  | "gex" | "dex" | "newsfeed" | "optionsladder" | "ai" | "screener";
 
 // Widget types that accept a per-widget symbol override (and global)
 export const SYMBOL_WIDGET_TYPES: WidgetType[] = [
-  "chart", "orderflow", "openinterest", "openinterest3d", "gex", "dex",
+  "chart", "orderflow", "openinterest", "openinterest3d", "gex", "dex", "optionsladder",
 ];
 // NewsFeed respects global[0] but has no per-widget input
 
@@ -102,7 +102,7 @@ function makeMainTab(): DashboardTab {
     makeWidget("openinterest"),
     makeWidget("dex"),
     makeWidget("newsfeed"),
-    makeWidget("report"),
+    makeWidget("optionsladder"),
     makeWidget("screener"),
   ];
   return { id: uuid(), name: "Main", layout: makeDefaultLayout(widgets), widgets, globalSymbols: [] };

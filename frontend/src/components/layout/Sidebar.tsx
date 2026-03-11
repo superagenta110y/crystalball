@@ -3,7 +3,7 @@
 import React from "react";
 import {
   BarChart2, Activity, Layers, TrendingUp, TrendingDown,
-  CandlestickChart, Newspaper, Tv, FileText, ScanSearch
+  CandlestickChart, Newspaper, ScanSearch, ListOrdered
 } from "lucide-react";
 
 const WIDGETS = [
@@ -11,11 +11,10 @@ const WIDGETS = [
   { id: "orderflow",    label: "Order Flow",      icon: Activity,         desc: "Buy/sell bubble chart" },
   { id: "openinterest", label: "Open Interest",   icon: BarChart2,        desc: "OI by strike" },
   { id: "openinterest3d",label: "OI Grid",        icon: Layers,           desc: "Net OI skew grid by strike/expiry" },
-  { id: "gex",          label: "GEX",             icon: TrendingUp,       desc: "Gamma exposure levels" },
-  { id: "dex",          label: "DEX",             icon: TrendingDown,     desc: "Delta exposure" },
+  { id: "gex",          label: "Gamma Exposure",  icon: TrendingUp,       desc: "Gamma exposure levels" },
+  { id: "dex",          label: "Delta Exposure",  icon: TrendingDown,     desc: "Delta exposure" },
   { id: "newsfeed",     label: "News Feed",       icon: Newspaper,        desc: "Real-time market news" },
-  { id: "bloomberg",    label: "Bloomberg TV",    icon: Tv,               desc: "Live stream embed" },
-  { id: "report",       label: "Market Report",   icon: FileText,         desc: "Daily SPY/QQQ bias" },
+  { id: "optionsladder",label: "Options Ladder",  icon: ListOrdered,      desc: "Single-expiration calls/puts ladder" },
   { id: "screener",     label: "Screener",        icon: ScanSearch,       desc: "Realtime filtered ticker table" },
 ];
 

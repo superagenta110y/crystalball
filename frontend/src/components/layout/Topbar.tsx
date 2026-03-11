@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Plus, Palette, ChevronDown, Settings, MessageCircle, Moon, Sun, Monitor, X } from "lucide-react";
 import Link from "next/link";
+
 import { useDashboardStore, type WidgetType, type ThemeMode, DEFAULT_THEME } from "@/lib/store/dashboardStore";
 import { AppColorPicker } from "@/components/ui/AppColorPicker";
 
@@ -13,11 +14,10 @@ const WIDGET_LIST: { id: WidgetType; label: string }[] = [
   { id: "orderflow",      label: "Order Flow" },
   { id: "openinterest",   label: "Open Interest" },
   { id: "openinterest3d", label: "OI Grid" },
-  { id: "gex",            label: "GEX" },
-  { id: "dex",            label: "DEX" },
+  { id: "gex",            label: "Gamma Exposure" },
+  { id: "dex",            label: "Delta Exposure" },
   { id: "newsfeed",       label: "News Feed" },
-  { id: "bloomberg",      label: "Bloomberg TV" },
-  { id: "report",         label: "Market Report" },
+  { id: "optionsladder",  label: "Options Ladder" },
   { id: "screener",       label: "Screener" },
 ];
 
