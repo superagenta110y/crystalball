@@ -162,6 +162,7 @@ export default function Dashboard() {
   const [resizeDebugEdges, setResizeDebugEdges] = useState<Record<string, string[]>>({});
   const [gapTargets, setGapTargets] = useState<Array<{ id: string; x: number; y: number; w: number; h: number }>>([]);
   const [activeGapId, setActiveGapId] = useState<string | null>(null);
+  const [sideSplitTarget, setSideSplitTarget] = useState<{ targetId: string; side: "left" | "right" } | null>(null);
 
   // Hydrate tab/zoom from URL
   useEffect(() => {
@@ -288,11 +289,23 @@ export default function Dashboard() {
     lastZoneRef.current = zone;
     setSnapZone(zone);
 
+    const gx = ((e.clientX - PADDING) / Math.max(1, width - PADDING * 2)) * 12;
+    const gy = ((e.clientY - (TOPBAR_H + TABBAR_H) - PADDING) / Math.max(1, height - TOPBAR_H - TABBAR_H - PADDING * 2)) * Math.max(12, ...layout.map(it => it.y + it.h));
+
     if (gapTargets.length) {
-      const gx = ((e.clientX - PADDING) / Math.max(1, width - PADDING * 2)) * 12;
-      const gy = ((e.clientY - (TOPBAR_H + TABBAR_H) - PADDING) / Math.max(1, height - TOPBAR_H - TABBAR_H - PADDING * 2)) * Math.max(12, ...layout.map(it => it.y + it.h));
       const hit = gapTargets.find(g => gx >= g.x && gx <= g.x + g.w && gy >= g.y && gy <= g.y + g.h);
       setActiveGapId(hit?.id || null);
+    }
+
+    // Side-split target preview: drop into left/right half of wide tile.
+    const wideTarget = layout.find(it => it.w >= 10 && gy >= it.y && gy <= (it.y + it.h) && gx >= it.x && gx <= (it.x + it.w));
+    if (wideTarget) {
+      const rel = (gx - wideTarget.x) / Math.max(1, wideTarget.w);
+      if (rel <= 0.45) setSideSplitTarget({ targetId: wideTarget.i, side: "left" });
+      else if (rel >= 0.55) setSideSplitTarget({ targetId: wideTarget.i, side: "right" });
+      else setSideSplitTarget(null);
+    } else {
+      setSideSplitTarget(null);
     }
   }, [width, height, detectSnapZone, gapTargets]);
 
@@ -314,33 +327,25 @@ export default function Dashboard() {
     const maxRowsAllowed = Math.max(6, Math.floor((availablePx - MARGIN) / (minRowPx + MARGIN)));
     const halfH = Math.max(3, Math.floor(maxRowsAllowed / 2));
 
-    // Side-drop split: drop to left/right of a wide existing widget to create 50/50 pair.
-    if (!activeGap && !snapZone) {
+    // Side-drop split: explicit left/right-half target preview on wide tiles.
+    if (!activeGap && !snapZone && sideSplitTarget) {
       const dragged = l[idx];
-      const cX = dragged.x + dragged.w / 2;
-      const cY = dragged.y + dragged.h / 2;
-      const targetIdx = l.findIndex((it, i) => i !== idx && it.w >= 10 && cY >= it.y && cY <= (it.y + it.h));
+      const targetIdx = l.findIndex((it, i) => i !== idx && it.i === sideSplitTarget.targetId);
       if (targetIdx >= 0) {
         const t = l[targetIdx];
-        const leftZone = cX <= (t.x + t.w * 0.35);
-        const rightZone = cX >= (t.x + t.w * 0.65);
-        if (leftZone || rightZone) {
-          const half = Math.max(2, Math.floor(t.w / 2));
-          if (rightZone) {
-            // Keep target on left, place dragged on right.
-            t.w = half;
-            dragged.x = t.x + half;
-            dragged.w = Math.max(2, t.w);
-          } else {
-            // Place dragged on left, move target right.
-            dragged.x = t.x;
-            dragged.w = half;
-            t.x = t.x + half;
-            t.w = Math.max(2, half);
-          }
-          dragged.y = t.y;
-          dragged.h = t.h;
+        const half = Math.max(2, Math.floor(t.w / 2));
+        if (sideSplitTarget.side === "right") {
+          t.w = half;
+          dragged.x = t.x + half;
+          dragged.w = half;
+        } else {
+          dragged.x = t.x;
+          dragged.w = half;
+          t.x = t.x + half;
+          t.w = half;
         }
+        dragged.y = t.y;
+        dragged.h = t.h;
       }
     }
 
@@ -422,9 +427,10 @@ export default function Dashboard() {
     lastZoneRef.current = null;
     setSnapZone(null);
     setActiveGapId(null);
+    setSideSplitTarget(null);
     setGapTargets([]);
     updateLayout(activeTabId, l);
-  }, [activeTabId, updateLayout, snapZone, height, gapTargets, activeGapId]);
+  }, [activeTabId, updateLayout, snapZone, height, gapTargets, activeGapId, sideSplitTarget]);
 
   const handleResize = useCallback((newLayout: Layout[], oldItem: Layout, newItem: Layout) => {
     const l = newLayout.map(it => ({ ...it }));
@@ -658,6 +664,23 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="relative h-full">
+              {sideSplitTarget && (() => {
+                const t = layout.find(it => it.i === sideSplitTarget.targetId);
+                if (!t) return null;
+                const leftPct = (t.x / 12) * 100;
+                const wPct = (t.w / 12) * 100;
+                const halfPct = wPct / 2;
+                return (
+                  <div className="absolute z-41 pointer-events-none border-2 border-accent bg-accent/30 rounded-xl transition-all duration-100"
+                    style={{
+                      left: `calc(${sideSplitTarget.side === "left" ? leftPct : leftPct + halfPct}% + ${PADDING}px)`,
+                      width: `calc(${halfPct}% - ${PADDING * 2}px)`,
+                      top: `${PADDING + (t.y * (rowHeight + MARGIN))}px`,
+                      height: `${Math.max(12, t.h * rowHeight + (t.h - 1) * MARGIN)}px`,
+                    }}
+                  />
+                );
+              })()}
               {snapZone && (
                 <div className={`absolute z-40 pointer-events-none border-2 border-accent bg-accent/35 rounded-xl shadow-[inset_0_0_0_1px_rgba(255,255,255,0.24)] backdrop-blur-[1px] transition-all duration-150
                   ${snapZone === "left" ? "left-0 top-0 h-full w-1/2" : ""}
@@ -677,7 +700,7 @@ export default function Dashboard() {
                 rowHeight={rowHeight}
                 width={gridWidth}
                 onLayoutChange={handleLayoutChange}
-                onDragStart={(layout:any, oldItem:any) => { setGapTargets(computeGapTargets(layout as Layout[], oldItem?.i)); setActiveGapId(null); }}
+                onDragStart={(layout:any, oldItem:any) => { setGapTargets(computeGapTargets(layout as Layout[], oldItem?.i)); setActiveGapId(null); setSideSplitTarget(null); }}
                 onDrag={handleDrag as any}
                 onDragStop={handleDragStop}
                 onResizeStart={() => setResizeDebugEdges({})}
