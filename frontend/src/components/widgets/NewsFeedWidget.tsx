@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 
 interface NewsItem {
   id: string;
@@ -11,8 +11,6 @@ interface NewsItem {
   created_at?: string;
   symbols?: string[];
 }
-
-type SymbolItem = { symbol: string; name?: string };
 
 interface NewsFeedWidgetProps {
   globalSymbol?: string;
@@ -27,37 +25,7 @@ export function NewsFeedWidget({ globalSymbol = "SPY", config, onConfigChange }:
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [filterSymbol, setFilterSymbol] = useState((config?.newsSymbol || "").toUpperCase());
-  const [draft, setDraft] = useState((config?.newsSymbol || "").toUpperCase());
-  const [symItems, setSymItems] = useState<SymbolItem[]>([]);
-  const [symOpen, setSymOpen] = useState(false);
-  const symRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const s = (config?.newsSymbol || "").toUpperCase();
-    setFilterSymbol(s);
-    setDraft(s);
-  }, [config?.newsSymbol]);
-
-  useEffect(() => {
-    const onDoc = (e: MouseEvent) => {
-      if (symRef.current && !symRef.current.contains(e.target as Node)) setSymOpen(false);
-    };
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, []);
-
-  useEffect(() => {
-    const q = draft.trim();
-    if (!q) { setSymItems([]); return; }
-    const t = setTimeout(() => {
-      fetch(`${API}/api/market/symbols?q=${encodeURIComponent(q)}&limit=10`)
-        .then(r => r.json())
-        .then(d => setSymItems(d?.items || []))
-        .catch(() => setSymItems([]));
-    }, 100);
-    return () => clearTimeout(t);
-  }, [draft]);
+  const filterSymbol = (config?.symbol || config?.newsSymbol || "").toUpperCase();
 
   useEffect(() => {
     let cancel = false;
@@ -87,44 +55,9 @@ export function NewsFeedWidget({ globalSymbol = "SPY", config, onConfigChange }:
     return () => { cancel = true; clearInterval(t); };
   }, [filterSymbol, globalSymbol]);
 
-  const selectSymbol = (s: string) => {
-    const v = s.toUpperCase();
-    setDraft(v);
-    setFilterSymbol(v);
-    onConfigChange?.({ newsSymbol: v });
-    setSymOpen(false);
-  };
-
-  const clearFilter = () => {
-    setDraft("");
-    setFilterSymbol("");
-    onConfigChange?.({ newsSymbol: "" });
-  };
-
   return (
     <div className="h-full w-full overflow-hidden flex flex-col relative">
-      <div className="absolute top-1 right-1 z-30 flex items-center gap-1" ref={symRef}>
-        <input
-          value={draft}
-          onChange={(e) => { setDraft(e.target.value.toUpperCase()); setSymOpen(true); }}
-          onFocus={() => setSymOpen(true)}
-          placeholder="All symbols"
-          className="cb-input bg-transparent border border-neutral-500/70 rounded px-2 py-0.5 text-xs font-mono w-24 hover:bg-surface-overlay/40"
-        />
-        {filterSymbol && <button onClick={clearFilter} className="p-1 rounded text-neutral-500 hover:text-white hover:bg-surface-overlay">✕</button>}
-        {symOpen && symItems.length > 0 && (
-          <div className="absolute right-0 top-7 z-50 w-56 rounded-md bg-surface-raised shadow-xl max-h-64 overflow-auto pop-in">
-            {symItems.map((it) => (
-              <button key={it.symbol} onClick={() => selectSymbol(it.symbol)} className="w-full text-left px-2 py-1.5 hover:bg-surface-overlay">
-                <div className="text-xs font-mono text-white">{it.symbol}</div>
-                <div className="text-[10px] text-neutral-500 truncate">{it.name || ""}</div>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="flex-1 min-h-0 overflow-auto p-2 pt-8 space-y-2">
+      <div className="flex-1 min-h-0 overflow-auto p-2 space-y-2">
         {loading && (
           <div className="text-xs text-neutral-600 animate-pulse">Loading news…</div>
         )}

@@ -191,6 +191,12 @@ export function ChartWidget({
         }))
       );
     }
+    if (extShadeRef.current) {
+      extShadeRef.current.applyOptions({
+        topColor: theme.mode === "light" ? "rgba(115,115,115,0.18)" : "rgba(120,120,120,0.34)",
+        bottomColor: "rgba(0,0,0,0)",
+      });
+    }
     chartRef.current.applyOptions({
       grid: { vertLines: { color: gridLine }, horzLines: { color: gridLine } },
       layout: { textColor: axisText },
@@ -258,8 +264,12 @@ export function ChartWidget({
         priceLineVisible: false,
         lastValueVisible: false,
       });
-      const extShadeSeries = chart.addHistogramSeries({
+      const extShadeSeries = chart.addAreaSeries({
         priceScaleId: "session-bg",
+        lineColor: "transparent",
+        lineWidth: 1,
+        topColor: theme.mode === "light" ? "rgba(115,115,115,0.18)" : "rgba(120,120,120,0.34)",
+        bottomColor: "rgba(0,0,0,0)",
         priceLineVisible: false,
         lastValueVisible: false,
       });
@@ -529,10 +539,22 @@ export function ChartWidget({
       return pre || post;
     };
 
-    const shade = theme.mode === "light" ? "rgba(115,115,115,0.18)" : "rgba(120,120,120,0.34)";
-    extShadeRef.current.setData(
-      bars.map((b) => ({ time: b.time, value: isExt(b.time) ? 1 : 0, color: isExt(b.time) ? shade : "rgba(0,0,0,0)" }))
-    );
+    const tfSecMap: Record<string, number> = {
+      "1s": 1, "5s": 5, "1m": 60, "5m": 300, "15m": 900, "30m": 1800,
+      "1h": 3600, "4h": 14400, "1d": 86400, "1w": 604800,
+    };
+    const eps = Math.max(1, Math.floor((tfSecMap[timeframe] || 60) / 100));
+    const pts: Array<{ time: number; value: number }> = [];
+    let prev: number | null = null;
+    for (const b of bars) {
+      const cur = isExt(b.time) ? 1 : 0;
+      if (prev !== null && cur !== prev) {
+        pts.push({ time: Math.max(0, b.time - eps), value: prev });
+      }
+      pts.push({ time: b.time, value: cur });
+      prev = cur;
+    }
+    extShadeRef.current.setData(pts);
   }, [timeframe, theme.mode]);
 
   useEffect(() => {

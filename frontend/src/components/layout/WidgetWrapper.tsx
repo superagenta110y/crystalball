@@ -1,6 +1,7 @@
 "use client";
 import React from "react";
 import { X, GripHorizontal, Maximize2, Minimize2, Filter } from "lucide-react";
+import { useDashboardStore } from "@/lib/store/dashboardStore";
 import type { WidgetInstance } from "@/lib/store/dashboardStore";
 
 const WIDGET_LABELS: Record<string, { full: string; mobile: string }> = {
@@ -27,6 +28,7 @@ interface WidgetWrapperProps {
 
 export function WidgetWrapper({ instance, onRemove, onToggleZoom, isZoomed, children }: WidgetWrapperProps) {
   const label = WIDGET_LABELS[instance.type] ?? { full: instance.type, mobile: instance.type.slice(0, 5) };
+  const { activeTabId, updateWidgetConfig } = useDashboardStore();
   const [confirmRemove, setConfirmRemove] = React.useState(false);
   const inlineHeaderTypes = new Set(["chart", "gex", "dex", "openinterest", "openinterest3d", "orderflow"]);
   const disableZoomTypes = new Set(["openinterest"]);
@@ -39,6 +41,15 @@ export function WidgetWrapper({ instance, onRemove, onToggleZoom, isZoomed, chil
         <div className="widget-header widget-drag-handle cursor-grab active:cursor-grabbing select-none">
           <div className="flex items-center gap-1.5">
             <GripHorizontal size={11} className="opacity-30" />
+            {instance.type === "newsfeed" && (
+              <input
+                value={instance.config.symbol || ""}
+                onMouseDown={(e) => e.stopPropagation()}
+                onChange={(e) => updateWidgetConfig(activeTabId, instance.id, { symbol: e.target.value.toUpperCase() })}
+                placeholder="All"
+                className="cb-input bg-transparent border border-neutral-500/70 rounded px-2 py-0.5 text-[11px] font-mono w-16 hover:bg-surface-overlay/40"
+              />
+            )}
             <span className="hidden sm:inline">{label.full}</span><span className="sm:hidden">{label.mobile}</span>
             {instance.type === "screener" && (
               <button onMouseDown={(e) => e.stopPropagation()} onClick={() => window.dispatchEvent(new Event("screener:toggle-filters"))} className="opacity-100 sm:opacity-0 sm:group-hover/widget:opacity-100 transition p-1 rounded hover:bg-surface-overlay" title="Filters"><Filter size={12} /></button>
