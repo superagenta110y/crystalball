@@ -158,6 +158,7 @@ export default function Dashboard() {
   const widgets  = tab?.widgets ?? [];
   const isMobile = (width ?? 0) < 768;
   const [zoomedWidgetId, setZoomedWidgetId] = useState<string | null>(null);
+  const [resizeDebugEdges, setResizeDebugEdges] = useState<Record<string, string[]>>({});
 
   // Hydrate tab/zoom from URL
   useEffect(() => {
@@ -346,6 +347,63 @@ export default function Dashboard() {
     updateLayout(activeTabId, l);
   }, [activeTabId, updateLayout, snapZone, height]);
 
+  const handleResize = useCallback((newLayout: Layout[], oldItem: Layout, newItem: Layout) => {
+    const l = newLayout.map(it => ({ ...it }));
+    const idx = l.findIndex(it => it.i === newItem.i);
+    if (idx < 0) return;
+    const item = l[idx];
+    const oldRight = oldItem.x + oldItem.w;
+    const newRight = item.x + item.w;
+    const dx = newRight - oldRight;
+    const oldBottom = oldItem.y + oldItem.h;
+    const newBottom = item.y + item.h;
+    const dy = newBottom - oldBottom;
+    const overlapY = (a: Layout, b: Layout) => Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+    const overlapX = (a: Layout, b: Layout) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x));
+
+    const dbg: Record<string, string[]> = { [item.i]: [] };
+
+    if (dx !== 0) {
+      dbg[item.i].push("right");
+      const moved = new Set<string>();
+      const queue: string[] = [];
+      for (const it of l) {
+        if (it.i !== item.i && it.x === oldRight && overlapY(it, oldItem) > 0) { moved.add(it.i); queue.push(it.i); }
+      }
+      while (queue.length) {
+        const id = queue.shift()!;
+        const cur = l.find(x => x.i === id); if (!cur) continue;
+        const curRight = cur.x + cur.w;
+        for (const nxt of l) {
+          if (nxt.i === item.i || moved.has(nxt.i)) continue;
+          if (nxt.x === curRight && overlapY(nxt, cur) > 0) { moved.add(nxt.i); queue.push(nxt.i); }
+        }
+      }
+      moved.forEach(id => { dbg[id] = [...(dbg[id] || []), "left"]; });
+    }
+
+    if (dy !== 0) {
+      dbg[item.i].push("bottom");
+      const moved = new Set<string>();
+      const queue: string[] = [];
+      for (const it of l) {
+        if (it.i !== item.i && it.y === oldBottom && overlapX(it, oldItem) > 0) { moved.add(it.i); queue.push(it.i); }
+      }
+      while (queue.length) {
+        const id = queue.shift()!;
+        const cur = l.find(x => x.i === id); if (!cur) continue;
+        const curBottom = cur.y + cur.h;
+        for (const nxt of l) {
+          if (nxt.i === item.i || moved.has(nxt.i)) continue;
+          if (nxt.y === curBottom && overlapX(nxt, cur) > 0) { moved.add(nxt.i); queue.push(nxt.i); }
+        }
+      }
+      moved.forEach(id => { dbg[id] = [...(dbg[id] || []), "top"]; });
+    }
+
+    setResizeDebugEdges(dbg);
+  }, []);
+
   const handleResizeStop = useCallback((newLayout: Layout[], oldItem: Layout, newItem: Layout) => {
     const l = newLayout.map(it => ({ ...it }));
     const idx = l.findIndex(it => it.i === newItem.i);
@@ -433,6 +491,7 @@ export default function Dashboard() {
       if (it.h < 3) it.h = 3;
     }
 
+    setResizeDebugEdges({});
     updateLayout(activeTabId, l);
   }, [activeTabId, updateLayout]);
 
@@ -541,6 +600,8 @@ export default function Dashboard() {
                 onLayoutChange={handleLayoutChange}
                 onDrag={handleDrag as any}
                 onDragStop={handleDragStop}
+                onResizeStart={() => setResizeDebugEdges({})}
+                onResize={handleResize as any}
                 onResizeStop={handleResizeStop as any}
                 draggableHandle=".widget-drag-handle"
                 margin={[MARGIN, MARGIN]}
@@ -551,7 +612,11 @@ export default function Dashboard() {
                 isResizable
               >
                 {widgets.map(instance => (
-                  <div key={instance.id} className="widget">
+                  <div key={instance.id} className="widget relative">
+                    {resizeDebugEdges[instance.id]?.includes("left") && <div className="absolute left-0 top-0 bottom-0 w-1 bg-accent/80 z-40 pointer-events-none" />}
+                    {resizeDebugEdges[instance.id]?.includes("right") && <div className="absolute right-0 top-0 bottom-0 w-1 bg-accent/80 z-40 pointer-events-none" />}
+                    {resizeDebugEdges[instance.id]?.includes("top") && <div className="absolute left-0 right-0 top-0 h-1 bg-accent/80 z-40 pointer-events-none" />}
+                    {resizeDebugEdges[instance.id]?.includes("bottom") && <div className="absolute left-0 right-0 bottom-0 h-1 bg-accent/80 z-40 pointer-events-none" />}
                     <WidgetWrapper
                       instance={instance}
                       onRemove={() => removeWidget(activeTabId, instance.id)}
