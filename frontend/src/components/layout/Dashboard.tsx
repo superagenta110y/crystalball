@@ -314,6 +314,36 @@ export default function Dashboard() {
     const maxRowsAllowed = Math.max(6, Math.floor((availablePx - MARGIN) / (minRowPx + MARGIN)));
     const halfH = Math.max(3, Math.floor(maxRowsAllowed / 2));
 
+    // Side-drop split: drop to left/right of a wide existing widget to create 50/50 pair.
+    if (!activeGap && !snapZone) {
+      const dragged = l[idx];
+      const cX = dragged.x + dragged.w / 2;
+      const cY = dragged.y + dragged.h / 2;
+      const targetIdx = l.findIndex((it, i) => i !== idx && it.w >= 10 && cY >= it.y && cY <= (it.y + it.h));
+      if (targetIdx >= 0) {
+        const t = l[targetIdx];
+        const leftZone = cX <= (t.x + t.w * 0.35);
+        const rightZone = cX >= (t.x + t.w * 0.65);
+        if (leftZone || rightZone) {
+          const half = Math.max(2, Math.floor(t.w / 2));
+          if (rightZone) {
+            // Keep target on left, place dragged on right.
+            t.w = half;
+            dragged.x = t.x + half;
+            dragged.w = Math.max(2, t.w);
+          } else {
+            // Place dragged on left, move target right.
+            dragged.x = t.x;
+            dragged.w = half;
+            t.x = t.x + half;
+            t.w = Math.max(2, half);
+          }
+          dragged.y = t.y;
+          dragged.h = t.h;
+        }
+      }
+    }
+
     if (!activeGap && snapZone) {
       if (snapZone === "left")      { l[idx].x = 0; l[idx].y = 0; l[idx].w = 6; l[idx].h = maxRowsAllowed; }
       if (snapZone === "right")     { l[idx].x = 6; l[idx].y = 0; l[idx].w = 6; l[idx].h = maxRowsAllowed; }
