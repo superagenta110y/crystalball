@@ -159,6 +159,8 @@ export default function Dashboard() {
   const isMobile = (width ?? 0) < 768;
   const [zoomedWidgetId, setZoomedWidgetId] = useState<string | null>(null);
   const [resizeDebugEdges, setResizeDebugEdges] = useState<Record<string, string[]>>({});
+  const [gapTargets, setGapTargets] = useState<Array<{ id: string; x: number; y: number; w: number; h: number }>>([]);
+  const [activeGapId, setActiveGapId] = useState<string | null>(null);
 
   // Hydrate tab/zoom from URL
   useEffect(() => {
@@ -244,7 +246,36 @@ export default function Dashboard() {
     return null;
   }, []);
 
-  const handleDrag = useCallback((_layout: Layout[], _oldItem: Layout, _newItem: Layout, _placeholder: Layout, e: MouseEvent) => {
+  const computeGapTargets = useCallback((layout: Layout[], ignoreId?: string) => {
+    const filtered = layout.filter(it => it.i !== ignoreId);
+    const maxY = Math.max(12, ...filtered.map(it => it.y + it.h));
+    const gaps: Array<{ id: string; x: number; y: number; w: number; h: number; area: number }> = [];
+    for (let y = 0; y < maxY; y++) {
+      for (let x = 0; x < 12; x++) {
+        const covered = filtered.some(o => !(x + 1 <= o.x || o.x + o.w <= x || y + 1 <= o.y || o.y + o.h <= y));
+        if (covered) continue;
+        let bestW = 0, bestH = 0, bestA = 0;
+        for (let w = 12 - x; w >= 2; w--) {
+          let h = 0;
+          while (y + h < maxY) {
+            const cand = { x, y, w, h: h + 1 };
+            const coll = filtered.some(o => !(cand.x + cand.w <= o.x || o.x + o.w <= cand.x || cand.y + cand.h <= o.y || o.y + o.h <= cand.y));
+            if (coll) break;
+            h++;
+          }
+          const a = w * h;
+          if (h >= 3 && a > bestA) { bestA = a; bestW = w; bestH = h; }
+        }
+        if (bestA > 0) gaps.push({ id: `g-${x}-${y}`, x, y, w: bestW, h: bestH, area: bestA });
+      }
+    }
+    // dedupe by exact rect and keep largest few meaningful targets
+    const uniq = new Map<string, { id: string; x: number; y: number; w: number; h: number; area: number }>();
+    for (const g of gaps) uniq.set(`${g.x}:${g.y}:${g.w}:${g.h}`, g);
+    return Array.from(uniq.values()).sort((a, b) => b.area - a.area).slice(0, 6).map(({ area, ...r }) => r);
+  }, []);
+
+  const handleDrag = useCallback((layout: Layout[], _oldItem: Layout, _newItem: Layout, _placeholder: Layout, e: MouseEvent) => {
     if (!width || !height) return;
     const zone = detectSnapZone(
       e.clientX,
@@ -255,19 +286,34 @@ export default function Dashboard() {
     );
     lastZoneRef.current = zone;
     setSnapZone(zone);
-  }, [width, height, detectSnapZone]);
+
+    if (gapTargets.length) {
+      const gx = ((e.clientX - PADDING) / Math.max(1, width - PADDING * 2)) * 12;
+      const gy = ((e.clientY - (TOPBAR_H + TABBAR_H) - PADDING) / Math.max(1, height - TOPBAR_H - TABBAR_H - PADDING * 2)) * Math.max(12, ...layout.map(it => it.y + it.h));
+      const hit = gapTargets.find(g => gx >= g.x && gx <= g.x + g.w && gy >= g.y && gy <= g.y + g.h);
+      setActiveGapId(hit?.id || null);
+    }
+  }, [width, height, detectSnapZone, gapTargets]);
 
   const handleDragStop = useCallback((newLayout: Layout[], _oldItem: Layout, newItem: Layout) => {
     const l = newLayout.map(it => ({ ...it }));
     const idx = l.findIndex(it => it.i === newItem.i);
     if (idx < 0) return updateLayout(activeTabId, newLayout);
 
+    const activeGap = gapTargets.find(g => g.id === activeGapId);
+    if (activeGap) {
+      l[idx].x = activeGap.x;
+      l[idx].y = activeGap.y;
+      l[idx].w = activeGap.w;
+      l[idx].h = activeGap.h;
+    }
+
     const availablePx = Math.max(120, (height ?? 900) - TOPBAR_H - TABBAR_H - PADDING * 2);
     const minRowPx = 6;
     const maxRowsAllowed = Math.max(6, Math.floor((availablePx - MARGIN) / (minRowPx + MARGIN)));
     const halfH = Math.max(3, Math.floor(maxRowsAllowed / 2));
 
-    if (snapZone) {
+    if (!activeGap && snapZone) {
       if (snapZone === "left")      { l[idx].x = 0; l[idx].y = 0; l[idx].w = 6; l[idx].h = maxRowsAllowed; }
       if (snapZone === "right")     { l[idx].x = 6; l[idx].y = 0; l[idx].w = 6; l[idx].h = maxRowsAllowed; }
       if (snapZone === "top")       { l[idx].x = 0; l[idx].y = 0; l[idx].w = 12; l[idx].h = halfH; }
@@ -344,8 +390,10 @@ export default function Dashboard() {
 
     lastZoneRef.current = null;
     setSnapZone(null);
+    setActiveGapId(null);
+    setGapTargets([]);
     updateLayout(activeTabId, l);
-  }, [activeTabId, updateLayout, snapZone, height]);
+  }, [activeTabId, updateLayout, snapZone, height, gapTargets, activeGapId]);
 
   const handleResize = useCallback((newLayout: Layout[], oldItem: Layout, newItem: Layout) => {
     const l = newLayout.map(it => ({ ...it }));
@@ -579,6 +627,16 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="relative h-full">
+              {gapTargets.map(g => (
+                <div key={g.id} className={`absolute z-30 pointer-events-none rounded-lg border transition-all ${activeGapId === g.id ? "border-accent bg-accent/35" : "border-accent/40 bg-accent/14"}`}
+                  style={{
+                    left: `calc(${(g.x / 12) * 100}% + ${PADDING}px)`,
+                    width: `calc(${(g.w / 12) * 100}% - ${PADDING * 2}px)`,
+                    top: `${PADDING + (g.y * (rowHeight + MARGIN))}px`,
+                    height: `${Math.max(12, g.h * rowHeight + (g.h - 1) * MARGIN)}px`,
+                  }}
+                />
+              ))}
               {snapZone && (
                 <div className={`absolute z-40 pointer-events-none border-2 border-accent bg-accent/35 rounded-xl shadow-[inset_0_0_0_1px_rgba(255,255,255,0.24)] backdrop-blur-[1px] transition-all duration-150
                   ${snapZone === "left" ? "left-0 top-0 h-full w-1/2" : ""}
@@ -598,6 +656,7 @@ export default function Dashboard() {
                 rowHeight={rowHeight}
                 width={gridWidth}
                 onLayoutChange={handleLayoutChange}
+                onDragStart={(layout:any, oldItem:any) => { setGapTargets(computeGapTargets(layout as Layout[], oldItem?.i)); setActiveGapId(null); }}
                 onDrag={handleDrag as any}
                 onDragStop={handleDragStop}
                 onResizeStart={() => setResizeDebugEdges({})}
