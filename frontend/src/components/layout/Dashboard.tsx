@@ -628,16 +628,6 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="relative h-full">
-              {gapTargets.map(g => (
-                <div key={g.id} className={`absolute z-30 pointer-events-none rounded-lg border transition-all ${activeGapId === g.id ? "border-accent bg-accent/35" : "border-accent/40 bg-accent/14"}`}
-                  style={{
-                    left: `calc(${(g.x / 12) * 100}% + ${PADDING}px)`,
-                    width: `calc(${(g.w / 12) * 100}% - ${PADDING * 2}px)`,
-                    top: `${PADDING + (g.y * (rowHeight + MARGIN))}px`,
-                    height: `${Math.max(12, g.h * rowHeight + (g.h - 1) * MARGIN)}px`,
-                  }}
-                />
-              ))}
               {snapZone && (
                 <div className={`absolute z-40 pointer-events-none border-2 border-accent bg-accent/35 rounded-xl shadow-[inset_0_0_0_1px_rgba(255,255,255,0.24)] backdrop-blur-[1px] transition-all duration-150
                   ${snapZone === "left" ? "left-0 top-0 h-full w-1/2" : ""}
