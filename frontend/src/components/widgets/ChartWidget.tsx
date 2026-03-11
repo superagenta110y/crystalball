@@ -191,12 +191,6 @@ export function ChartWidget({
         }))
       );
     }
-    if (extShadeRef.current) {
-      extShadeRef.current.applyOptions({
-        topColor: theme.mode === "light" ? "rgba(115,115,115,0.18)" : "rgba(120,120,120,0.34)",
-        bottomColor: "rgba(0,0,0,0)",
-      });
-    }
     chartRef.current.applyOptions({
       grid: { vertLines: { color: gridLine }, horzLines: { color: gridLine } },
       layout: { textColor: axisText },
@@ -264,12 +258,8 @@ export function ChartWidget({
         priceLineVisible: false,
         lastValueVisible: false,
       });
-      const extShadeSeries = chart.addAreaSeries({
+      const extShadeSeries = chart.addHistogramSeries({
         priceScaleId: "session-bg",
-        lineColor: "transparent",
-        lineWidth: 1,
-        topColor: theme.mode === "light" ? "rgba(115,115,115,0.18)" : "rgba(120,120,120,0.34)",
-        bottomColor: "rgba(0,0,0,0)",
         priceLineVisible: false,
         lastValueVisible: false,
       });
@@ -539,10 +529,11 @@ export function ChartWidget({
       return pre || post;
     };
 
+    const shade = theme.mode === "light" ? "rgba(115,115,115,0.18)" : "rgba(120,120,120,0.34)";
     extShadeRef.current.setData(
-      bars.map((b) => ({ time: b.time, value: isExt(b.time) ? 1 : 0 }))
+      bars.map((b) => ({ time: b.time, value: isExt(b.time) ? 1 : 0, color: isExt(b.time) ? shade : "rgba(0,0,0,0)" }))
     );
-  }, [timeframe]);
+  }, [timeframe, theme.mode]);
 
   useEffect(() => {
     const bars = Array.from(cacheRef.current.values()).sort((a,b)=>a.time-b.time);
