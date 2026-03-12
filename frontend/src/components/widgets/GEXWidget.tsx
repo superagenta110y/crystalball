@@ -77,9 +77,8 @@ export function GEXWidget({ symbol = "SPY", isGlobalOverride, config, onConfigCh
     if (allSelected) return "All";
     if (selectedExpirations.length === 0) return "None";
     if (selectedExpirations.length === 1) return selectedExpirations[0];
-    return `${selectedExpirations.length} selected`;
+    return `${selectedExpirations.length}`;
   }, [availableExpirations.length, allSelected, selectedExpirations]);
-  const expBadge = allSelected ? 0 : selectedExpirations.length;
 
   const toggleExpiration = (exp: string, checked: boolean) => {
     setSelectedExpirations(prev => {
@@ -107,7 +106,7 @@ export function GEXWidget({ symbol = "SPY", isGlobalOverride, config, onConfigCh
           <>
             <details className="relative">
               <summary className="list-none cursor-pointer text-xs text-neutral-300 relative">
-                <span className="relative inline-flex items-center"><CalendarDays size={12} />{expBadge > 0 && <span className="absolute -top-2 -right-2 text-[9px] w-4 h-4 inline-flex items-center justify-center rounded-full bg-accent !text-white border border-accent">{expBadge}</span>}</span>
+                <span className="inline-flex items-center gap-1"><CalendarDays size={12} /><span className="text-[11px] font-mono text-neutral-400">{expLabel}</span></span>
               </summary>
               <div className="absolute left-0 mt-1 z-20 w-52 max-h-64 overflow-auto rounded border border-surface-border bg-surface p-2 shadow-xl text-neutral-200">
                 <label className="flex items-center gap-2 text-xs py-1 border-b border-surface-border mb-1">
