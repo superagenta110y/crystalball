@@ -413,6 +413,7 @@ export default function Dashboard() {
     const halfH = Math.max(3, Math.floor(maxRowsAllowed / 2));
 
     // Side-drop split: explicit left/right-half target preview on wide tiles.
+    let usedSideSplit = false;
     if (!activeGap && !snapZone && sideSplitTarget) {
       const dragged = l[idx];
       const targetIdx = l.findIndex((it, i) => i !== idx && it.i === sideSplitTarget.targetId);
@@ -431,11 +432,23 @@ export default function Dashboard() {
         }
         dragged.y = t.y;
         dragged.h = t.h;
+        usedSideSplit = true;
       }
     }
 
+    const hasOverlap = (layoutIn: Layout[]) => {
+      for (let i = 0; i < layoutIn.length; i++) {
+        for (let j = i + 1; j < layoutIn.length; j++) {
+          const a = layoutIn[i], b = layoutIn[j];
+          const overlaps = !(a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y);
+          if (overlaps) return true;
+        }
+      }
+      return false;
+    };
+
     const zoneAtDrop = snapZone || lastZoneRef.current;
-    let shouldRetileOthers = false;
+    let shouldRetileOthers = usedSideSplit;
 
     if (!activeGap && zoneAtDrop) {
       if (zoneAtDrop === "left")      { l[idx].x = 0; l[idx].y = 0; l[idx].w = 6; l[idx].h = maxRowsAllowed; }
@@ -454,6 +467,9 @@ export default function Dashboard() {
       if (t.y + t.h > maxRowsAllowed) t.y = Math.max(0, maxRowsAllowed - t.h);
       shouldRetileOthers = l.some((it, i) => i !== idx && it.y + it.h > maxRowsAllowed);
     }
+
+    // Safety: if anything overlaps after drop/split, force a retile around the dropped anchor.
+    if (!shouldRetileOthers && hasOverlap(l)) shouldRetileOthers = true;
 
     if (shouldRetileOthers) {
       const anchor = l[idx];
