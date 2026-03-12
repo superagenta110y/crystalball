@@ -432,7 +432,7 @@ export default function Dashboard() {
   }, [activeTabId, updateLayout, snapZone, height, gapTargets, activeGapId, sideSplitTarget]);
 
   const handleResize = useCallback((newLayout: Layout[], oldItem: Layout, newItem: Layout) => {
-    const l = newLayout.map(it => ({ ...it }));
+    const l = newLayout as Layout[];
     const idx = l.findIndex(it => it.i === newItem.i);
     if (idx < 0) return;
     const item = l[idx];
@@ -450,39 +450,27 @@ export default function Dashboard() {
     if (dx !== 0) {
       dbg[item.i].push("right");
       const moved = new Set<string>();
-      const queue: string[] = [];
       for (const it of l) {
-        if (it.i !== item.i && it.x === oldRight && overlapY(it, oldItem) > 0) { moved.add(it.i); queue.push(it.i); }
-      }
-      while (queue.length) {
-        const id = queue.shift()!;
-        const cur = l.find(x => x.i === id); if (!cur) continue;
-        const curRight = cur.x + cur.w;
-        for (const nxt of l) {
-          if (nxt.i === item.i || moved.has(nxt.i)) continue;
-          if (nxt.x === curRight && overlapY(nxt, cur) > 0) { moved.add(nxt.i); queue.push(nxt.i); }
+        if (it.i !== item.i && it.x === oldRight && overlapY(it, oldItem) > 0) {
+          moved.add(it.i);
+          it.x += dx;
+          it.w = Math.max(2, it.w - dx); // preserve far edge, keep connected edge glued
         }
       }
-      moved.forEach(id => { dbg[id] = [...(dbg[id] || []), "left"]; });
+      moved.forEach(id => { dbg[id] = [...(dbg[id] || []), "left", "right"]; });
     }
 
     if (dy !== 0) {
       dbg[item.i].push("bottom");
       const moved = new Set<string>();
-      const queue: string[] = [];
       for (const it of l) {
-        if (it.i !== item.i && it.y === oldBottom && overlapX(it, oldItem) > 0) { moved.add(it.i); queue.push(it.i); }
-      }
-      while (queue.length) {
-        const id = queue.shift()!;
-        const cur = l.find(x => x.i === id); if (!cur) continue;
-        const curBottom = cur.y + cur.h;
-        for (const nxt of l) {
-          if (nxt.i === item.i || moved.has(nxt.i)) continue;
-          if (nxt.y === curBottom && overlapX(nxt, cur) > 0) { moved.add(nxt.i); queue.push(nxt.i); }
+        if (it.i !== item.i && it.y === oldBottom && overlapX(it, oldItem) > 0) {
+          moved.add(it.i);
+          it.y += dy;
+          it.h = Math.max(3, it.h - dy); // preserve lower edge while staying connected
         }
       }
-      moved.forEach(id => { dbg[id] = [...(dbg[id] || []), "top"]; });
+      moved.forEach(id => { dbg[id] = [...(dbg[id] || []), "top", "bottom"]; });
     }
 
     setResizeDebugEdges(dbg);
@@ -500,73 +488,27 @@ export default function Dashboard() {
     const oldBottom = oldItem.y + oldItem.h;
     const newBottom = item.y + item.h;
     const dy = newBottom - oldBottom;
-
     const overlapY = (a: Layout, b: Layout) => Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
     const overlapX = (a: Layout, b: Layout) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x));
 
-    // Propagate right-edge connection: any widget connected to resized right edge moves with it.
     if (dx !== 0) {
-      const moved = new Set<string>();
-      const queue: string[] = [];
-
-      // seed: directly connected to resized widget right edge
       for (const it of l) {
-        if (it.i === item.i) continue;
-        if (it.x === oldRight && overlapY(it, oldItem) > 0) {
-          queue.push(it.i);
-          moved.add(it.i);
+        if (it.i !== item.i && it.x === oldRight && overlapY(it, oldItem) > 0) {
+          it.x += dx;
+          it.w = Math.max(2, it.w - dx);
         }
-      }
-
-      while (queue.length) {
-        const id = queue.shift()!;
-        const cur = l.find(x => x.i === id);
-        if (!cur) continue;
-        const curRight = cur.x + cur.w;
-        for (const nxt of l) {
-          if (nxt.i === item.i || moved.has(nxt.i)) continue;
-          if (nxt.x === curRight && overlapY(nxt, cur) > 0) {
-            moved.add(nxt.i);
-            queue.push(nxt.i);
-          }
-        }
-      }
-
-      for (const it of l) {
-        if (moved.has(it.i)) it.x += dx;
       }
     }
 
-    // Propagate bottom-edge connection similarly for vertical resize.
     if (dy !== 0) {
-      const moved = new Set<string>();
-      const queue: string[] = [];
       for (const it of l) {
-        if (it.i === item.i) continue;
-        if (it.y === oldBottom && overlapX(it, oldItem) > 0) {
-          queue.push(it.i);
-          moved.add(it.i);
+        if (it.i !== item.i && it.y === oldBottom && overlapX(it, oldItem) > 0) {
+          it.y += dy;
+          it.h = Math.max(3, it.h - dy);
         }
-      }
-      while (queue.length) {
-        const id = queue.shift()!;
-        const cur = l.find(x => x.i === id);
-        if (!cur) continue;
-        const curBottom = cur.y + cur.h;
-        for (const nxt of l) {
-          if (nxt.i === item.i || moved.has(nxt.i)) continue;
-          if (nxt.y === curBottom && overlapX(nxt, cur) > 0) {
-            moved.add(nxt.i);
-            queue.push(nxt.i);
-          }
-        }
-      }
-      for (const it of l) {
-        if (moved.has(it.i)) it.y += dy;
       }
     }
 
-    // Clamp to dashboard bounds to avoid off-screen placement.
     for (const it of l) {
       if (it.x < 0) it.x = 0;
       if (it.w < 2) it.w = 2;
