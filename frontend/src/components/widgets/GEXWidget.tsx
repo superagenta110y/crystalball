@@ -74,7 +74,7 @@ export function GEXWidget({ symbol = "SPY", isGlobalOverride, config, onConfigCh
 
   const allSelected = availableExpirations.length > 0 && selectedExpirations.length === availableExpirations.length;
   const expLabel = useMemo(() => {
-    if (!availableExpirations.length) return "No expirations";
+    if (!availableExpirations.length) return "-";
     if (allSelected) return "All";
     if (selectedExpirations.length === 0) return "None";
     if (selectedExpirations.length === 1) return selectedExpirations[0];

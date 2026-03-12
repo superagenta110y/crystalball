@@ -105,7 +105,7 @@ export function OpenInterest3DWidget({ symbol = "SPY", isGlobalOverride, config,
 
   const allSelected = availableExpirations.length > 0 && selectedExpirations.length === availableExpirations.length;
   const expLabel = !availableExpirations.length
-    ? "No expirations"
+    ? "-"
     : allSelected
       ? "All"
       : selectedExpirations.length === 0
