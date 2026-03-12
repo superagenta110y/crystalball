@@ -1,12 +1,13 @@
 use axum::{
-    extract::{Path, Query, State, WebSocketUpgrade},
+    extract::{Path, Query, State, WebSocketUpgrade, ws::{WebSocket, Message}},
     response::IntoResponse,
     routing::{delete, get, post, put},
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
-use chrono::Utc;
+use chrono::{Utc, DateTime, FixedOffset};
+use futures_util::StreamExt;
 use tokio::sync::RwLock;
 use tower_http::{cors::CorsLayer, services::ServeDir, trace::TraceLayer};
 
@@ -392,7 +393,37 @@ async fn report_daily_bias(Path(_): Path<String>) -> String { "TODO: daily bias"
 async fn news_feed(Query(_q): Query<HashMap<String,String>>) -> Json<serde_json::Value> { Json(serde_json::json!([])) }
 async fn ai_status() -> Json<serde_json::Value> { Json(serde_json::json!({"configured": false})) }
 async fn ai_chat() -> Json<serde_json::Value> { Json(serde_json::json!({"reply":"TODO"})) }
-async fn screener_get(Query(_q): Query<HashMap<String,String>>) -> Json<serde_json::Value> { Json(serde_json::json!({"i":[],"t":0,"p":1,"ps":50})) }
+
+async fn screener_get(Query(q): Query<HashMap<String,String>>, State(s): State<AppState>) -> Json<serde_json::Value> {
+    let page = q.get("page").and_then(|x| x.parse::<usize>().ok()).unwrap_or(1).max(1);
+    let page_size = q.get("page_size").and_then(|x| x.parse::<usize>().ok()).unwrap_or(50).clamp(1, 200);
+    let universe = vec!["SPY","QQQ","IWM","AAPL","MSFT","NVDA","AMZN","GOOGL","META","TSLA","AMD","NFLX","JPM","BAC","GS","XOM","CVX","UNH","PFE","PLTR","COIN","MSTR"];
+    let mut items: Vec<serde_json::Value> = Vec::new();
+    for sym in universe {
+        let quote = market_quote(Path(sym.to_string()), State(s.clone())).await.0;
+        let p = quote.get("last_price").and_then(|v| v.as_f64()).unwrap_or(0.0);
+        items.push(serde_json::json!({
+            "s": sym,
+            "p": p,
+            "sec": "Unknown",
+            "mc": 0,
+            "rv": 0,
+            "c1m": 0,
+            "c1h": 0,
+            "c1d": 0,
+            "c1w": 0,
+            "c1mo": 0,
+            "c1y": 0,
+            "ytd": 0,
+            "lg": "",
+        }));
+    }
+    let total = items.len();
+    let a = (page - 1) * page_size;
+    let b = (a + page_size).min(total);
+    let slice = if a < total { items[a..b].to_vec() } else { vec![] };
+    Json(serde_json::json!({"i": slice, "t": total, "p": page, "ps": page_size}))
+}
 async fn providers_list(State(s): State<AppState>) -> Json<serde_json::Value> {
     let providers = s.sqlite.list_providers().unwrap_or_default();
     let data = s.sqlite.get_setting("active_provider_data").ok().flatten();
@@ -462,13 +493,84 @@ async fn settings_ui_theme_put(State(s): State<AppState>, Json(req): Json<ThemeR
     Json(serde_json::json!({"ok": true}))
 }
 
-async fn ws_quotes(_ws: WebSocketUpgrade, State(_s): State<AppState>, Path(_symbol): Path<String>) -> impl IntoResponse {
-    // TODO: 1s polling loop, push quote payload parity.
-    axum::http::StatusCode::NOT_IMPLEMENTED
+async fn ws_quotes(ws: WebSocketUpgrade, State(s): State<AppState>, Path(symbol): Path<String>) -> impl IntoResponse {
+    ws.on_upgrade(move |socket| handle_ws_quotes(socket, s, symbol))
 }
-async fn ws_screener(_ws: WebSocketUpgrade, State(_s): State<AppState>) -> impl IntoResponse {
-    axum::http::StatusCode::NOT_IMPLEMENTED
+
+async fn handle_ws_quotes(mut socket: WebSocket, state: AppState, symbol: String) {
+    let sym = symbol.to_uppercase();
+    loop {
+        let payload = market_quote(Path(sym.clone()), State(state.clone())).await.0;
+        if socket.send(Message::Text(payload.to_string())).await.is_err() {
+            break;
+        }
+        tokio::select! {
+            _ = tokio::time::sleep(std::time::Duration::from_secs(1)) => {},
+            msg = socket.recv() => {
+                if msg.is_none() { break; }
+            }
+        }
+    }
 }
-async fn ws_orderflow(_ws: WebSocketUpgrade, State(_s): State<AppState>, Path(_symbol): Path<String>) -> impl IntoResponse {
-    axum::http::StatusCode::NOT_IMPLEMENTED
+
+async fn ws_screener(ws: WebSocketUpgrade, State(s): State<AppState>) -> impl IntoResponse {
+    ws.on_upgrade(move |socket| handle_ws_screener(socket, s))
+}
+
+async fn handle_ws_screener(mut socket: WebSocket, state: AppState) {
+    let mut symbols: Vec<String> = vec!["SPY".into(), "QQQ".into()];
+    loop {
+        if let Some(Ok(Message::Text(txt))) = socket.recv().await {
+            if let Ok(v) = serde_json::from_str::<serde_json::Value>(&txt) {
+                if let Some(arr) = v.get("symbols").and_then(|x| x.as_array()) {
+                    symbols = arr.iter().filter_map(|x| x.as_str().map(|s| s.to_uppercase())).take(100).collect();
+                }
+            }
+        }
+
+        let mut items = Vec::new();
+        for sym in &symbols {
+            let q = market_quote(Path(sym.clone()), State(state.clone())).await.0;
+            items.push(serde_json::json!({
+                "s": sym,
+                "p": q.get("last_price").cloned().unwrap_or(serde_json::json!(0)),
+                "rv": 0,
+                "c1d": 0,
+            }));
+        }
+        let msg = serde_json::json!({"type":"screener","items":items}).to_string();
+        if socket.send(Message::Text(msg)).await.is_err() { break; }
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    }
+}
+
+async fn ws_orderflow(ws: WebSocketUpgrade, State(s): State<AppState>, Path(symbol): Path<String>) -> impl IntoResponse {
+    ws.on_upgrade(move |socket| handle_ws_orderflow(socket, s, symbol))
+}
+
+async fn handle_ws_orderflow(mut socket: WebSocket, state: AppState, symbol: String) {
+    let sym = symbol.to_uppercase();
+    loop {
+        let trades = market_trades(Path(sym.clone()), Query(HashMap::from([(String::from("limit"), String::from("500"))])), State(state.clone())).await.0;
+        let arr = trades.as_array().cloned().unwrap_or_default();
+        let mut by_sec: HashMap<i64, (f64,f64)> = HashMap::new();
+        let mut prev = 0.0;
+        for t in arr {
+            let price = t.get("price").and_then(|x| x.as_f64()).unwrap_or(0.0);
+            let size = t.get("size").and_then(|x| x.as_f64()).unwrap_or(0.0);
+            let ts = t.get("timestamp").and_then(|x| x.as_str()).unwrap_or("");
+            if price <= 0.0 || size <= 0.0 || ts.is_empty() { continue; }
+            let sec = DateTime::<FixedOffset>::parse_from_rfc3339(ts).map(|d| d.timestamp()).unwrap_or(0);
+            let e = by_sec.entry(sec).or_insert((0.0,0.0));
+            if prev > 0.0 {
+                if price >= prev { e.0 += size; } else { e.1 += size; }
+            } else { e.0 += size * 0.5; e.1 += size * 0.5; }
+            prev = price;
+        }
+        let mut buckets: Vec<serde_json::Value> = by_sec.into_iter().map(|(sec,(buy,sell))| serde_json::json!({"sec":sec,"buy":buy,"sell":sell})).collect();
+        buckets.sort_by(|a,b| a.get("sec").and_then(|x| x.as_i64()).cmp(&b.get("sec").and_then(|x| x.as_i64())));
+        let msg = serde_json::json!({"type":"orderflow","symbol":sym,"buckets":buckets}).to_string();
+        if socket.send(Message::Text(msg)).await.is_err() { break; }
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    }
 }
