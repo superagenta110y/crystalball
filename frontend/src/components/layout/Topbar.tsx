@@ -235,7 +235,10 @@ export function Topbar() {
           )}
         </div>
 
-        <button onClick={() => window.dispatchEvent(new Event('settings:open'))} className="topbar-btn flex items-center gap-1.5 px-2 py-1.5 sm:px-2.5 sm:py-1 rounded-md text-xs text-neutral-500 sm:text-neutral-300 hover:text-white hover:bg-surface-overlay transition" title="Settings">
+        <button id="topbar-settings-button" onClick={(e) => {
+          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+          window.dispatchEvent(new CustomEvent('settings:open', { detail: { anchor: { top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left } } }));
+        }} className="topbar-btn flex items-center gap-1.5 px-2 py-1.5 sm:px-2.5 sm:py-1 rounded-md text-xs text-neutral-500 sm:text-neutral-300 hover:text-white hover:bg-surface-overlay transition" title="Settings">
           <Settings size={13} />
           <span className="hidden sm:inline text-xs">Settings</span>
         </button>

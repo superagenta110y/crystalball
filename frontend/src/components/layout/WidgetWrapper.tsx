@@ -64,7 +64,13 @@ export function WidgetWrapper({ instance, onRemove, onToggleZoom, onRetilePromin
   }, []);
 
   return (
-    <div className="flex flex-col h-full group/widget">
+    <div
+      className="flex flex-col h-full group/widget"
+      onDoubleClickCapture={(e) => {
+        const t = e.target as HTMLElement;
+        if (t?.closest?.('.widget-drag-handle')) onRetileProminent?.();
+      }}
+    >
       {!useInlineHeader && (
         <div className="widget-header widget-drag-handle cursor-grab active:cursor-grabbing select-none" onDoubleClick={() => onRetileProminent?.()}>
           <div className="flex items-center gap-1.5 text-xs leading-none">

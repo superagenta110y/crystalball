@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { X, Plus, Trash2, Link2, Brain, Gem, Bot, CandlestickChart, ArrowLeft } from "lucide-react";
+import { X, Plus, Link2, Brain, Gem, Bot, CandlestickChart, ArrowLeft } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -31,6 +31,14 @@ type ProviderDef = {
   fields: Array<{ key: string; label: string; type?: string; placeholder?: string }>;
 };
 
+const PROVIDER_LOGOS: Record<ProviderType, string> = {
+  alpaca: "https://cdn.simpleicons.org/alpacadotjs/ffffff",
+  hoodlink: "https://cdn.simpleicons.org/linktree/ffffff",
+  openai: "https://cdn.simpleicons.org/openai/ffffff",
+  gemini: "https://cdn.simpleicons.org/googlegemini/ffffff",
+  claude: "https://cdn.simpleicons.org/anthropic/ffffff",
+};
+
 const PROVIDER_DEFS: ProviderDef[] = [
   { type: "alpaca", label: "Alpaca", role: "data", icon: <CandlestickChart size={15} />, fields: [
     { key: "api_key", label: "API Key", placeholder: "PK..." },
@@ -57,6 +65,8 @@ export function SettingsModal() {
   const [selectedType, setSelectedType] = useState<ProviderType | null>(null);
   const [editing, setEditing] = useState<Provider | null>(null);
   const [form, setForm] = useState<Record<string, string>>({});
+  const [anchor, setAnchor] = useState<{ top: number; right: number; bottom: number; left: number } | null>(null);
+  const [vw, setVw] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1200);
 
   const load = async () => {
     setLoading(true);
@@ -69,13 +79,21 @@ export function SettingsModal() {
   };
 
   useEffect(() => {
-    const onOpen = () => { setOpen(true); setView("list"); load(); };
+    const onOpen = (e: Event) => {
+      const ce = e as CustomEvent<any>;
+      const a = ce?.detail?.anchor;
+      if (a && typeof a.top === 'number') setAnchor(a);
+      setOpen(true); setView("list"); load();
+    };
     const onOpenAdd = () => { setOpen(true); setView("pick"); load(); };
+    const onResize = () => setVw(window.innerWidth);
     window.addEventListener("settings:open", onOpen as EventListener);
     window.addEventListener("settings:open-add-provider", onOpenAdd as EventListener);
+    window.addEventListener("resize", onResize);
     return () => {
       window.removeEventListener("settings:open", onOpen as EventListener);
       window.removeEventListener("settings:open-add-provider", onOpenAdd as EventListener);
+      window.removeEventListener("resize", onResize);
     };
   }, []);
 
@@ -103,10 +121,13 @@ export function SettingsModal() {
     if (editing?.id) {
       await fetch(`${API}/api/providers/${editing.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body });
     } else {
-      await fetch(`${API}/api/providers`, { method: "POST", headers: { "Content-Type": "application/json" }, body });
+      const r = await fetch(`${API}/api/providers`, { method: "POST", headers: { "Content-Type": "application/json" }, body });
+      if (r.ok) {
+        const created = await r.json();
+        if (created?.id) setEditing(created);
+      }
     }
     await load();
-    setView("list");
   };
 
   const remove = async () => {
@@ -127,10 +148,22 @@ export function SettingsModal() {
     await load();
   };
 
+  useEffect(() => {
+    if (view !== "detail" || !selectedType) return;
+    const t = setTimeout(() => { save(); }, 450);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form, selectedType, editing?.id, view]);
+
   if (!open) return null;
+  const isMobile = vw < 768;
+  const panelW = 760;
+  const panelH = 620;
+  const left = Math.max(8, Math.min((anchor ? anchor.right : vw - 20) - panelW, vw - panelW - 8));
+  const top = Math.max(8, (anchor?.top ?? 56));
 
   return (
-    <div className="fixed inset-0 z-[140] bg-surface text-[var(--text-primary)]">
+    <div className={isMobile ? "fixed inset-0 z-[140] bg-surface text-[var(--text-primary)]" : "fixed z-[140] bg-surface text-[var(--text-primary)] border border-surface-border rounded-xl shadow-2xl overflow-hidden pop-in"} style={isMobile ? undefined : { width: panelW, height: panelH, left, top }}>
       <div className="h-12 px-4 border-b border-surface-border flex items-center justify-between">
         <div className="text-sm font-semibold">Settings</div>
         <button onClick={() => setOpen(false)} className="p-1.5 rounded hover:bg-surface-overlay"><X size={16} /></button>
@@ -154,10 +187,9 @@ export function SettingsModal() {
                   const active = state.active.data === p.id || state.active.ai === p.id;
                   return (
                     <button key={p.id} onClick={() => openDetail(p)} className="w-full flex items-center gap-3 px-2 py-2 rounded hover:bg-surface-overlay text-left">
-                      <span className={`w-2 h-2 rounded-full ${active ? "bg-green-400" : "bg-green-500/80"}`} />
-                      <span className="text-neutral-300">{def?.icon}</span>
+                      <img src={PROVIDER_LOGOS[p.type]} alt={p.type} className="w-4 h-4 rounded-sm" />
                       <span className="text-sm text-white">{def?.label || p.type}</span>
-                      <span className="ml-auto text-[11px] text-neutral-500 font-mono truncate max-w-[40%]">{p.url || (p.api_key ? "configured" : "")}</span>
+                      <span className={`ml-auto w-2 h-2 rounded-full ${active ? "bg-green-400" : "bg-green-500/80"}`} />
                     </button>
                   );
                 })}
@@ -182,9 +214,20 @@ export function SettingsModal() {
 
         {view === "detail" && currentDef && (
           <div className="max-w-xl mx-auto">
-            <button onClick={() => setView("list")} className="inline-flex items-center gap-1 text-sm text-neutral-500 hover:text-white mb-3"><ArrowLeft size={14} /> Back</button>
+            <div className="flex items-center justify-between mb-3">
+              <button onClick={() => setView("list")} className="inline-flex items-center gap-1 text-sm text-neutral-500 hover:text-white"><ArrowLeft size={14} /> Back</button>
+              {editing && (
+                <details className="relative">
+                  <summary className="list-none cursor-pointer px-2 py-1 rounded hover:bg-surface-overlay text-sm text-neutral-300">Actions</summary>
+                  <div className="absolute right-0 top-7 z-20 rounded bg-surface-raised border border-surface-border shadow-xl p-1 min-w-[120px] pop-in">
+                    <button onClick={() => activate(editing)} className="w-full text-left px-2 py-1 rounded text-sm hover:bg-surface-overlay">Set Active</button>
+                    <button onClick={remove} className="w-full text-left px-2 py-1 rounded text-sm text-red-300 hover:bg-surface-overlay">Delete</button>
+                  </div>
+                </details>
+              )}
+            </div>
             <div className="space-y-3">
-              <div className="text-sm text-white inline-flex items-center gap-2">{currentDef.icon} {currentDef.label}</div>
+              <div className="text-sm text-white inline-flex items-center gap-2"><img src={PROVIDER_LOGOS[currentDef.type]} alt={currentDef.type} className="w-4 h-4 rounded-sm" /> {currentDef.label}</div>
               {currentDef.fields.map((f) => (
                 <div key={f.key} className="space-y-1">
                   <label className="text-[11px] text-neutral-500">{f.label}</label>
@@ -198,16 +241,7 @@ export function SettingsModal() {
                 </div>
               ))}
 
-              {editing && (
-                <div className="flex items-center gap-2 pt-1">
-                  <button onClick={() => activate(editing)} className="px-2 py-1 rounded hover:bg-surface-overlay text-sm text-neutral-300">Set Active</button>
-                  <button onClick={remove} className="px-2 py-1 rounded hover:bg-surface-overlay text-sm text-red-300 inline-flex items-center gap-1"><Trash2 size={14} /> Delete</button>
-                </div>
-              )}
-
-              <div className="pt-1">
-                <button onClick={save} className="px-3 py-1.5 rounded hover:bg-surface-overlay text-sm text-white">Save</button>
-              </div>
+              <div className="pt-1 text-[11px] text-neutral-500">Changes save automatically.</div>
             </div>
           </div>
         )}

@@ -374,6 +374,10 @@ async fn market_options(Path(symbol): Path<String>, Query(q): Query<HashMap<Stri
     let sym = symbol.to_uppercase();
     let expiration = q.get("expiration_date").cloned();
     let otype = q.get("option_type").cloned();
+    let cache_key = format!("opt:{}:{:?}:{:?}", sym, expiration, otype);
+    if let Ok(Some(v)) = s.lmdb.get_json(&cache_key) {
+        if let Some(arr) = v.as_array() { return Json(serde_json::Value::Array(arr.clone())); }
+    }
     let client = reqwest::Client::new();
 
     match active_provider(&s) {
@@ -419,7 +423,41 @@ async fn market_options(Path(symbol): Path<String>, Query(q): Query<HashMap<Stri
                 if page_token.is_none() { break; }
                 if expiration.is_some() { break; }
             }
-            return Json(serde_json::Value::Array(all));
+
+            // Enrich contracts with snapshot greeks (delta/gamma) for GEX/DEX fidelity.
+            let mut out = all.clone();
+            let symbols: Vec<String> = all.iter()
+                .filter_map(|c| c.get("symbol").and_then(|x| x.as_str()).map(|s| s.to_string()))
+                .collect();
+            let mut greeks: std::collections::HashMap<String, (f64, f64)> = std::collections::HashMap::new();
+            for chunk in symbols.chunks(100) {
+                let syms = chunk.join(",");
+                let r = client
+                    .get("https://data.alpaca.markets/v1beta1/options/snapshots")
+                    .headers(alpaca_headers(&api_key, &secret_key))
+                    .query(&[("symbols", syms)])
+                    .send().await;
+                let Ok(resp) = r else { continue; };
+                let Ok(v) = resp.json::<serde_json::Value>().await else { continue; };
+                if let Some(map) = v.get("snapshots").and_then(|x| x.as_object()) {
+                    for (k, snap) in map {
+                        let delta = json_num(snap.get("greeks").and_then(|g| g.get("delta")));
+                        let gamma = json_num(snap.get("greeks").and_then(|g| g.get("gamma")));
+                        greeks.insert(k.clone(), (delta, gamma));
+                    }
+                }
+            }
+            for c in &mut out {
+                if let Some(symb) = c.get("symbol").and_then(|x| x.as_str()) {
+                    if let Some((d, g)) = greeks.get(symb) {
+                        c["delta"] = serde_json::json!(d);
+                        c["gamma"] = serde_json::json!(g);
+                    }
+                }
+            }
+            let arr = serde_json::Value::Array(out);
+            let _ = s.lmdb.set_json(&cache_key, &arr, 20);
+            return Json(arr);
         }
     }
 
@@ -428,6 +466,8 @@ async fn market_options(Path(symbol): Path<String>, Query(q): Query<HashMap<Stri
 
 async fn market_expirations(Path(symbol): Path<String>, State(s): State<AppState>) -> Json<serde_json::Value> {
     let sym = symbol.to_uppercase();
+    let cache_key = format!("exp:{}", sym);
+    if let Ok(Some(v)) = s.lmdb.get_json(&cache_key) { return Json(v); }
     let client = reqwest::Client::new();
     match active_provider(&s) {
         ActiveProvider::Alpaca { api_key, secret_key, .. } => {
@@ -461,31 +501,64 @@ async fn market_expirations(Path(symbol): Path<String>, State(s): State<AppState
                 if page_token.is_none() { break; }
             }
             exps.sort(); exps.dedup();
-            return Json(serde_json::json!({"symbol": sym, "expirations": exps}));
+            let payload = serde_json::json!({"symbol": sym, "expirations": exps});
+            let _ = s.lmdb.set_json(&cache_key, &payload, 300);
+            return Json(payload);
         }
         ActiveProvider::Hoodlink { .. } => {}
     }
-    Json(serde_json::json!({"symbol": sym, "expirations": []}))
+    let payload = serde_json::json!({"symbol": sym, "expirations": []});
+    let _ = s.lmdb.set_json(&cache_key, &payload, 60);
+    Json(payload)
 }
 
-async fn market_symbols(Query(q): Query<HashMap<String,String>>) -> Json<serde_json::Value> {
+async fn market_symbols(Query(q): Query<HashMap<String,String>>, State(s): State<AppState>) -> Json<serde_json::Value> {
     let query = q.get("q").cloned().unwrap_or_default().to_uppercase();
     let limit = q.get("limit").and_then(|x| x.parse::<usize>().ok()).unwrap_or(20).min(100);
+    let cache_key = format!("sym:{}:{}", query, limit);
+    if let Ok(Some(v)) = s.lmdb.get_json(&cache_key) { return Json(v); }
+
     let symbols = vec![
         ("SPY","SPDR S&P 500 ETF"),("QQQ","Invesco QQQ Trust"),("IWM","iShares Russell 2000 ETF"),
         ("AAPL","Apple Inc."),("MSFT","Microsoft Corp."),("NVDA","NVIDIA Corp."),("AMZN","Amazon.com Inc."),
         ("GOOGL","Alphabet Class A"),("META","Meta Platforms"),("TSLA","Tesla Inc."),("AMD","Advanced Micro Devices"),
         ("NFLX","Netflix Inc."),("JPM","JPMorgan Chase"),("BAC","Bank of America"),("GS","Goldman Sachs"),
         ("XOM","Exxon Mobil"),("CVX","Chevron"),("UNH","UnitedHealth Group"),("PFE","Pfizer Inc."),
-        ("PLTR","Palantir"),("COIN","Coinbase"),("MSTR","MicroStrategy")
+        ("PLTR","Palantir"),("COIN","Coinbase"),("MSTR","MicroStrategy"),("SNDK","Sandisk Corp")
     ];
-    let out: Vec<serde_json::Value> = symbols.into_iter()
+    let mut out: Vec<serde_json::Value> = symbols.into_iter()
         .filter(|(s,n)| query.is_empty() || s.contains(&query) || n.to_uppercase().contains(&query))
         .take(limit)
         .map(|(s,n)| serde_json::json!({"symbol": s, "name": n}))
         .collect();
+
+    // Exact backend lookup for rarer tickers via Alpaca asset endpoint.
+    if !query.is_empty() && query.len() <= 8 && out.iter().all(|x| x.get("symbol").and_then(|v| v.as_str()) != Some(query.as_str())) {
+      if let ActiveProvider::Alpaca { api_key, secret_key, .. } = active_provider(&s) {
+        let client = reqwest::Client::new();
+        let r = client
+          .get(format!("https://paper-api.alpaca.markets/v2/assets/{}", query))
+          .headers(alpaca_headers(&api_key, &secret_key))
+          .send().await;
+        if let Ok(resp) = r {
+          if resp.status().is_success() {
+            if let Ok(v) = resp.json::<serde_json::Value>().await {
+              let sym = v.get("symbol").and_then(|x| x.as_str()).unwrap_or("").to_string();
+              if !sym.is_empty() {
+                let name = v.get("name").and_then(|x| x.as_str()).unwrap_or("").to_string();
+                out.insert(0, serde_json::json!({"symbol": sym, "name": name}));
+              }
+            }
+          }
+        }
+      }
+    }
+
+    out.truncate(limit);
     let syms: Vec<String> = out.iter().filter_map(|x| x.get("symbol").and_then(|v| v.as_str()).map(|s| s.to_string())).collect();
-    Json(serde_json::json!({"symbols": syms, "items": out}))
+    let payload = serde_json::json!({"symbols": syms, "items": out});
+    let _ = s.lmdb.set_json(&cache_key, &payload, 1800);
+    Json(payload)
 }
 async fn analytics_gex(Path(symbol): Path<String>, Query(q): Query<HashMap<String,String>>, State(s): State<AppState>) -> Json<serde_json::Value> {
     analytics_core(symbol, q, s, "gex").await
@@ -530,10 +603,22 @@ async fn analytics_core(symbol: String, q: HashMap<String,String>, s: AppState, 
             if strike <= 0.0 { continue; }
             let key = (strike * 100.0).round() as i64;
             let oi = json_num(o.get("open_interest"));
-            let gamma = json_num(o.get("gamma"));
-            let delta = json_num(o.get("delta"));
+            let mut gamma = json_num(o.get("gamma"));
+            let mut delta = json_num(o.get("delta"));
             let t = o.get("option_type").or_else(|| o.get("type")).and_then(|x| x.as_str()).unwrap_or("").to_lowercase();
             let sign = if t == "put" { -1.0 } else { 1.0 };
+
+            // Fallback approximations when broker snapshots don't provide greeks.
+            if spot > 0.0 && delta.abs() < 1e-9 {
+                let m = (spot - strike) / spot;
+                let call_delta = (0.5 + m * 8.0).clamp(0.0, 1.0);
+                delta = if t == "put" { call_delta - 1.0 } else { call_delta };
+            }
+            if spot > 0.0 && gamma.abs() < 1e-9 {
+                let m = (spot - strike) / spot;
+                gamma = (-(m / 0.08).powi(2)).exp() * 0.01;
+            }
+
             let value = if kind == "gex" { sign * gamma * oi } else { sign * delta * oi };
             *by_strike.entry(key).or_insert(0.0) += value;
         }

@@ -474,6 +474,12 @@ export default function Dashboard() {
     const item = l[idx];
 
     const prev = resizeBaselineRef.current[item.i] || oldItem;
+    const oldLeft = prev.x;
+    const newLeft = item.x;
+    const dl = newLeft - oldLeft;
+    const oldTop = prev.y;
+    const newTop = item.y;
+    const dt = newTop - oldTop;
     const oldRight = prev.x + prev.w;
     const newRight = item.x + item.w;
     const dx = newRight - oldRight;
@@ -484,6 +490,18 @@ export default function Dashboard() {
     const overlapX = (a: Layout, b: Layout) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x));
 
     const dbg: Record<string, string[]> = { [item.i]: [] };
+
+    if (dl !== 0) {
+      dbg[item.i].push("left");
+      const moved = new Set<string>();
+      for (const it of l) {
+        if (it.i !== item.i && (it.x + it.w) === oldLeft && overlapY(it, oldItem) > 0) {
+          moved.add(it.i);
+          it.w = Math.max(2, it.w + dl); // move right edge with resized left boundary
+        }
+      }
+      moved.forEach(id => { dbg[id] = [...(dbg[id] || []), "right"]; });
+    }
 
     if (dx !== 0) {
       dbg[item.i].push("right");
@@ -496,6 +514,18 @@ export default function Dashboard() {
         }
       }
       moved.forEach(id => { dbg[id] = [...(dbg[id] || []), "left", "right"]; });
+    }
+
+    if (dt !== 0) {
+      dbg[item.i].push("top");
+      const moved = new Set<string>();
+      for (const it of l) {
+        if (it.i !== item.i && (it.y + it.h) === oldTop && overlapX(it, oldItem) > 0) {
+          moved.add(it.i);
+          it.h = Math.max(3, it.h + dt); // move lower edge with resized top boundary
+        }
+      }
+      moved.forEach(id => { dbg[id] = [...(dbg[id] || []), "bottom"]; });
     }
 
     if (dy !== 0) {
@@ -521,6 +551,12 @@ export default function Dashboard() {
     if (idx < 0) return updateLayout(activeTabId, newLayout);
 
     const item = l[idx];
+    const oldLeft = oldItem.x;
+    const newLeft = item.x;
+    const dl = newLeft - oldLeft;
+    const oldTop = oldItem.y;
+    const newTop = item.y;
+    const dt = newTop - oldTop;
     const oldRight = oldItem.x + oldItem.w;
     const newRight = item.x + item.w;
     const dx = newRight - oldRight;
@@ -530,11 +566,27 @@ export default function Dashboard() {
     const overlapY = (a: Layout, b: Layout) => Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
     const overlapX = (a: Layout, b: Layout) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x));
 
+    if (dl !== 0) {
+      for (const it of l) {
+        if (it.i !== item.i && (it.x + it.w) === oldLeft && overlapY(it, oldItem) > 0) {
+          it.w = Math.max(2, it.w + dl);
+        }
+      }
+    }
+
     if (dx !== 0) {
       for (const it of l) {
         if (it.i !== item.i && it.x === oldRight && overlapY(it, oldItem) > 0) {
           it.x += dx;
           it.w = Math.max(2, it.w - dx);
+        }
+      }
+    }
+
+    if (dt !== 0) {
+      for (const it of l) {
+        if (it.i !== item.i && (it.y + it.h) === oldTop && overlapX(it, oldItem) > 0) {
+          it.h = Math.max(3, it.h + dt);
         }
       }
     }
