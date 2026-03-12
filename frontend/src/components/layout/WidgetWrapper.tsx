@@ -73,7 +73,7 @@ export function WidgetWrapper({ instance, onRemove, onToggleZoom, onRetilePromin
     >
       {!useInlineHeader && (
         <div className="widget-header widget-drag-handle cursor-grab active:cursor-grabbing select-none" onDoubleClick={() => onRetileProminent?.()}>
-          <div className="flex items-center gap-1.5 text-xs leading-none">
+          <div className="ml-auto flex items-center gap-1.5 text-xs leading-none opacity-100 md:opacity-0 md:group-hover/widget:opacity-100 transition">
             <GripHorizontal size={11} className="opacity-30" />
             <span className="hidden sm:inline">{label.full}</span><span className="sm:hidden">{label.mobile}</span>
             {instance.type === "newsfeed" && (
@@ -103,7 +103,7 @@ export function WidgetWrapper({ instance, onRemove, onToggleZoom, onRetilePromin
                   className="cb-input bg-transparent border border-neutral-500/70 rounded px-2 py-0.5 text-[11px] font-mono w-14 hover:bg-surface-overlay/40"
                 />
                 {newsOpen && newsItems.length > 0 && (
-                  <div className="absolute left-0 top-6 z-50 w-48 rounded bg-surface-raised shadow-xl p-1 pop-in">
+                  <div className="absolute right-0 top-6 z-50 w-48 rounded bg-surface-raised shadow-xl p-1 pop-in">
                     {newsItems.map(it => (
                       <button key={it.symbol} onClick={() => {
                         const next = Array.from(new Set([...newsSymbols, it.symbol]));
@@ -120,15 +120,13 @@ export function WidgetWrapper({ instance, onRemove, onToggleZoom, onRetilePromin
               </div>
             )}
             {instance.type === "screener" && (
-              <button onMouseDown={(e) => e.stopPropagation()} onClick={() => window.dispatchEvent(new Event("screener:toggle-filters"))} className="opacity-100 md:opacity-0 md:group-hover/widget:opacity-100 transition p-1 rounded hover:bg-surface-overlay" title="Filters"><Filter size={12} /></button>
+              <button onMouseDown={(e) => e.stopPropagation()} onClick={() => window.dispatchEvent(new Event("screener:toggle-filters"))} className="p-1 rounded hover:bg-surface-overlay" title="Filters"><Filter size={12} /></button>
             )}
             {instance.config.symbol && (
               <span className="text-neutral-600 font-mono">{instance.config.symbol}</span>
             )}
-          </div>
-          <div className="flex items-center gap-1">
-            {canZoom && <button onMouseDown={(e) => e.stopPropagation()} onClick={onToggleZoom} className="opacity-100 md:opacity-0 md:group-hover/widget:opacity-100 transition inline-flex items-center justify-center h-6 w-6 rounded hover:bg-surface-overlay" aria-label={isZoomed ? "Zoom out" : "Zoom in"} title={isZoomed ? "Zoom out" : "Zoom in"}>{isZoomed ? <Minimize2 size={13} /> : <Maximize2 size={13} />}</button>}
-            <button onMouseDown={(e) => e.stopPropagation()} onClick={() => setConfirmRemove(true)} className="opacity-100 md:opacity-0 md:group-hover/widget:opacity-100 transition inline-flex items-center justify-center h-6 w-6 rounded hover:bg-surface-overlay hover:text-red-400" aria-label="Remove widget"><X size={13} /></button>
+            {canZoom && <button onMouseDown={(e) => e.stopPropagation()} onClick={onToggleZoom} className="inline-flex items-center justify-center h-6 w-6 rounded hover:bg-surface-overlay" aria-label={isZoomed ? "Zoom out" : "Zoom in"} title={isZoomed ? "Zoom out" : "Zoom in"}>{isZoomed ? <Minimize2 size={13} /> : <Maximize2 size={13} />}</button>}
+            <button onMouseDown={(e) => e.stopPropagation()} onClick={() => setConfirmRemove(true)} className="inline-flex items-center justify-center h-6 w-6 rounded hover:bg-surface-overlay hover:text-red-400" aria-label="Remove widget"><X size={13} /></button>
           </div>
         </div>
       )}

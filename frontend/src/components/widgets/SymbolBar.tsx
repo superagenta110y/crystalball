@@ -52,13 +52,6 @@ export function SymbolBar({ symbol, isGlobalOverride, onSymbolChange, extra, lab
 
   return (
     <div className="flex items-center gap-2 px-2 py-1.5 pr-14 border-b border-surface-border shrink-0 text-xs">
-      {(label || mobileLabel) && (
-        <div className="widget-drag-handle cursor-grab active:cursor-grabbing select-none inline-flex items-center gap-1.5 text-neutral-500">
-          <GripHorizontal size={11} className="opacity-50" />
-          {label && <span className="hidden sm:inline text-xs uppercase tracking-wide leading-none">{label}</span>}
-          {mobileLabel && <span className="sm:hidden text-xs uppercase tracking-wide leading-none">{mobileLabel}</span>}
-        </div>
-      )}
       <div ref={ref} className="relative">
         <input
           value={draft}
@@ -66,7 +59,7 @@ export function SymbolBar({ symbol, isGlobalOverride, onSymbolChange, extra, lab
           onFocus={() => setOpen(true)}
           disabled={isGlobalOverride}
           title={isGlobalOverride ? "Controlled by global override in the header" : "Select symbol"}
-          className={`cb-input border rounded px-2 h-6 leading-none text-xs font-mono w-20 focus:outline-none text-white transition
+          className={`cb-input border rounded px-2 h-6 leading-none text-xs font-mono w-10 focus:outline-none text-white transition
             ${isGlobalOverride
               ? "bg-transparent border-accent/70 text-accent cursor-not-allowed shadow-[0_0_0_1px_rgba(0,212,170,0.25)]"
               : "bg-transparent border-neutral-500/70 hover:bg-surface-overlay/40 focus:border-accent/60"}`}
@@ -83,7 +76,17 @@ export function SymbolBar({ symbol, isGlobalOverride, onSymbolChange, extra, lab
         )}
       </div>
       {isGlobalOverride && <span className="text-neutral-700 text-xs leading-none" title="Global override active">⬡</span>}
-      {extra && <div className="flex items-center gap-2 leading-none">{extra}</div>}
+
+      <div className="ml-auto flex items-center gap-2 leading-none opacity-100 md:opacity-0 md:group-hover/widget:opacity-100 transition">
+        {(label || mobileLabel) && (
+          <div className="widget-drag-handle cursor-grab active:cursor-grabbing select-none inline-flex items-center gap-1.5 text-neutral-500">
+            <GripHorizontal size={11} className="opacity-50" />
+            {label && <span className="hidden sm:inline text-xs uppercase tracking-wide leading-none">{label}</span>}
+            {mobileLabel && <span className="sm:hidden text-xs uppercase tracking-wide leading-none">{mobileLabel}</span>}
+          </div>
+        )}
+        {extra && <div className="flex items-center gap-2 leading-none">{extra}</div>}
+      </div>
     </div>
   );
 }
