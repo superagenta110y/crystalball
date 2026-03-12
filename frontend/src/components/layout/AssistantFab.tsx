@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { Bot, MessageSquare, Plus, Send, X, Menu, Pencil, Trash2 } from "lucide-react";
+import { Bot, MessageSquare, Send, X, Menu, Pencil, Trash2 } from "lucide-react";
 
 type Msg = { role: "user" | "assistant"; content: string; ts: number };
 type Thread = { id: string; name: string; messages: Msg[] };
@@ -103,16 +103,20 @@ export function AssistantFab({ showFab = false }: { showFab?: boolean }) {
     if (!text) return;
     setInput("");
 
-    if (!configured) {
-      // no thread should be created when AI unavailable
-      alert(FALLBACK);
-      return;
-    }
-
     let tid = activeId;
     if (!tid) tid = createThread();
 
     append(tid, { role: "user", content: text, ts: Date.now() });
+
+    if (!configured) {
+      append(tid, {
+        role: "assistant",
+        content: "AI provider not configured yet. Opening Settings → Add Provider for you.",
+        ts: Date.now(),
+      });
+      window.dispatchEvent(new Event("settings:open-add-provider"));
+      return;
+    }
 
     setLoading(true);
     try {
@@ -146,15 +150,13 @@ export function AssistantFab({ showFab = false }: { showFab?: boolean }) {
       {open && (
         <div
           className={isMobile
-            ? "fixed inset-0 z-50 w-screen h-[100dvh] bg-surface-raised overflow-hidden"
-            : "fixed z-40 w-[380px] h-[560px] bg-surface-raised border border-surface-border rounded-xl shadow-2xl overflow-hidden"}
+            ? "fixed inset-0 z-50 w-screen h-[100dvh] bg-surface-raised overflow-hidden pop-in"
+            : "fixed z-40 w-[380px] h-[560px] bg-surface-raised border border-surface-border rounded-xl shadow-2xl overflow-hidden pop-in"}
           style={isMobile ? undefined : { left: anchoredLeft, top: anchoredTop }}
         >
           <div className="h-full flex">
-            {drawerOpen && (
-              <div className="w-44 border-r border-surface-border p-2 flex flex-col gap-2">
-                <button onClick={() => createThread()} className="text-xs px-2 py-1 rounded border border-surface-border hover:bg-surface-overlay inline-flex items-center gap-1"><Plus size={12} /> New</button>
-                <div className="flex-1 overflow-auto space-y-1">
+            <div className={`${drawerOpen ? "w-44 opacity-100" : "w-0 opacity-0"} transition-all duration-200 border-r border-surface-border p-2 flex flex-col gap-2 overflow-hidden`}>
+              <div className="flex-1 overflow-auto space-y-1">
                   {threads.map(t => (
                     <div key={t.id} className={`group rounded ${activeId===t.id ? "bg-accent/15" : "hover:bg-surface-overlay"}`}>
                       <button onClick={() => setActiveId(t.id)} className="w-full text-left text-xs px-2 py-1 inline-flex items-center gap-1">
@@ -168,11 +170,10 @@ export function AssistantFab({ showFab = false }: { showFab?: boolean }) {
                   ))}
                 </div>
               </div>
-            )}
 
             <div className="flex-1 flex flex-col">
               <div className="px-3 py-2 border-b border-surface-border text-xs text-neutral-300 flex items-center justify-between">
-                <button onClick={() => setDrawerOpen(v => !v)} className="inline-flex items-center gap-1"><Menu size={14} /> Threads</button>
+                <button onClick={() => setDrawerOpen(v => !v)} className="inline-flex items-center gap-1"><Menu size={14} /> Agent</button>
                 <button onClick={() => setOpen(false)} className="text-neutral-500 hover:text-white"><X size={14} /></button>
               </div>
 
@@ -198,7 +199,9 @@ export function AssistantFab({ showFab = false }: { showFab?: boolean }) {
 
               <div className="p-2 border-t border-surface-border flex gap-2">
                 <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&send()} className="flex-1 bg-surface-overlay border border-surface-border rounded px-2 py-1 text-xs" placeholder="Message assistant..." />
-                <button onClick={() => send()} className="px-2 py-1 rounded bg-accent/15 border border-accent/30 text-accent"><Send size={13} /></button>
+                {input.trim().length > 0 && (
+                  <button onClick={() => send()} className="px-2 py-1 rounded bg-white text-black hover:bg-neutral-200"><Send size={13} /></button>
+                )}
               </div>
             </div>
           </div>

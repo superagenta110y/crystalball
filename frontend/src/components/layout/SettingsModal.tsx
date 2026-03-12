@@ -70,8 +70,13 @@ export function SettingsModal() {
 
   useEffect(() => {
     const onOpen = () => { setOpen(true); setView("list"); load(); };
+    const onOpenAdd = () => { setOpen(true); setView("pick"); load(); };
     window.addEventListener("settings:open", onOpen as EventListener);
-    return () => window.removeEventListener("settings:open", onOpen as EventListener);
+    window.addEventListener("settings:open-add-provider", onOpenAdd as EventListener);
+    return () => {
+      window.removeEventListener("settings:open", onOpen as EventListener);
+      window.removeEventListener("settings:open-add-provider", onOpenAdd as EventListener);
+    };
   }, []);
 
   const currentDef = useMemo(() => PROVIDER_DEFS.find(p => p.type === (selectedType || editing?.type || "alpaca")), [selectedType, editing]);

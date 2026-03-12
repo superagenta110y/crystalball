@@ -174,7 +174,7 @@ export function Topbar() {
           </button>
           {showAddWidget && (
             <div className="absolute right-0 top-full mt-1 w-52 bg-surface-raised rounded-xl shadow-2xl z-50 overflow-hidden pop-in">
-              <div className="px-3 py-2 text-xs text-neutral-500 uppercase tracking-widest border-b border-surface-border">Add Widget</div>
+              <div className="block sm:hidden px-3 py-2 text-xs text-neutral-500 uppercase tracking-widest border-b border-surface-border">Add Widget</div>
               <div className="py-1 max-h-80 overflow-y-auto">
                 {WIDGET_LIST.map(({ id, label }) => (
                   <button key={`${id}-add`} onClick={() => { addWidget(activeTabId, id); setShowAddWidget(false); }} className="w-full flex items-center justify-between px-3 py-2 text-sm text-neutral-300 hover:text-white hover:bg-surface-overlay transition">
@@ -196,7 +196,7 @@ export function Topbar() {
           </button>
           {showStyle && (
             <div className="absolute right-0 top-full mt-1 w-56 bg-surface-raised rounded-xl shadow-2xl z-50 overflow-visible pop-in">
-              <div className="px-3 py-2 text-xs text-neutral-500 uppercase tracking-widest border-b border-surface-border">Style</div>
+              <div className="block sm:hidden px-3 py-2 text-xs text-neutral-500 uppercase tracking-widest border-b border-surface-border">Style</div>
               <div className="py-3 px-3 flex flex-col gap-4">
                 <div className="relative flex items-center justify-between">
                   <span className="text-xs text-neutral-400">Theme</span>
