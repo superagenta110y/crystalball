@@ -93,12 +93,38 @@ async fn main() -> anyhow::Result<()> {
 #[derive(Serialize)]
 struct StatusResponse {
     status: &'static str,
-    provider: &'static str,
+    provider: String,
     version: &'static str,
 }
 
-async fn status() -> Json<StatusResponse> {
-    Json(StatusResponse { status: "ok", provider: "pending", version: "0.1.0-rs" })
+#[derive(Deserialize)]
+struct ProviderUpsertReq {
+    r#type: String,
+    config: serde_json::Value,
+    name: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct ActivateReq {
+    role: String,
+}
+
+#[derive(Deserialize)]
+struct ActiveProviderReq {
+    provider: String,
+}
+
+#[derive(Deserialize)]
+struct ThemeReq {
+    mode: String,
+    accent: Option<String>,
+    bull: Option<String>,
+    bear: Option<String>,
+}
+
+async fn status(State(s): State<AppState>) -> Json<StatusResponse> {
+    let provider = s.sqlite.get_setting("active_provider_data").ok().flatten().unwrap_or_else(|| "pending".into());
+    Json(StatusResponse { status: "ok", provider, version: "0.1.0-rs" })
 }
 
 // ---- placeholder handlers (endpoint parity scaffold) ----
@@ -120,18 +146,74 @@ async fn news_feed(Query(_q): Query<HashMap<String,String>>) -> Json<serde_json:
 async fn ai_status() -> Json<serde_json::Value> { Json(serde_json::json!({"configured": false})) }
 async fn ai_chat() -> Json<serde_json::Value> { Json(serde_json::json!({"reply":"TODO"})) }
 async fn screener_get(Query(_q): Query<HashMap<String,String>>) -> Json<serde_json::Value> { Json(serde_json::json!({"i":[],"t":0,"p":1,"ps":50})) }
-async fn providers_list() -> Json<serde_json::Value> { Json(serde_json::json!({"providers":[],"active":{}})) }
-async fn providers_create() -> Json<serde_json::Value> { Json(serde_json::json!({"ok":true})) }
-async fn providers_get(Path(_): Path<String>) -> Json<serde_json::Value> { Json(serde_json::json!({})) }
-async fn providers_update(Path(_): Path<String>) -> Json<serde_json::Value> { Json(serde_json::json!({"ok":true})) }
-async fn providers_delete(Path(_): Path<String>) -> Json<serde_json::Value> { Json(serde_json::json!({"ok":true})) }
-async fn providers_activate(Path(_): Path<String>) -> Json<serde_json::Value> { Json(serde_json::json!({"ok":true})) }
-async fn settings_get() -> Json<serde_json::Value> { Json(serde_json::json!({})) }
-async fn settings_alpaca() -> Json<serde_json::Value> { Json(serde_json::json!({"ok":true})) }
-async fn settings_hoodlink() -> Json<serde_json::Value> { Json(serde_json::json!({"ok":true})) }
-async fn settings_active_provider() -> Json<serde_json::Value> { Json(serde_json::json!({"ok":true})) }
-async fn settings_ui_theme_get() -> Json<serde_json::Value> { Json(serde_json::json!({"mode":"dark"})) }
-async fn settings_ui_theme_put() -> Json<serde_json::Value> { Json(serde_json::json!({"ok":true})) }
+async fn providers_list(State(s): State<AppState>) -> Json<serde_json::Value> {
+    let providers = s.sqlite.list_providers().unwrap_or_default();
+    let data = s.sqlite.get_setting("active_provider_data").ok().flatten();
+    let ai = s.sqlite.get_setting("active_provider_ai").ok().flatten();
+    Json(serde_json::json!({"providers": providers, "active": {"data": data, "ai": ai}}))
+}
+
+async fn providers_create(State(s): State<AppState>, Json(req): Json<ProviderUpsertReq>) -> Json<serde_json::Value> {
+    let name = req.name.unwrap_or_else(|| req.r#type.clone());
+    let id = s.sqlite.upsert_provider(None, &req.r#type, &name, req.config).unwrap_or_default();
+    Json(serde_json::json!({"id": id}))
+}
+
+async fn providers_get(State(s): State<AppState>, Path(provider_id): Path<String>) -> Json<serde_json::Value> {
+    let p = s.sqlite.get_provider(&provider_id).ok().flatten();
+    Json(serde_json::json!(p))
+}
+
+async fn providers_update(State(s): State<AppState>, Path(provider_id): Path<String>, Json(req): Json<ProviderUpsertReq>) -> Json<serde_json::Value> {
+    let name = req.name.unwrap_or_else(|| req.r#type.clone());
+    let id = s.sqlite.upsert_provider(Some(provider_id), &req.r#type, &name, req.config).unwrap_or_default();
+    Json(serde_json::json!({"id": id, "ok": true}))
+}
+
+async fn providers_delete(State(s): State<AppState>, Path(provider_id): Path<String>) -> Json<serde_json::Value> {
+    let _ = s.sqlite.delete_provider(&provider_id);
+    Json(serde_json::json!({"ok": true}))
+}
+
+async fn providers_activate(State(s): State<AppState>, Path(provider_id): Path<String>, Json(req): Json<ActivateReq>) -> Json<serde_json::Value> {
+    let key = if req.role == "ai" { "active_provider_ai" } else { "active_provider_data" };
+    let _ = s.sqlite.set_setting(key, &provider_id);
+    Json(serde_json::json!({"ok": true}))
+}
+
+async fn settings_get(State(s): State<AppState>) -> Json<serde_json::Value> {
+    let alpaca = s.sqlite.list_providers().unwrap_or_default().into_iter().find(|p| p.r#type == "alpaca").map(|p| p.config).unwrap_or_else(|| serde_json::json!({}));
+    let hoodlink = s.sqlite.list_providers().unwrap_or_default().into_iter().find(|p| p.r#type == "hoodlink").map(|p| p.config).unwrap_or_else(|| serde_json::json!({}));
+    let active_provider = s.sqlite.get_setting("active_provider_data").ok().flatten();
+    Json(serde_json::json!({"alpaca": alpaca, "hoodlink": hoodlink, "active_provider": active_provider}))
+}
+
+async fn settings_alpaca(State(s): State<AppState>, Json(cfg): Json<serde_json::Value>) -> Json<serde_json::Value> {
+    let _ = s.sqlite.upsert_provider(None, "alpaca", "Alpaca", cfg);
+    Json(serde_json::json!({"ok": true}))
+}
+
+async fn settings_hoodlink(State(s): State<AppState>, Json(cfg): Json<serde_json::Value>) -> Json<serde_json::Value> {
+    let _ = s.sqlite.upsert_provider(None, "hoodlink", "Hoodlink", cfg);
+    Json(serde_json::json!({"ok": true}))
+}
+
+async fn settings_active_provider(State(s): State<AppState>, Json(req): Json<ActiveProviderReq>) -> Json<serde_json::Value> {
+    let _ = s.sqlite.set_setting("active_provider_data", &req.provider);
+    Json(serde_json::json!({"ok": true}))
+}
+
+async fn settings_ui_theme_get(State(s): State<AppState>) -> Json<serde_json::Value> {
+    let raw = s.sqlite.get_setting("ui_theme").ok().flatten().unwrap_or_else(|| "{}".into());
+    let v: serde_json::Value = serde_json::from_str(&raw).unwrap_or_else(|_| serde_json::json!({"mode":"dark"}));
+    Json(v)
+}
+
+async fn settings_ui_theme_put(State(s): State<AppState>, Json(req): Json<ThemeReq>) -> Json<serde_json::Value> {
+    let payload = serde_json::json!({"mode": req.mode, "accent": req.accent, "bull": req.bull, "bear": req.bear});
+    let _ = s.sqlite.set_setting("ui_theme", &payload.to_string());
+    Json(serde_json::json!({"ok": true}))
+}
 
 async fn ws_quotes(_ws: WebSocketUpgrade, State(_s): State<AppState>, Path(_symbol): Path<String>) -> impl IntoResponse {
     // TODO: 1s polling loop, push quote payload parity.
