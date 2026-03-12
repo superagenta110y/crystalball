@@ -936,7 +936,7 @@ export function ChartWidget({
             <SlidersHorizontal size={13} />
             {enabledCount > 0 && <span className="text-[11px] font-mono text-neutral-400">{enabledCount}</span>}
           </summary>
-          <div className="absolute z-20 mt-1 w-64 rounded bg-surface p-2 shadow-xl text-xs space-y-1 pop-in">
+          <div className="absolute right-0 z-20 mt-1 w-52 max-w-[calc(100vw-16px)] rounded bg-surface p-2 shadow-xl text-xs space-y-1 pop-in">
             {[
               { key: 'sma', label: 'SMA', enabled: indSMA, set: setIndSMA },
               { key: 'ema', label: 'EMA', enabled: indEMA, set: setIndEMA },
