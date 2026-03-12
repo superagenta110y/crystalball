@@ -665,6 +665,7 @@ export default function Dashboard() {
             >
               + Add Widget
             </button>
+            <span className="hidden sm:inline text-[10px] text-neutral-500">or</span>
             <button
               onClick={() => window.dispatchEvent(new Event('assistant:open'))}
               className="w-auto inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-surface-border bg-surface-raised hover:bg-surface-overlay text-xs text-white"
