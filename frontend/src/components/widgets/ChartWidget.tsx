@@ -898,7 +898,7 @@ export function ChartWidget({
             onFocus={() => setSymOpen(true)}
             disabled={isGlobalOverride}
             title={isGlobalOverride ? "Controlled by global override" : "Select symbol"}
-            className={`cb-input border rounded px-2 h-6 leading-none text-xs font-mono w-20 focus:outline-none text-white transition
+            className={`cb-input border rounded px-2 h-6 leading-none text-xs font-mono w-10 focus:outline-none text-white transition
               ${isGlobalOverride
                 ? "bg-surface-overlay border-accent/70 text-accent cursor-not-allowed shadow-[0_0_0_1px_rgba(0,212,170,0.25)]"
                 : "bg-transparent border-neutral-500/70 hover:bg-surface-overlay/40 focus:border-accent/60"}`}
@@ -916,27 +916,28 @@ export function ChartWidget({
           )}
         </div>
 
-        {/* Timeframes */}
-        <div ref={tfRef} className="relative">
-          <button onClick={() => setTfOpen(v => !v)} className="h-6 px-1.5 rounded text-xs font-mono leading-none text-neutral-300 hover:text-white hover:bg-surface-overlay inline-flex items-center gap-1">
-            <Clock3 size={11} className="opacity-80" />
-            <span>{timeframe}</span>
-          </button>
-          {tfOpen && (
-            <div className="absolute left-0 top-6 z-40 rounded-md bg-surface-raised shadow-xl p-1 pop-in min-w-[52px]">
-              {TIMEFRAMES.filter(tf => tf !== timeframe).map(tf => (
-                <button key={tf} onClick={() => { setTF(tf); setTfOpen(false); }} className="w-full text-left px-2 py-1 rounded text-xs font-mono text-neutral-400 hover:text-white hover:bg-surface-overlay">{tf}</button>
-              ))}
-            </div>
-          )}
-        </div>
+        <div className="ml-auto flex items-center gap-2 opacity-100 md:opacity-0 md:group-hover/widget:opacity-100 transition">
+          {/* Timeframes */}
+          <div ref={tfRef} className="relative">
+            <button onClick={() => setTfOpen(v => !v)} className="h-6 px-1.5 rounded text-xs font-mono leading-none text-neutral-300 hover:text-white hover:bg-surface-overlay inline-flex items-center gap-1">
+              <Clock3 size={11} className="opacity-80" />
+              <span>{timeframe}</span>
+            </button>
+            {tfOpen && (
+              <div className="absolute right-0 top-6 z-40 rounded-md bg-surface-raised shadow-xl p-1 pop-in min-w-[52px]">
+                {TIMEFRAMES.filter(tf => tf !== timeframe).map(tf => (
+                  <button key={tf} onClick={() => { setTF(tf); setTfOpen(false); }} className="w-full text-left px-2 py-1 rounded text-xs font-mono text-neutral-400 hover:text-white hover:bg-surface-overlay">{tf}</button>
+                ))}
+              </div>
+            )}
+          </div>
 
-        <details className="relative">
-          <summary className="list-none cursor-pointer h-6 px-1 rounded text-xs leading-none text-neutral-500 hover:text-white hover:bg-surface-overlay inline-flex items-center gap-1">
-            <SlidersHorizontal size={13} />
-            {enabledCount > 0 && <span className="text-[11px] font-mono text-neutral-400">{enabledCount}</span>}
-          </summary>
-          <div className="absolute right-0 z-20 mt-1 w-52 max-w-[calc(100vw-16px)] rounded bg-surface p-2 shadow-xl text-xs space-y-1 pop-in">
+          <details className="relative">
+            <summary className="list-none cursor-pointer h-6 px-1 rounded text-xs leading-none text-neutral-500 hover:text-white hover:bg-surface-overlay inline-flex items-center gap-1">
+              <SlidersHorizontal size={13} />
+              {enabledCount > 0 && <span className="text-[11px] font-mono text-neutral-400">{enabledCount}</span>}
+            </summary>
+            <div className="absolute right-0 z-20 mt-1 w-52 max-w-[calc(100vw-16px)] rounded bg-surface p-2 shadow-xl text-xs space-y-1 pop-in">
             {[
               { key: 'sma', label: 'SMA', enabled: indSMA, set: setIndSMA },
               { key: 'ema', label: 'EMA', enabled: indEMA, set: setIndEMA },
@@ -953,7 +954,7 @@ export function ChartWidget({
             ))}
           </div>
         </details>
-
+        </div>
 
       </div>
 
