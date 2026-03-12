@@ -93,9 +93,9 @@ function MobileLayout({ widgets, resolvedSymbols, isGlobalOverride, activeTabId 
   const mains = widgets.filter(w => MAIN_TYPES.includes(w.type));
   const subs  = widgets.filter(w => SUB_TYPES.includes(w.type));
 
-  const renderRow = (group: WidgetInstance[], heightClass: string) => (
+  const renderRow = (group: WidgetInstance[]) => (
     <div
-      className={`flex overflow-x-auto snap-x snap-mandatory ${heightClass}`}
+      className="h-full flex overflow-x-auto snap-x snap-mandatory min-h-0"
       style={{ scrollbarWidth: "none" }}
     >
       {group.map(instance => (
@@ -155,9 +155,9 @@ function MobileLayout({ widgets, resolvedSymbols, isGlobalOverride, activeTabId 
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      {renderRow(mains, "h-1/2")}
+      <div className="flex-1 min-h-0">{renderRow(mains)}</div>
       <div className="shrink-0 h-px bg-surface-border" />
-      {renderRow(subs, "h-1/2")}
+      <div className="flex-1 min-h-0">{renderRow(subs)}</div>
     </div>
   );
 }
@@ -649,7 +649,7 @@ export default function Dashboard() {
   const gridWidth = Math.max(width ?? 1200, 400);
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-surface">
+    <div className="flex flex-col h-[100dvh] overflow-hidden bg-surface">
       <Topbar />
       <TabBar />
 
