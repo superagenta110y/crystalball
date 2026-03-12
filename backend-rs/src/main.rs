@@ -7,7 +7,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use chrono::{Utc, DateTime, FixedOffset};
-use futures_util::StreamExt;
+use futures_util::{StreamExt, SinkExt};
 use tokio::sync::RwLock;
 use tower_http::{cors::CorsLayer, services::ServeDir, trace::TraceLayer};
 
@@ -218,6 +218,11 @@ async fn market_history(Path(symbol): Path<String>, Query(q): Query<HashMap<Stri
     let start = q.get("start").cloned();
     let end = q.get("end").cloned();
 
+    let cache_key = format!("hist:{}:{}:{}:{:?}:{:?}:{:?}", sym, timeframe, limit, latest, start, end);
+    if let Ok(Some(v)) = s.lmdb.get_json(&cache_key) {
+        return Json(v);
+    }
+
     let (api_key, secret_key, data_url) = match active_provider(&s) {
         ActiveProvider::Alpaca { api_key, secret_key, data_url } => (api_key, secret_key, data_url),
         ActiveProvider::Hoodlink { .. } => {
@@ -256,7 +261,9 @@ async fn market_history(Path(symbol): Path<String>, Query(q): Query<HashMap<Stri
             let compact: Vec<serde_json::Value> = bars.into_iter().take(limit).map(|b| serde_json::json!({
                 "ts": b.get("t"), "o": b.get("o"), "h": b.get("h"), "l": b.get("l"), "c": b.get("c"), "v": b.get("v")
             })).collect();
-            return Json(serde_json::json!({"s": sym, "tf": timeframe, "b": compact}));
+            let payload = serde_json::json!({"s": sym, "tf": timeframe, "b": compact});
+            let _ = s.lmdb.set_json(&cache_key, &payload, 10);
+            return Json(payload);
         }
     }
 
@@ -382,9 +389,44 @@ async fn market_symbols(Query(q): Query<HashMap<String,String>>) -> Json<serde_j
     let syms: Vec<String> = out.iter().filter_map(|x| x.get("symbol").and_then(|v| v.as_str()).map(|s| s.to_string())).collect();
     Json(serde_json::json!({"symbols": syms, "items": out}))
 }
-async fn analytics_gex(Path(_): Path<String>, Query(_q): Query<HashMap<String,String>>) -> Json<serde_json::Value> { Json(serde_json::json!([])) }
-async fn analytics_dex(Path(_): Path<String>, Query(_q): Query<HashMap<String,String>>) -> Json<serde_json::Value> { Json(serde_json::json!([])) }
-async fn analytics_oi(Path(_): Path<String>, Query(_q): Query<HashMap<String,String>>) -> Json<serde_json::Value> { Json(serde_json::json!([])) }
+async fn analytics_gex(Path(symbol): Path<String>, Query(q): Query<HashMap<String,String>>, State(s): State<AppState>) -> Json<serde_json::Value> {
+    analytics_core(symbol, q, s, "gex").await
+}
+async fn analytics_dex(Path(symbol): Path<String>, Query(q): Query<HashMap<String,String>>, State(s): State<AppState>) -> Json<serde_json::Value> {
+    analytics_core(symbol, q, s, "dex").await
+}
+async fn analytics_oi(Path(symbol): Path<String>, Query(q): Query<HashMap<String,String>>, State(s): State<AppState>) -> Json<serde_json::Value> {
+    analytics_core(symbol, q, s, "oi").await
+}
+
+async fn analytics_core(symbol: String, q: HashMap<String,String>, s: AppState, kind: &str) -> Json<serde_json::Value> {
+    let sym = symbol.to_uppercase();
+    let cache_key = format!("an:{}:{}:{:?}", kind, sym, q);
+    if let Ok(Some(v)) = s.lmdb.get_json(&cache_key) { return Json(v); }
+
+    let opts = market_options(Path(sym.clone()), Query(q.clone()), State(s.clone())).await.0;
+    let arr = opts.as_array().cloned().unwrap_or_default();
+    let mut rows: Vec<serde_json::Value> = Vec::new();
+    for o in arr {
+        let strike = o.get("strike_price").or_else(|| o.get("strike")).and_then(|x| x.as_f64()).unwrap_or(0.0);
+        if strike <= 0.0 { continue; }
+        let oi = o.get("open_interest").and_then(|x| x.as_f64()).unwrap_or(0.0);
+        let gamma = o.get("gamma").and_then(|x| x.as_f64()).unwrap_or(0.0);
+        let delta = o.get("delta").and_then(|x| x.as_f64()).unwrap_or(0.0);
+        let t = o.get("option_type").or_else(|| o.get("type")).and_then(|x| x.as_str()).unwrap_or("").to_lowercase();
+        let sign = if t == "put" { -1.0 } else { 1.0 };
+        let value = match kind {
+            "gex" => sign * gamma * oi,
+            "dex" => sign * delta * oi,
+            _ => sign * oi,
+        };
+        rows.push(serde_json::json!({"strike": strike, "value": value, "option_type": t, "open_interest": oi, "gamma": gamma, "delta": delta}));
+    }
+    rows.sort_by(|a,b| a.get("strike").and_then(|x| x.as_f64()).partial_cmp(&b.get("strike").and_then(|x| x.as_f64())).unwrap_or(std::cmp::Ordering::Equal));
+    let payload = serde_json::json!({"symbol": sym, "kind": kind, "rows": rows});
+    let _ = s.lmdb.set_json(&cache_key, &payload, 10);
+    Json(payload)
+}
 async fn orders_list() -> Json<serde_json::Value> { Json(serde_json::json!([])) }
 async fn orders_create() -> Json<serde_json::Value> { Json(serde_json::json!({"todo":"orders_create"})) }
 async fn orders_delete(Path(_): Path<String>) -> Json<serde_json::Value> { Json(serde_json::json!({"ok": true})) }
@@ -397,27 +439,38 @@ async fn ai_chat() -> Json<serde_json::Value> { Json(serde_json::json!({"reply":
 async fn screener_get(Query(q): Query<HashMap<String,String>>, State(s): State<AppState>) -> Json<serde_json::Value> {
     let page = q.get("page").and_then(|x| x.parse::<usize>().ok()).unwrap_or(1).max(1);
     let page_size = q.get("page_size").and_then(|x| x.parse::<usize>().ok()).unwrap_or(50).clamp(1, 200);
-    let universe = vec!["SPY","QQQ","IWM","AAPL","MSFT","NVDA","AMZN","GOOGL","META","TSLA","AMD","NFLX","JPM","BAC","GS","XOM","CVX","UNH","PFE","PLTR","COIN","MSTR"];
-    let mut items: Vec<serde_json::Value> = Vec::new();
-    for sym in universe {
-        let quote = market_quote(Path(sym.to_string()), State(s.clone())).await.0;
-        let p = quote.get("last_price").and_then(|v| v.as_f64()).unwrap_or(0.0);
-        items.push(serde_json::json!({
-            "s": sym,
-            "p": p,
-            "sec": "Unknown",
-            "mc": 0,
-            "rv": 0,
-            "c1m": 0,
-            "c1h": 0,
-            "c1d": 0,
-            "c1w": 0,
-            "c1mo": 0,
-            "c1y": 0,
-            "ytd": 0,
-            "lg": "",
-        }));
-    }
+    let cache_key = "screener:snapshot:v1";
+
+    let snapshot = if let Ok(Some(v)) = s.lmdb.get_json(cache_key) {
+        v
+    } else {
+        let universe = vec!["SPY","QQQ","IWM","AAPL","MSFT","NVDA","AMZN","GOOGL","META","TSLA","AMD","NFLX","JPM","BAC","GS","XOM","CVX","UNH","PFE","PLTR","COIN","MSTR"];
+        let mut items: Vec<serde_json::Value> = Vec::new();
+        for sym in universe {
+            let quote = market_quote(Path(sym.to_string()), State(s.clone())).await.0;
+            let p = quote.get("last_price").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            items.push(serde_json::json!({
+                "s": sym,
+                "p": p,
+                "sec": "Unknown",
+                "mc": 0,
+                "rv": 0,
+                "c1m": 0,
+                "c1h": 0,
+                "c1d": 0,
+                "c1w": 0,
+                "c1mo": 0,
+                "c1y": 0,
+                "ytd": 0,
+                "lg": "",
+            }));
+        }
+        let payload = serde_json::json!({"items": items});
+        let _ = s.lmdb.set_json(cache_key, &payload, 15);
+        payload
+    };
+
+    let items = snapshot.get("items").and_then(|x| x.as_array()).cloned().unwrap_or_default();
     let total = items.len();
     let a = (page - 1) * page_size;
     let b = (a + page_size).min(total);

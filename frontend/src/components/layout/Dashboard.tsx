@@ -581,7 +581,7 @@ export default function Dashboard() {
       }
     }
     updateLayout(activeTabId, layout);
-  }, [activeLayout, activeTabId, updateLayout, width, height, prominent]);
+  }, [layout, activeTabId, updateLayout, width, height, prominent]);
 
   const isGlobalOverride = (tab?.globalSymbols?.length ?? 0) > 0;
 

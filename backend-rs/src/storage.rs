@@ -1,5 +1,6 @@
 use anyhow::Result;
-use heed::{Env, EnvOpenOptions};
+use heed::{Env, EnvOpenOptions, Database};
+use heed::types::{Str, Bytes};
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use std::{path::PathBuf, sync::{Arc, Mutex}};
@@ -126,6 +127,7 @@ impl SqliteStore {
 #[derive(Clone)]
 pub struct LmdbCache {
     pub env: Arc<Env>,
+    db: Database<Str, Bytes>,
     _guard: Arc<Mutex<()>>,
 }
 
@@ -139,9 +141,37 @@ impl LmdbCache {
                 .map_size(256 * 1024 * 1024)
                 .open(path)?
         };
+        let mut wtxn = env.write_txn()?;
+        let db: Database<Str, Bytes> = env.create_database(&mut wtxn, Some("cache"))?;
+        wtxn.commit()?;
         Ok(Self {
             env: Arc::new(env),
+            db,
             _guard: Arc::new(Mutex::new(())),
         })
+    }
+
+    pub fn set_json(&self, key: &str, value: &serde_json::Value, ttl_sec: i64) -> Result<()> {
+        let exp = chrono::Utc::now().timestamp() + ttl_sec;
+        let blob = serde_json::json!({"exp": exp, "v": value});
+        let bytes = blob.to_string();
+        let _g = self._guard.lock().ok();
+        let mut wtxn = self.env.write_txn()?;
+        self.db.put(&mut wtxn, key, bytes.as_bytes())?;
+        wtxn.commit()?;
+        Ok(())
+    }
+
+    pub fn get_json(&self, key: &str) -> Result<Option<serde_json::Value>> {
+        let _g = self._guard.lock().ok();
+        let rtxn = self.env.read_txn()?;
+        let bytes = self.db.get(&rtxn, key)?;
+        let Some(raw) = bytes else { return Ok(None); };
+        let parsed: serde_json::Value = serde_json::from_slice(raw).unwrap_or(serde_json::json!({}));
+        let exp = parsed.get("exp").and_then(|x| x.as_i64()).unwrap_or(0);
+        if exp > 0 && chrono::Utc::now().timestamp() > exp {
+            return Ok(None);
+        }
+        Ok(parsed.get("v").cloned())
     }
 }
