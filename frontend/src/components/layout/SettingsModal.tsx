@@ -31,8 +31,11 @@ type ProviderDef = {
   fields: Array<{ key: string; label: string; type?: string; placeholder?: string }>;
 };
 
+const ALPACA_LOGO_DARK = "https://s3.tradingview.com/brokers/logo/160x160_LS__alpaca.svg";
+const ALPACA_LOGO_LIGHT = "https://s3.tradingview.com/brokers/logo/160x160_DS__alpaca.svg";
+
 const PROVIDER_LOGOS: Record<ProviderType, string> = {
-  alpaca: "https://s3.tradingview.com/brokers/logo/160x160_LS__alpaca.svg",
+  alpaca: ALPACA_LOGO_DARK,
   hoodlink: "https://cdn.simpleicons.org/linktree/ffffff",
   openai: "https://cdn.simpleicons.org/openai/ffffff",
   gemini: "https://cdn.simpleicons.org/googlegemini/ffffff",
@@ -197,7 +200,14 @@ export function SettingsModal() {
                   const active = state.active.data === p.id || state.active.ai === p.id;
                   return (
                     <button key={p.id} onClick={() => openDetail(p)} className="w-full flex items-center gap-3 px-2 py-2 rounded hover:bg-surface-overlay text-left">
-                      <img src={PROVIDER_LOGOS[p.type]} alt={p.type} className="w-4 h-4 rounded-sm" style={p.type === "alpaca" && isLight ? { filter: "brightness(0)" } : undefined} />
+                      <img
+                        src={p.type === "alpaca" ? (isLight ? ALPACA_LOGO_LIGHT : ALPACA_LOGO_DARK) : PROVIDER_LOGOS[p.type]}
+                        alt={p.type}
+                        className="w-4 h-4 rounded-sm"
+                        onError={(e) => {
+                          if (p.type === "alpaca") (e.currentTarget as HTMLImageElement).src = ALPACA_LOGO_DARK;
+                        }}
+                      />
                       <span className="text-sm text-white">{def?.label || p.type}</span>
                       <span className={`ml-auto w-2 h-2 rounded-full ${active ? "bg-green-400" : "bg-green-500/80"}`} />
                     </button>
@@ -237,7 +247,7 @@ export function SettingsModal() {
               )}
             </div>
             <div className="space-y-3">
-              <div className="text-sm text-white inline-flex items-center gap-2"><img src={PROVIDER_LOGOS[currentDef.type]} alt={currentDef.type} className="w-4 h-4 rounded-sm" style={currentDef.type === "alpaca" && isLight ? { filter: "brightness(0)" } : undefined} /> {currentDef.label}</div>
+              <div className="text-sm text-white inline-flex items-center gap-2"><img src={currentDef.type === "alpaca" ? (isLight ? ALPACA_LOGO_LIGHT : ALPACA_LOGO_DARK) : PROVIDER_LOGOS[currentDef.type]} alt={currentDef.type} className="w-4 h-4 rounded-sm" onError={(e) => { if (currentDef.type === "alpaca") (e.currentTarget as HTMLImageElement).src = ALPACA_LOGO_DARK; }} /> {currentDef.label}</div>
               {currentDef.fields.map((f) => (
                 <div key={f.key} className="space-y-1">
                   <label className="text-[11px] text-neutral-500">{f.label}</label>
