@@ -171,12 +171,67 @@ const MARGIN    = 6;  // gap between cells
 const PADDING   = 6;  // container padding
 
 type SnapZone = "left" | "right" | "top" | "bottom" | "top-left" | "top-right" | "bottom-left" | "bottom-right" | null;
+type GridRect = { x: number; y: number; w: number; h: number };
 
 function computeRowHeight(windowH: number, layout: Layout[]): number {
   if (!layout.length) return 30;
   const maxRow = layout.reduce((m, l) => Math.max(m, l.y + l.h), 1);
   const available = windowH - TOPBAR_H - TABBAR_H - PADDING * 2 - MARGIN * (maxRow + 1);
   return Math.max(6, Math.floor(available / maxRow));
+}
+
+function computeMaxRowsAllowed(windowH?: number) {
+  const availablePx = Math.max(120, (windowH ?? 900) - TOPBAR_H - TABBAR_H - PADDING * 2);
+  const minRowPx = 6;
+  return Math.max(6, Math.floor((availablePx - MARGIN) / (minRowPx + MARGIN)));
+}
+
+function buildFreeRectsAroundAnchor(anchor: GridRect, maxRows: number): GridRect[] {
+  const rects: GridRect[] = [];
+  if (anchor.x >= 2) rects.push({ x: 0, y: 0, w: anchor.x, h: maxRows });
+  const rightX = anchor.x + anchor.w;
+  if (12 - rightX >= 2) rects.push({ x: rightX, y: 0, w: 12 - rightX, h: maxRows });
+  if (anchor.w >= 2 && anchor.y >= 3) rects.push({ x: anchor.x, y: 0, w: anchor.w, h: anchor.y });
+  const bottomY = anchor.y + anchor.h;
+  if (anchor.w >= 2 && maxRows - bottomY >= 3) rects.push({ x: anchor.x, y: bottomY, w: anchor.w, h: maxRows - bottomY });
+  return rects;
+}
+
+function retileItemsIntoRects(items: Layout[], freeRects: GridRect[]) {
+  if (!items.length || !freeRects.length) return;
+  const totalArea = freeRects.reduce((sum, r) => sum + r.w * r.h, 0) || 1;
+  let start = 0;
+
+  for (let ri = 0; ri < freeRects.length; ri++) {
+    const fr = freeRects[ri];
+    const remaining = items.length - start;
+    if (remaining <= 0) break;
+
+    const rawTake = Math.round(((fr.w * fr.h) / totalArea) * items.length);
+    const take = Math.max(
+      ri === freeRects.length - 1 ? remaining : 1,
+      Math.min(remaining, rawTake || 1)
+    );
+
+    const chunk = items.slice(start, start + take);
+    start += take;
+
+    const n = chunk.length;
+    const aspect = fr.w / Math.max(1, fr.h);
+    const cols = Math.max(1, Math.min(n, Math.ceil(Math.sqrt(n * aspect))));
+    const rows = Math.max(1, Math.ceil(n / cols));
+    const cellW = Math.max(2, Math.floor(fr.w / cols));
+    const cellH = Math.max(3, Math.floor(fr.h / rows));
+
+    chunk.forEach((it, i2) => {
+      const c = i2 % cols;
+      const r = Math.floor(i2 / cols);
+      it.x = fr.x + c * cellW;
+      it.y = fr.y + r * cellH;
+      it.w = c === cols - 1 ? Math.max(2, fr.x + fr.w - it.x) : cellW;
+      it.h = r === rows - 1 ? Math.max(3, fr.y + fr.h - it.y) : cellH;
+    });
+  }
 }
 
 // ─── Main dashboard ──────────────────────────────────────────────────────────
@@ -245,9 +300,7 @@ export default function Dashboard() {
   const handleLayoutChange = useCallback(
     (newLayout: Layout[]) => {
       if (!height) return updateLayout(activeTabId, newLayout);
-      const availablePx = Math.max(120, height - TOPBAR_H - TABBAR_H - PADDING * 2);
-      const minRowPx = 6;
-      const maxRowsAllowed = Math.max(4, Math.floor((availablePx - MARGIN) / (minRowPx + MARGIN)));
+      const maxRowsAllowed = computeMaxRowsAllowed(height);
       const fixed = newLayout.map(it => ({ ...it }));
       for (const it of fixed) {
         if (it.h > maxRowsAllowed) it.h = maxRowsAllowed;
@@ -356,9 +409,7 @@ export default function Dashboard() {
       l[idx].h = activeGap.h;
     }
 
-    const availablePx = Math.max(120, (height ?? 900) - TOPBAR_H - TABBAR_H - PADDING * 2);
-    const minRowPx = 6;
-    const maxRowsAllowed = Math.max(6, Math.floor((availablePx - MARGIN) / (minRowPx + MARGIN)));
+    const maxRowsAllowed = computeMaxRowsAllowed(height);
     const halfH = Math.max(3, Math.floor(maxRowsAllowed / 2));
 
     // Side-drop split: explicit left/right-half target preview on wide tiles.
@@ -384,6 +435,8 @@ export default function Dashboard() {
     }
 
     const zoneAtDrop = snapZone || lastZoneRef.current;
+    let shouldRetileOthers = false;
+
     if (!activeGap && zoneAtDrop) {
       if (zoneAtDrop === "left")      { l[idx].x = 0; l[idx].y = 0; l[idx].w = 6; l[idx].h = maxRowsAllowed; }
       if (zoneAtDrop === "right")     { l[idx].x = 6; l[idx].y = 0; l[idx].w = 6; l[idx].h = maxRowsAllowed; }
@@ -393,61 +446,20 @@ export default function Dashboard() {
       if (zoneAtDrop === "top-right") { l[idx].x = 6; l[idx].y = 0; l[idx].w = 6; l[idx].h = halfH; }
       if (zoneAtDrop === "bottom-left")  { l[idx].x = 0; l[idx].y = maxRowsAllowed - halfH; l[idx].w = 6; l[idx].h = halfH; }
       if (zoneAtDrop === "bottom-right") { l[idx].x = 6; l[idx].y = maxRowsAllowed - halfH; l[idx].w = 6; l[idx].h = halfH; }
-
-      const freeRects: Array<{x:number;y:number;w:number;h:number}> = [];
-      if (zoneAtDrop === "left") freeRects.push({ x: 6, y: 0, w: 6, h: maxRowsAllowed });
-      if (zoneAtDrop === "right") freeRects.push({ x: 0, y: 0, w: 6, h: maxRowsAllowed });
-      if (zoneAtDrop === "top") freeRects.push({ x: 0, y: halfH, w: 12, h: Math.max(2, maxRowsAllowed - halfH) });
-      if (zoneAtDrop === "bottom") freeRects.push({ x: 0, y: 0, w: 12, h: Math.max(2, maxRowsAllowed - halfH) });
-      if (zoneAtDrop === "top-left") {
-        freeRects.push({ x: 6, y: 0, w: 6, h: halfH });
-        freeRects.push({ x: 0, y: halfH, w: 12, h: Math.max(2, maxRowsAllowed - halfH) });
-      }
-      if (zoneAtDrop === "top-right") {
-        freeRects.push({ x: 0, y: 0, w: 6, h: halfH });
-        freeRects.push({ x: 0, y: halfH, w: 12, h: Math.max(2, maxRowsAllowed - halfH) });
-      }
-      if (zoneAtDrop === "bottom-left") {
-        freeRects.push({ x: 6, y: maxRowsAllowed - halfH, w: 6, h: halfH });
-        freeRects.push({ x: 0, y: 0, w: 12, h: Math.max(2, maxRowsAllowed - halfH) });
-      }
-      if (zoneAtDrop === "bottom-right") {
-        freeRects.push({ x: 0, y: maxRowsAllowed - halfH, w: 6, h: halfH });
-        freeRects.push({ x: 0, y: 0, w: 12, h: Math.max(2, maxRowsAllowed - halfH) });
-      }
-
-      const others = l.filter((_, i) => i !== idx);
-      const totalArea = freeRects.reduce((s, r) => s + (r.w * r.h), 0) || 1;
-      let start = 0;
-      for (let ri = 0; ri < freeRects.length; ri++) {
-        const fr = freeRects[ri];
-        const remaining = others.length - start;
-        if (remaining <= 0) break;
-        const rawTake = Math.round((fr.w * fr.h / totalArea) * others.length);
-        const take = Math.max(ri === freeRects.length - 1 ? remaining : 1, Math.min(remaining, rawTake || 1));
-        const chunk = others.slice(start, start + take);
-        start += take;
-
-        const n = chunk.length;
-        const aspect = fr.w / Math.max(1, fr.h);
-        const cols = Math.max(1, Math.min(n, Math.ceil(Math.sqrt(n * aspect))));
-        const rows = Math.max(1, Math.ceil(n / cols));
-        const cellW = Math.max(2, Math.floor(fr.w / cols));
-        const cellH = Math.max(3, Math.floor(fr.h / rows));
-
-        chunk.forEach((it, i2) => {
-          const c = i2 % cols;
-          const r = Math.floor(i2 / cols);
-          it.x = fr.x + c * cellW;
-          it.y = fr.y + r * cellH;
-          it.w = (c === cols - 1) ? Math.max(2, fr.x + fr.w - it.x) : cellW;
-          it.h = (r === rows - 1) ? Math.max(3, fr.y + fr.h - it.y) : cellH;
-        });
-      }
+      shouldRetileOthers = true;
     } else {
-      // no anchor zone: keep dragged widget size/position from drop, only clamp to viewport rows
+      // no anchor zone: keep dropped footprint, but if this causes overflow for other widgets,
+      // retile everyone else back into visible space.
       const t = l[idx];
       if (t.y + t.h > maxRowsAllowed) t.y = Math.max(0, maxRowsAllowed - t.h);
+      shouldRetileOthers = l.some((it, i) => i !== idx && it.y + it.h > maxRowsAllowed);
+    }
+
+    if (shouldRetileOthers) {
+      const anchor = l[idx];
+      const others = l.filter((_, i) => i !== idx);
+      const freeRects = buildFreeRectsAroundAnchor(anchor, maxRowsAllowed);
+      if (freeRects.length) retileItemsIntoRects(others, freeRects);
     }
 
     // final safety clamp (nothing offscreen)
@@ -702,6 +714,19 @@ export default function Dashboard() {
     const q = u.searchParams.toString();
     window.history.replaceState({}, "", q ? `${u.pathname}?${q}` : u.pathname);
   }, [activeTabId, zoomedWidgetId]);
+
+  // Desktop safety: when a newly added widget overflows a fully packed page,
+  // retile the entire page so everything remains visible.
+  useEffect(() => {
+    if (isMobile || !layout.length) return;
+    const maxRowsAllowed = computeMaxRowsAllowed(height);
+    const hasOverflow = layout.some((it) => it.y + it.h > maxRowsAllowed);
+    if (!hasOverflow) return;
+
+    const next = layout.map((it) => ({ ...it }));
+    retileItemsIntoRects(next, [{ x: 0, y: 0, w: 12, h: maxRowsAllowed }]);
+    updateLayout(activeTabId, next);
+  }, [isMobile, layout, height, activeTabId, updateLayout]);
 
   const gridWidth = Math.max(width ?? 1200, 400);
 
