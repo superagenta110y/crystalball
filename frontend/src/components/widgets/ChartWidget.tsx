@@ -884,8 +884,8 @@ export function ChartWidget({
   return (
     <div className="relative flex flex-col h-full w-full">
       {/* Toolbar */}
-      <div className="flex items-center gap-2 px-2 py-1.5 pr-14 border-b border-surface-border shrink-0 flex-wrap">
-        <div className="widget-drag-handle cursor-grab active:cursor-grabbing select-none inline-flex items-center gap-1.5 text-neutral-500">
+      <div className="flex items-center gap-2 px-2 py-1.5 pr-14 border-b border-surface-border shrink-0 flex-wrap text-xs">
+        <div className="widget-drag-handle cursor-grab active:cursor-grabbing select-none inline-flex items-center gap-1.5 text-neutral-500 leading-none">
           <GripHorizontal size={11} className="opacity-50" />
           <span className="text-xs uppercase tracking-wide">Chart</span>
         </div>
@@ -898,7 +898,7 @@ export function ChartWidget({
             onFocus={() => setSymOpen(true)}
             disabled={isGlobalOverride}
             title={isGlobalOverride ? "Controlled by global override" : "Select symbol"}
-            className={`cb-input border rounded px-2 py-0.5 text-xs font-mono w-20 focus:outline-none text-white transition
+            className={`cb-input border rounded px-2 h-6 leading-none text-xs font-mono w-20 focus:outline-none text-white transition
               ${isGlobalOverride
                 ? "bg-surface-overlay border-accent/70 text-accent cursor-not-allowed shadow-[0_0_0_1px_rgba(0,212,170,0.25)]"
                 : "bg-transparent border-neutral-500/70 hover:bg-surface-overlay/40 focus:border-accent/60"}`}
@@ -918,7 +918,7 @@ export function ChartWidget({
 
         {/* Timeframes */}
         <div ref={tfRef} className="relative">
-          <button onClick={() => setTfOpen(v => !v)} className="px-1.5 py-0.5 rounded text-xs font-mono text-neutral-300 hover:text-white hover:bg-surface-overlay inline-flex items-center gap-1">
+          <button onClick={() => setTfOpen(v => !v)} className="h-6 px-1.5 rounded text-xs font-mono leading-none text-neutral-300 hover:text-white hover:bg-surface-overlay inline-flex items-center gap-1">
             <span>{timeframe}</span>
           </button>
           {tfOpen && (
@@ -931,7 +931,7 @@ export function ChartWidget({
         </div>
 
         <details className="relative">
-          <summary className="list-none cursor-pointer px-1 py-0.5 text-xs text-neutral-500 hover:text-white hover:bg-surface-overlay rounded inline-flex items-center gap-1">
+          <summary className="list-none cursor-pointer h-6 px-1 rounded text-xs leading-none text-neutral-500 hover:text-white hover:bg-surface-overlay inline-flex items-center gap-1">
             <SlidersHorizontal size={13} />
             {enabledCount > 1 && <span className="text-[11px] font-mono text-neutral-400">{enabledCount}</span>}
           </summary>
