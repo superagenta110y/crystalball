@@ -157,6 +157,7 @@ export default function Dashboard() {
   const isMobile = (width ?? 0) < 768;
   const [zoomedWidgetId, setZoomedWidgetId] = useState<string | null>(null);
   const [resizeDebugEdges, setResizeDebugEdges] = useState<Record<string, string[]>>({});
+  const resizeBaselineRef = useRef<Record<string, Layout>>({});
   const [gapTargets, setGapTargets] = useState<Array<{ id: string; x: number; y: number; w: number; h: number }>>([]);
   const [activeGapId, setActiveGapId] = useState<string | null>(null);
   const [sideSplitTarget, setSideSplitTarget] = useState<{ targetId: string; side: "left" | "right" } | null>(null);
@@ -436,10 +437,12 @@ export default function Dashboard() {
     const idx = l.findIndex(it => it.i === newItem.i);
     if (idx < 0) return;
     const item = l[idx];
-    const oldRight = oldItem.x + oldItem.w;
+
+    const prev = resizeBaselineRef.current[item.i] || oldItem;
+    const oldRight = prev.x + prev.w;
     const newRight = item.x + item.w;
     const dx = newRight - oldRight;
-    const oldBottom = oldItem.y + oldItem.h;
+    const oldBottom = prev.y + prev.h;
     const newBottom = item.y + item.h;
     const dy = newBottom - oldBottom;
     const overlapY = (a: Layout, b: Layout) => Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
@@ -473,6 +476,7 @@ export default function Dashboard() {
       moved.forEach(id => { dbg[id] = [...(dbg[id] || []), "top", "bottom"]; });
     }
 
+    resizeBaselineRef.current[item.i] = { ...item };
     setResizeDebugEdges(dbg);
   }, []);
 
@@ -644,9 +648,9 @@ export default function Dashboard() {
                 onDragStart={(layout:any, oldItem:any) => { setGapTargets(computeGapTargets(layout as Layout[], oldItem?.i)); setActiveGapId(null); setSideSplitTarget(null); }}
                 onDrag={handleDrag as any}
                 onDragStop={handleDragStop}
-                onResizeStart={() => setResizeDebugEdges({})}
+                onResizeStart={(_layout:any, oldItem:any) => { setResizeDebugEdges({}); resizeBaselineRef.current = { [oldItem.i]: { ...oldItem } }; }}
                 onResize={handleResize as any}
-                onResizeStop={handleResizeStop as any}
+                onResizeStop={(layout:any, oldItem:any, newItem:any) => { resizeBaselineRef.current = {}; handleResizeStop(layout, oldItem, newItem); }}
                 draggableHandle=".widget-drag-handle"
                 margin={[MARGIN, MARGIN]}
                 containerPadding={[PADDING, PADDING]}
@@ -654,6 +658,7 @@ export default function Dashboard() {
                 preventCollision={false}
                 isDraggable
                 isResizable
+                resizeHandles={["e", "s", "se"] as any}
               >
                 {widgets.map(instance => (
                   <div key={instance.id} className="widget relative">
