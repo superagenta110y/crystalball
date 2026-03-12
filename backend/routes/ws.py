@@ -127,7 +127,6 @@ async def _orderflow_loop(symbol: str):
             ordered = sorted(trades or [], key=lambda t: t.get("timestamp", ""))
             by_sec: dict[int, dict[str, float]] = {}
             prev_trade_price = 0.0
-            now_sec = int(asyncio.get_event_loop().time())
             for t in ordered:
                 ts_raw = t.get("timestamp")
                 if not ts_raw:
@@ -145,7 +144,7 @@ async def _orderflow_loop(symbol: str):
                     continue
                 conds = t.get("conditions") or []
                 is_t = isinstance(conds, list) and ("T" in conds)
-                slot = by_sec.get(sec) or {"buy": 0.0, "sell": 0.0}
+                slot = by_sec.get(sec) or {"buy": 0.0, "sell": 0.0, "pxv": 0.0, "vol": 0.0}
                 if is_t and prev_trade_price > 0:
                     if price > prev_trade_price:
                         slot["buy"] += size
@@ -162,14 +161,25 @@ async def _orderflow_loop(symbol: str):
                         slot["buy"] += size / 2; slot["sell"] += size / 2
                 else:
                     slot["buy"] += size / 2; slot["sell"] += size / 2
+                slot["pxv"] += price * size
+                slot["vol"] += size
                 by_sec[sec] = slot
                 prev_trade_price = price
+
+            buckets = []
+            for k, v in sorted(by_sec.items()):
+                vol = float(v.get("vol") or 0.0)
+                buy = float(v.get("buy") or 0.0)
+                sell = float(v.get("sell") or 0.0)
+                price = (float(v.get("pxv") or 0.0) / vol) if vol > 0 else 0.0
+                imbalance = ((buy - sell) / vol) if vol > 0 else 0.0
+                buckets.append({"sec": k, "buy": buy, "sell": sell, "vol": vol, "price": price, "imbalance": imbalance})
 
             payload = {
                 "type": "orderflow",
                 "symbol": symbol,
                 "mid": mid,
-                "buckets": [{"sec": k, "buy": v["buy"], "sell": v["sell"]} for k, v in sorted(by_sec.items())],
+                "buckets": buckets,
             }
             msg = json.dumps(payload)
             dead: Set[WebSocket] = set()
@@ -181,7 +191,7 @@ async def _orderflow_loop(symbol: str):
             clients -= dead
         except Exception:
             pass
-        await asyncio.sleep(1)
+        await asyncio.sleep(0.25)
     _orderflow_tasks.pop(symbol, None)
 
 

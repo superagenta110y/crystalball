@@ -250,7 +250,7 @@ export function Topbar() {
                     {(() => { const cur = THEME_MODES.find(m => m.id === theme.mode) || THEME_MODES[0]; const Icon = cur.Icon; return <Icon size={15} />; })()}
                   </button>
                   {showThemeMenu && (
-                    <div className="absolute right-0 top-[34px] z-20 w-8 rounded-full bg-surface-overlay shadow-xl p-0.5 pop-in">
+                    <div className="absolute right-[36px] top-0 z-20 h-8 rounded-full bg-surface-overlay shadow-xl p-0.5 pop-in flex items-center gap-0.5">
                       {THEME_MODES.filter(m => m.id !== theme.mode).map(({ id, Icon }) => (
                         <button key={id} onClick={() => { setTheme({ mode: id }); setShowThemeMenu(false); }} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-surface-border text-neutral-300 hover:text-white">
                           <Icon size={14} />
