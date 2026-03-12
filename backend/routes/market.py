@@ -52,32 +52,72 @@ async def history(
 
     # Cursor-based mode (preferred for frontend panning)
     if latest is not None:
+        step = _tf_sec(timeframe)
         end_ts = _parse_latest_to_end_ts(latest, timeframe)
         end_iso = _ts_to_iso(end_ts)
 
-        # Constrain cursor loads to a recent bounded window to avoid provider returning stale/ancient slices.
-        req_start = start
-        if not req_start:
-            step = _tf_sec(timeframe)
-            # Keep window close to requested size so providers that honor start+limit
-            # return the most recent slice instead of very old bars.
-            lookback_bars = max(int(limit * 1.5), 400)
-            start_ts = max(0, end_ts - step * lookback_bars)
-            req_start = _ts_to_iso(start_ts)
+        # Fully-formed bar boundary; anything newer is still forming and must not be cached forever.
+        now_ts = int(datetime.now(timezone.utc).timestamp())
+        current_bucket_ts = (now_ts // step) * step
+        latest_closed_ts = current_bucket_ts - step
 
-        key = f"hist:{sym}:{timeframe}:{limit}:{req_start}:{end_iso}"
-        cached = history_cache.get(key)
-        if cached is not None:
-            return cached
+        # Start with immutable cached bars.
+        cached = history_cache.get_cached_bars(sym, timeframe, end_ts=end_ts, limit=limit)
+        merged: dict[int, dict] = {}
+        for b in cached:
+            try:
+                merged[int(b.get("ts"))] = b
+            except Exception:
+                continue
 
-        bars = await provider.get_history(sym, timeframe=timeframe, limit=limit, start=req_start, end=end_iso)
+        # Pull only what is needed (plus small buffer for non-trading gaps).
+        attempts = 0
+        fetch_end_ts = end_ts
+        while len(merged) < limit and attempts < 5:
+            attempts += 1
+            missing = max(1, limit - len(merged))
+            req_limit = min(5000, max(80, int(missing * 1.6)))
+            batch = await provider.get_history(
+                sym,
+                timeframe=timeframe,
+                limit=req_limit,
+                start=start,
+                end=_ts_to_iso(fetch_end_ts),
+            )
+            if not batch:
+                break
 
-        compact = [
-            {"ts": b.get("timestamp"), "o": b.get("open"), "h": b.get("high"), "l": b.get("low"), "c": b.get("close"), "v": b.get("volume")}
-            for b in bars
-        ]
-        payload = {"s": sym, "tf": timeframe, "b": compact}
-        history_cache.setex(key, history_cache.ttl_for_timeframe(timeframe), payload)
+            compact_batch = []
+            for b in batch:
+                ts_raw = b.get("timestamp")
+                if ts_raw is None:
+                    continue
+                try:
+                    if isinstance(ts_raw, (int, float)):
+                        ts = int(ts_raw)
+                    else:
+                        ts = int(datetime.fromisoformat(str(ts_raw).replace("Z", "+00:00")).timestamp())
+                except Exception:
+                    continue
+                compact = {"ts": ts, "o": b.get("open"), "h": b.get("high"), "l": b.get("low"), "c": b.get("close"), "v": b.get("volume")}
+                compact_batch.append(compact)
+                merged[ts] = compact
+
+            # Indefinite caching only for fully-formed immutable bars.
+            history_cache.upsert_immutable_bars(sym, timeframe, compact_batch, latest_closed_ts=latest_closed_ts)
+
+            oldest_ts = min((x.get("ts") for x in compact_batch if isinstance(x.get("ts"), int)), default=None)
+            if oldest_ts is None:
+                break
+            next_fetch_end = oldest_ts - step
+            if next_fetch_end >= fetch_end_ts:
+                break
+            fetch_end_ts = next_fetch_end
+
+        ordered = [merged[k] for k in sorted(merged.keys()) if k <= end_ts]
+        if len(ordered) > limit:
+            ordered = ordered[-limit:]
+        payload = {"s": sym, "tf": timeframe, "b": ordered}
         return payload
 
     # Legacy mode (backward compatible)
