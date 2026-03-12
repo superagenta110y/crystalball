@@ -25,7 +25,8 @@ struct AppState {
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt().with_env_filter("info").init();
 
-    let sqlite = storage::SqliteStore::open("crystalball.db")?;
+    // Reuse the existing Python backend DB for provider/settings continuity.
+    let sqlite = storage::SqliteStore::open("../backend/crystalball.db")?;
     sqlite.init()?;
     let lmdb = storage::LmdbCache::open("./cache.lmdb")?;
 
