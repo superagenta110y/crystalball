@@ -88,6 +88,7 @@ function MobileLayout({ widgets, resolvedSymbols, isGlobalOverride, activeTabId 
   activeTabId: string;
 }) {
   const { removeWidget, updateWidgetConfig } = useDashboardStore();
+  const [zoomedWidgetId, setZoomedWidgetId] = useState<string | null>(null);
 
   const mains = widgets.filter(w => MAIN_TYPES.includes(w.type));
   const subs  = widgets.filter(w => SUB_TYPES.includes(w.type));
@@ -103,12 +104,19 @@ function MobileLayout({ widgets, resolvedSymbols, isGlobalOverride, activeTabId 
           className="snap-start shrink-0 w-full h-full p-1"
         >
           <div className="h-full rounded-xl border border-surface-border bg-surface-raised overflow-hidden">
-            {renderWidget({
-              instance,
-              resolvedSymbol: resolvedSymbols[instance.id] ?? "SPY",
-              isGlobalOverride,
-              onConfigChange: (patch) => updateWidgetConfig(activeTabId, instance.id, patch),
-            })}
+            <WidgetWrapper
+              instance={instance}
+              onRemove={() => removeWidget(activeTabId, instance.id)}
+              onToggleZoom={() => setZoomedWidgetId(z => z === instance.id ? null : instance.id)}
+              isZoomed={zoomedWidgetId === instance.id}
+            >
+              {renderWidget({
+                instance,
+                resolvedSymbol: resolvedSymbols[instance.id] ?? "SPY",
+                isGlobalOverride,
+                onConfigChange: (patch) => updateWidgetConfig(activeTabId, instance.id, patch),
+              })}
+            </WidgetWrapper>
           </div>
         </div>
       ))}
@@ -120,9 +128,33 @@ function MobileLayout({ widgets, resolvedSymbols, isGlobalOverride, activeTabId 
     </div>
   );
 
+  if (zoomedWidgetId) {
+    const instance = widgets.find(w => w.id === zoomedWidgetId);
+    if (instance) {
+      return (
+        <div className="flex-1 overflow-hidden p-1">
+          <div className="h-full rounded-xl border border-surface-border bg-surface-raised overflow-hidden">
+            <WidgetWrapper
+              instance={instance}
+              onRemove={() => removeWidget(activeTabId, instance.id)}
+              onToggleZoom={() => setZoomedWidgetId(null)}
+              isZoomed
+            >
+              {renderWidget({
+                instance,
+                resolvedSymbol: resolvedSymbols[instance.id] ?? "SPY",
+                isGlobalOverride,
+                onConfigChange: (patch) => updateWidgetConfig(activeTabId, instance.id, patch),
+              })}
+            </WidgetWrapper>
+          </div>
+        </div>
+      );
+    }
+  }
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Swipe indicator dots */}
       {renderRow(mains, "h-1/2")}
       <div className="shrink-0 h-px bg-surface-border" />
       {renderRow(subs, "h-1/2")}
