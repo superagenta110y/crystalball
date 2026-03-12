@@ -73,6 +73,12 @@ export function Topbar() {
   }, []);
 
   useEffect(() => {
+    const onOpenAdd = () => setShowAddWidget(true);
+    window.addEventListener("topbar:add-widget", onOpenAdd as EventListener);
+    return () => window.removeEventListener("topbar:add-widget", onOpenAdd as EventListener);
+  }, []);
+
+  useEffect(() => {
     const q = draft.trim().toUpperCase();
     if (!q) {
       const base = recentSymbols.length ? recentSymbols : COMMON_SYMBOLS;

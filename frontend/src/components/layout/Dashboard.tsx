@@ -654,19 +654,23 @@ export default function Dashboard() {
       <TabBar />
 
       {widgets.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center gap-4 text-neutral-500">
-          <svg width="96" height="96" viewBox="0 0 96 96" className="opacity-90">
-            <defs>
-              <radialGradient id="cbGlow" cx="50%" cy="42%" r="58%">
-                <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.45" />
-                <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.05" />
-              </radialGradient>
-            </defs>
-            <circle cx="48" cy="48" r="28" fill="url(#cbGlow)" stroke="var(--accent)" strokeOpacity="0.45"/>
-            <path d="M24 72h48" stroke="currentColor" strokeOpacity="0.5" strokeWidth="4" strokeLinecap="round"/>
-            <path d="M32 76h32" stroke="currentColor" strokeOpacity="0.35" strokeWidth="4" strokeLinecap="round"/>
-          </svg>
-          <p className="text-sm">Click <strong className="text-neutral-300">[+Add Widget]</strong> or <button className="text-accent underline" onClick={() => window.dispatchEvent(new Event('assistant:open'))}>[Use AI]</button> to build your dashboard.</p>
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 text-neutral-500 px-4">
+          <img src="/logo.svg" alt="CrystalBall" className="w-20 h-20 opacity-90" />
+          <p className="text-sm text-neutral-300">Build your dashboard:</p>
+          <div className="w-full max-w-md flex flex-col sm:flex-row gap-2">
+            <button
+              onClick={() => window.dispatchEvent(new Event('topbar:add-widget'))}
+              className="flex-1 px-3 py-2 rounded-lg border border-surface-border bg-surface-raised hover:bg-surface-overlay text-xs text-neutral-200"
+            >
+              + Add Widget
+            </button>
+            <button
+              onClick={() => window.dispatchEvent(new Event('assistant:open'))}
+              className="flex-1 px-3 py-2 rounded-lg border border-accent/40 bg-accent/10 hover:bg-accent/15 text-xs text-accent"
+            >
+              ❇️ Use AI
+            </button>
+          </div>
         </div>
       ) : isMobile ? (
         <MobileLayout
