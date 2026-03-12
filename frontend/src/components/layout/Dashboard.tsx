@@ -161,6 +161,7 @@ export default function Dashboard() {
   const [gapTargets, setGapTargets] = useState<Array<{ id: string; x: number; y: number; w: number; h: number }>>([]);
   const [activeGapId, setActiveGapId] = useState<string | null>(null);
   const [sideSplitTarget, setSideSplitTarget] = useState<{ targetId: string; side: "left" | "right" } | null>(null);
+  const [prominent, setProminent] = useState<{ id: string; alt: boolean } | null>(null);
 
   // Hydrate tab/zoom from URL
   useEffect(() => {
@@ -228,9 +229,9 @@ export default function Dashboard() {
   const lastZoneRef = useRef<SnapZone>(null);
 
   const detectSnapZone = useCallback((x: number, y: number, w: number, h: number, prev: SnapZone): SnapZone => {
-    const edge = 70;
-    const corner = 110;
-    const grace = prev ? 24 : 0; // hysteresis/leeway before dropping zone
+    const edge = 92;
+    const corner = 132;
+    const grace = prev ? 56 : 16; // stronger hysteresis/leeway before dropping zone
     const nearLeft = x <= (edge + grace);
     const nearRight = x >= (w - edge - grace);
     const nearTop = y <= (edge + grace);
@@ -349,34 +350,35 @@ export default function Dashboard() {
       }
     }
 
-    if (!activeGap && snapZone) {
-      if (snapZone === "left")      { l[idx].x = 0; l[idx].y = 0; l[idx].w = 6; l[idx].h = maxRowsAllowed; }
-      if (snapZone === "right")     { l[idx].x = 6; l[idx].y = 0; l[idx].w = 6; l[idx].h = maxRowsAllowed; }
-      if (snapZone === "top")       { l[idx].x = 0; l[idx].y = 0; l[idx].w = 12; l[idx].h = halfH; }
-      if (snapZone === "bottom")    { l[idx].x = 0; l[idx].y = maxRowsAllowed - halfH; l[idx].w = 12; l[idx].h = halfH; }
-      if (snapZone === "top-left")  { l[idx].x = 0; l[idx].y = 0; l[idx].w = 6; l[idx].h = halfH; }
-      if (snapZone === "top-right") { l[idx].x = 6; l[idx].y = 0; l[idx].w = 6; l[idx].h = halfH; }
-      if (snapZone === "bottom-left")  { l[idx].x = 0; l[idx].y = maxRowsAllowed - halfH; l[idx].w = 6; l[idx].h = halfH; }
-      if (snapZone === "bottom-right") { l[idx].x = 6; l[idx].y = maxRowsAllowed - halfH; l[idx].w = 6; l[idx].h = halfH; }
+    const zoneAtDrop = snapZone || lastZoneRef.current;
+    if (!activeGap && zoneAtDrop) {
+      if (zoneAtDrop === "left")      { l[idx].x = 0; l[idx].y = 0; l[idx].w = 6; l[idx].h = maxRowsAllowed; }
+      if (zoneAtDrop === "right")     { l[idx].x = 6; l[idx].y = 0; l[idx].w = 6; l[idx].h = maxRowsAllowed; }
+      if (zoneAtDrop === "top")       { l[idx].x = 0; l[idx].y = 0; l[idx].w = 12; l[idx].h = halfH; }
+      if (zoneAtDrop === "bottom")    { l[idx].x = 0; l[idx].y = maxRowsAllowed - halfH; l[idx].w = 12; l[idx].h = halfH; }
+      if (zoneAtDrop === "top-left")  { l[idx].x = 0; l[idx].y = 0; l[idx].w = 6; l[idx].h = halfH; }
+      if (zoneAtDrop === "top-right") { l[idx].x = 6; l[idx].y = 0; l[idx].w = 6; l[idx].h = halfH; }
+      if (zoneAtDrop === "bottom-left")  { l[idx].x = 0; l[idx].y = maxRowsAllowed - halfH; l[idx].w = 6; l[idx].h = halfH; }
+      if (zoneAtDrop === "bottom-right") { l[idx].x = 6; l[idx].y = maxRowsAllowed - halfH; l[idx].w = 6; l[idx].h = halfH; }
 
       const freeRects: Array<{x:number;y:number;w:number;h:number}> = [];
-      if (snapZone === "left") freeRects.push({ x: 6, y: 0, w: 6, h: maxRowsAllowed });
-      if (snapZone === "right") freeRects.push({ x: 0, y: 0, w: 6, h: maxRowsAllowed });
-      if (snapZone === "top") freeRects.push({ x: 0, y: halfH, w: 12, h: Math.max(2, maxRowsAllowed - halfH) });
-      if (snapZone === "bottom") freeRects.push({ x: 0, y: 0, w: 12, h: Math.max(2, maxRowsAllowed - halfH) });
-      if (snapZone === "top-left") {
+      if (zoneAtDrop === "left") freeRects.push({ x: 6, y: 0, w: 6, h: maxRowsAllowed });
+      if (zoneAtDrop === "right") freeRects.push({ x: 0, y: 0, w: 6, h: maxRowsAllowed });
+      if (zoneAtDrop === "top") freeRects.push({ x: 0, y: halfH, w: 12, h: Math.max(2, maxRowsAllowed - halfH) });
+      if (zoneAtDrop === "bottom") freeRects.push({ x: 0, y: 0, w: 12, h: Math.max(2, maxRowsAllowed - halfH) });
+      if (zoneAtDrop === "top-left") {
         freeRects.push({ x: 6, y: 0, w: 6, h: halfH });
         freeRects.push({ x: 0, y: halfH, w: 12, h: Math.max(2, maxRowsAllowed - halfH) });
       }
-      if (snapZone === "top-right") {
+      if (zoneAtDrop === "top-right") {
         freeRects.push({ x: 0, y: 0, w: 6, h: halfH });
         freeRects.push({ x: 0, y: halfH, w: 12, h: Math.max(2, maxRowsAllowed - halfH) });
       }
-      if (snapZone === "bottom-left") {
+      if (zoneAtDrop === "bottom-left") {
         freeRects.push({ x: 6, y: maxRowsAllowed - halfH, w: 6, h: halfH });
         freeRects.push({ x: 0, y: 0, w: 12, h: Math.max(2, maxRowsAllowed - halfH) });
       }
-      if (snapZone === "bottom-right") {
+      if (zoneAtDrop === "bottom-right") {
         freeRects.push({ x: 0, y: maxRowsAllowed - halfH, w: 6, h: halfH });
         freeRects.push({ x: 0, y: 0, w: 12, h: Math.max(2, maxRowsAllowed - halfH) });
       }
@@ -525,6 +527,62 @@ export default function Dashboard() {
     updateLayout(activeTabId, l);
   }, [activeTabId, updateLayout]);
 
+  const handleRetileProminent = useCallback((widgetId: string) => {
+    const layout = activeLayout.map(it => ({ ...it }));
+    const idx = layout.findIndex(it => it.i === widgetId);
+    if (idx < 0 || !layout.length) return;
+
+    const isPortrait = (height || 0) > (width || 0);
+    const nextAlt = (prominent?.id === widgetId) ? !prominent.alt : false;
+    setProminent({ id: widgetId, alt: nextAlt });
+
+    const maxRows = Math.max(10, ...layout.map(it => it.y + it.h));
+    const main = layout[idx];
+    if (isPortrait) {
+      // portrait: prominent on top half
+      main.x = 0; main.y = 0; main.w = 12; main.h = Math.max(4, Math.floor(maxRows / 2));
+      const others = layout.filter((_, i) => i !== idx);
+      const remY = main.h;
+      const remH = Math.max(3, maxRows - remY);
+      if (!nextAlt) {
+        // horizontal strip grid
+        const n = Math.max(1, others.length);
+        const wEach = Math.max(2, Math.floor(12 / n));
+        others.forEach((o, i) => { o.x = i * wEach; o.y = remY; o.w = (i === n - 1) ? 12 - o.x : wEach; o.h = remH; });
+      } else {
+        // vertical stack
+        const n = Math.max(1, others.length);
+        const hEach = Math.max(3, Math.floor(remH / n));
+        others.forEach((o, i) => { o.x = 0; o.y = remY + i * hEach; o.w = 12; o.h = (i === n - 1) ? remH - i * hEach : hEach; });
+      }
+    } else {
+      // landscape: prominent on left half
+      main.x = 0; main.y = 0; main.w = 6; main.h = maxRows;
+      const others = layout.filter((_, i) => i !== idx);
+      if (!nextAlt) {
+        // vertical stack on right
+        const n = Math.max(1, others.length);
+        const hEach = Math.max(3, Math.floor(maxRows / n));
+        others.forEach((o, i) => { o.x = 6; o.y = i * hEach; o.w = 6; o.h = (i === n - 1) ? maxRows - i * hEach : hEach; });
+      } else {
+        // horizontal lanes on right upper/lower
+        const n = Math.max(1, others.length);
+        const cols = Math.min(2, n);
+        const rows = Math.ceil(n / cols);
+        const hEach = Math.max(3, Math.floor(maxRows / rows));
+        const wEach = Math.max(2, Math.floor(6 / cols));
+        others.forEach((o, i) => {
+          const c = i % cols, r = Math.floor(i / cols);
+          o.x = 6 + c * wEach;
+          o.y = r * hEach;
+          o.w = (c === cols - 1) ? 6 - c * wEach : wEach;
+          o.h = (r === rows - 1) ? maxRows - r * hEach : hEach;
+        });
+      }
+    }
+    updateLayout(activeTabId, layout);
+  }, [activeLayout, activeTabId, updateLayout, width, height, prominent]);
+
   const isGlobalOverride = (tab?.globalSymbols?.length ?? 0) > 0;
 
   const resolvedSymbols = useMemo(
@@ -670,6 +728,7 @@ export default function Dashboard() {
                       instance={instance}
                       onRemove={() => removeWidget(activeTabId, instance.id)}
                       onToggleZoom={() => setZoomedWidgetId(instance.id)}
+                      onRetileProminent={() => handleRetileProminent(instance.id)}
                       isZoomed={false}
                     >
                       {renderWidget({
