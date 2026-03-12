@@ -631,6 +631,10 @@ export default function Dashboard() {
   );
 
   useEffect(() => {
+    if (!widgets.length) {
+      setZoomedWidgetId(null);
+      return;
+    }
     if (zoomedWidgetId && !widgets.some(w => w.id === zoomedWidgetId)) {
       setZoomedWidgetId(null);
     }
@@ -658,7 +662,7 @@ export default function Dashboard() {
         <div className="flex-1 flex flex-col items-center justify-center gap-4 text-neutral-500 px-4">
           <img src="/logo.svg" alt="CrystalBall" className="w-20 h-20 opacity-90" />
           <p className="text-sm text-neutral-300">Build your dashboard:</p>
-          <div className="w-full max-w-md flex flex-col sm:flex-row gap-2 items-center justify-center">
+          <div className="w-full max-w-md flex flex-row gap-2 items-center justify-center">
             <button
               onClick={() => window.dispatchEvent(new Event('topbar:add-widget'))}
               className="w-auto px-3 py-2 rounded-lg border border-surface-border bg-surface-raised hover:bg-surface-overlay text-xs text-white"
