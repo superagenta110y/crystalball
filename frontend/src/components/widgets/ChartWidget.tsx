@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { SlidersHorizontal, Settings2, CircleHelp, X, GripHorizontal } from "lucide-react";
+import { SlidersHorizontal, Settings2, CircleHelp, X, GripHorizontal, Clock3 } from "lucide-react";
 import { useDashboardStore } from "@/lib/store/dashboardStore";
 import { AppColorPicker } from "@/components/ui/AppColorPicker";
 import { AppDropdown } from "@/components/ui/AppDropdown";
@@ -919,6 +919,7 @@ export function ChartWidget({
         {/* Timeframes */}
         <div ref={tfRef} className="relative">
           <button onClick={() => setTfOpen(v => !v)} className="h-6 px-1.5 rounded text-xs font-mono leading-none text-neutral-300 hover:text-white hover:bg-surface-overlay inline-flex items-center gap-1">
+            <Clock3 size={11} className="opacity-80" />
             <span>{timeframe}</span>
           </button>
           {tfOpen && (

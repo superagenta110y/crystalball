@@ -126,7 +126,7 @@ export function OpenInterestWidget({ symbol = "SPY", isGlobalOverride, config, o
           <>
             <details className="relative">
               <summary className="list-none cursor-pointer text-xs text-neutral-300 relative">
-                <span className="inline-flex items-center gap-1"><CalendarDays size={12} /><span className="text-[11px] font-mono text-neutral-400">{expLabel}</span></span>
+                <span className="inline-flex items-center gap-1"><CalendarDays size={12} /><span className="text-[11px] font-mono text-neutral-400 leading-none pt-[1px]">{expLabel}</span></span>
               </summary>
               <div className="absolute left-0 mt-1 z-20 w-52 max-h-64 overflow-auto rounded border border-surface-border bg-surface p-2 shadow-xl text-neutral-200">
                 <label className="flex items-center gap-2 text-xs py-1 border-b border-surface-border mb-1">
