@@ -528,20 +528,20 @@ export default function Dashboard() {
   }, [activeTabId, updateLayout]);
 
   const handleRetileProminent = useCallback((widgetId: string) => {
-    const layout = activeLayout.map(it => ({ ...it }));
-    const idx = layout.findIndex(it => it.i === widgetId);
-    if (idx < 0 || !layout.length) return;
+    const nextLayout = layout.map(it => ({ ...it }));
+    const idx = nextLayout.findIndex(it => it.i === widgetId);
+    if (idx < 0 || !nextLayout.length) return;
 
     const isPortrait = (height || 0) > (width || 0);
     const nextAlt = (prominent?.id === widgetId) ? !prominent.alt : false;
     setProminent({ id: widgetId, alt: nextAlt });
 
-    const maxRows = Math.max(10, ...layout.map(it => it.y + it.h));
-    const main = layout[idx];
+    const maxRows = Math.max(10, ...nextLayout.map(it => it.y + it.h));
+    const main = nextLayout[idx];
     if (isPortrait) {
       // portrait: prominent on top half
       main.x = 0; main.y = 0; main.w = 12; main.h = Math.max(4, Math.floor(maxRows / 2));
-      const others = layout.filter((_, i) => i !== idx);
+      const others = nextLayout.filter((_, i) => i !== idx);
       const remY = main.h;
       const remH = Math.max(3, maxRows - remY);
       if (!nextAlt) {
@@ -558,7 +558,7 @@ export default function Dashboard() {
     } else {
       // landscape: prominent on left half
       main.x = 0; main.y = 0; main.w = 6; main.h = maxRows;
-      const others = layout.filter((_, i) => i !== idx);
+      const others = nextLayout.filter((_, i) => i !== idx);
       if (!nextAlt) {
         // vertical stack on right
         const n = Math.max(1, others.length);
@@ -580,7 +580,7 @@ export default function Dashboard() {
         });
       }
     }
-    updateLayout(activeTabId, layout);
+    updateLayout(activeTabId, nextLayout);
   }, [layout, activeTabId, updateLayout, width, height, prominent]);
 
   const isGlobalOverride = (tab?.globalSymbols?.length ?? 0) > 0;
