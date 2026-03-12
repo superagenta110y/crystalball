@@ -184,6 +184,15 @@ fn tf_step_seconds(tf: &str) -> i64 {
     }
 }
 
+fn json_num(v: Option<&serde_json::Value>) -> f64 {
+    if let Some(x) = v {
+        if let Some(n) = x.as_f64() { return n; }
+        if let Some(n) = x.as_i64() { return n as f64; }
+        if let Some(s) = x.as_str() { return s.parse::<f64>().unwrap_or(0.0); }
+    }
+    0.0
+}
+
 fn normalize_time_anchor(v: &str, tf: &str) -> String {
     let t = v.trim();
     let step = tf_step_seconds(tf).max(1);
@@ -471,26 +480,49 @@ async fn analytics_core(symbol: String, q: HashMap<String,String>, s: AppState, 
     let cache_key = format!("an:{}:{}:{:?}", kind, sym, q);
     if let Ok(Some(v)) = s.lmdb.get_json(&cache_key) { return Json(v); }
 
+    let quote = market_quote(Path(sym.clone()), State(s.clone())).await.0;
+    let spot = quote.get("last_price").and_then(|x| x.as_f64()).unwrap_or(0.0);
     let opts = market_options(Path(sym.clone()), Query(q.clone()), State(s.clone())).await.0;
     let arr = opts.as_array().cloned().unwrap_or_default();
-    let mut rows: Vec<serde_json::Value> = Vec::new();
-    for o in arr {
-        let strike = o.get("strike_price").or_else(|| o.get("strike")).and_then(|x| x.as_f64()).unwrap_or(0.0);
-        if strike <= 0.0 { continue; }
-        let oi = o.get("open_interest").and_then(|x| x.as_f64()).unwrap_or(0.0);
-        let gamma = o.get("gamma").and_then(|x| x.as_f64()).unwrap_or(0.0);
-        let delta = o.get("delta").and_then(|x| x.as_f64()).unwrap_or(0.0);
-        let t = o.get("option_type").or_else(|| o.get("type")).and_then(|x| x.as_str()).unwrap_or("").to_lowercase();
-        let sign = if t == "put" { -1.0 } else { 1.0 };
-        let value = match kind {
-            "gex" => sign * gamma * oi,
-            "dex" => sign * delta * oi,
-            _ => sign * oi,
-        };
-        rows.push(serde_json::json!({"strike": strike, "value": value, "option_type": t, "open_interest": oi, "gamma": gamma, "delta": delta}));
-    }
-    rows.sort_by(|a,b| a.get("strike").and_then(|x| x.as_f64()).partial_cmp(&b.get("strike").and_then(|x| x.as_f64())).unwrap_or(std::cmp::Ordering::Equal));
-    let payload = serde_json::json!({"symbol": sym, "kind": kind, "rows": rows});
+
+    let payload = if kind == "oi" {
+        let mut by_strike: std::collections::BTreeMap<i64, (f64, f64)> = std::collections::BTreeMap::new();
+        for o in arr {
+            let strike = json_num(o.get("strike_price").or_else(|| o.get("strike")));
+            if strike <= 0.0 { continue; }
+            let key = (strike * 100.0).round() as i64;
+            let oi = json_num(o.get("open_interest"));
+            let t = o.get("option_type").or_else(|| o.get("type")).and_then(|x| x.as_str()).unwrap_or("").to_lowercase();
+            let e = by_strike.entry(key).or_insert((0.0, 0.0));
+            if t == "put" { e.1 += oi; } else { e.0 += oi; }
+        }
+        let data: Vec<serde_json::Value> = by_strike.into_iter().map(|(k, (c, p))| {
+            let strike = (k as f64) / 100.0;
+            serde_json::json!({"strike": strike, "oi_call": c, "oi_put": p, "oi_total": c + p, "volume_total": 0})
+        }).collect();
+        serde_json::json!({"symbol": sym, "spot": spot, "expirations": [], "data": data})
+    } else {
+        let mut by_strike: std::collections::BTreeMap<i64, f64> = std::collections::BTreeMap::new();
+        for o in arr {
+            let strike = json_num(o.get("strike_price").or_else(|| o.get("strike")));
+            if strike <= 0.0 { continue; }
+            let key = (strike * 100.0).round() as i64;
+            let oi = json_num(o.get("open_interest"));
+            let gamma = json_num(o.get("gamma"));
+            let delta = json_num(o.get("delta"));
+            let t = o.get("option_type").or_else(|| o.get("type")).and_then(|x| x.as_str()).unwrap_or("").to_lowercase();
+            let sign = if t == "put" { -1.0 } else { 1.0 };
+            let value = if kind == "gex" { sign * gamma * oi } else { sign * delta * oi };
+            *by_strike.entry(key).or_insert(0.0) += value;
+        }
+        let data: Vec<serde_json::Value> = by_strike.into_iter().map(|(k, v)| {
+            let strike = (k as f64) / 100.0;
+            if kind == "gex" { serde_json::json!({"strike": strike, "gex": v}) }
+            else { serde_json::json!({"strike": strike, "dex": v}) }
+        }).collect();
+        serde_json::json!({"symbol": sym, "spot": spot, "expirations": [], "data": data})
+    };
+
     let _ = s.lmdb.set_json(&cache_key, &payload, 10);
     Json(payload)
 }
@@ -499,7 +531,41 @@ async fn orders_create() -> Json<serde_json::Value> { Json(serde_json::json!({"t
 async fn orders_delete(Path(_): Path<String>) -> Json<serde_json::Value> { Json(serde_json::json!({"ok": true})) }
 async fn account_get() -> Json<serde_json::Value> { Json(serde_json::json!({"todo":"account"})) }
 async fn report_daily_bias(Path(_): Path<String>) -> String { "TODO: daily bias".into() }
-async fn news_feed(Query(_q): Query<HashMap<String,String>>) -> Json<serde_json::Value> { Json(serde_json::json!([])) }
+async fn news_feed(Query(q): Query<HashMap<String,String>>, State(s): State<AppState>) -> Json<serde_json::Value> {
+    let limit = q.get("limit").and_then(|x| x.parse::<usize>().ok()).unwrap_or(20).clamp(1, 50);
+    let symbols = q.get("symbols").cloned().unwrap_or_default();
+    let client = reqwest::Client::new();
+
+    match active_provider(&s) {
+        ActiveProvider::Alpaca { api_key, secret_key, data_url } => {
+            let mut params: Vec<(String,String)> = vec![("limit".into(), limit.to_string())];
+            if !symbols.trim().is_empty() { params.push(("symbols".into(), symbols)); }
+            let r = client
+                .get(format!("{}/v1beta1/news", data_url))
+                .headers(alpaca_headers(&api_key, &secret_key))
+                .query(&params)
+                .send().await;
+            if let Ok(resp) = r {
+                if let Ok(v) = resp.json::<serde_json::Value>().await {
+                    let items = v.get("news").and_then(|x| x.as_array()).cloned().unwrap_or_default();
+                    let out: Vec<serde_json::Value> = items.into_iter().map(|n| serde_json::json!({
+                        "id": n.get("id").cloned().unwrap_or(serde_json::json!("")),
+                        "headline": n.get("headline").cloned().unwrap_or(serde_json::json!("")),
+                        "summary": n.get("summary").cloned().unwrap_or(serde_json::json!("")),
+                        "source": n.get("source").cloned().unwrap_or(serde_json::json!("")),
+                        "url": n.get("url").cloned().unwrap_or(serde_json::json!("")),
+                        "created_at": n.get("created_at").cloned().unwrap_or(serde_json::json!("")),
+                        "symbols": n.get("symbols").cloned().unwrap_or(serde_json::json!([])),
+                    })).collect();
+                    return Json(serde_json::Value::Array(out));
+                }
+            }
+        }
+        ActiveProvider::Hoodlink { .. } => {}
+    }
+
+    Json(serde_json::json!([]))
+}
 async fn ai_status() -> Json<serde_json::Value> { Json(serde_json::json!({"configured": false})) }
 async fn ai_chat() -> Json<serde_json::Value> { Json(serde_json::json!({"reply":"TODO"})) }
 
