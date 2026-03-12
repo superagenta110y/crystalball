@@ -758,7 +758,7 @@ export default function Dashboard() {
                 preventCollision={false}
                 isDraggable
                 isResizable
-                resizeHandles={["n", "e", "s", "w", "ne", "se", "sw"] as any}
+                resizeHandles={["n", "e", "s", "w", "se", "sw"] as any}
               >
                 {widgets.map(instance => (
                   <div key={instance.id} className="widget relative">

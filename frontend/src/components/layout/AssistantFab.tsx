@@ -111,10 +111,9 @@ export function AssistantFab({ showFab = false }: { showFab?: boolean }) {
     if (!configured) {
       append(tid, {
         role: "assistant",
-        content: "AI provider not configured yet. Opening Settings → Add Provider for you.",
+        content: "AI provider not configured yet. Click here to open Settings → Add Provider. [[open_settings]]",
         ts: Date.now(),
       });
-      window.dispatchEvent(new Event("settings:open-add-provider"));
       return;
     }
 
@@ -173,16 +172,32 @@ export function AssistantFab({ showFab = false }: { showFab?: boolean }) {
 
             <div className="flex-1 flex flex-col">
               <div className="px-3 py-2 border-b border-surface-border text-xs text-neutral-300 flex items-center justify-between">
-                <button onClick={() => setDrawerOpen(v => !v)} className="inline-flex items-center gap-1"><Menu size={14} /> Agent</button>
+                {threads.length > 0 ? (
+                  <button onClick={() => setDrawerOpen(v => !v)} className="inline-flex items-center gap-1"><Menu size={14} /> Agent</button>
+                ) : (
+                  <div className="inline-flex items-center gap-1"><Bot size={14} /> Agent</div>
+                )}
                 <button onClick={() => setOpen(false)} className="text-neutral-500 hover:text-white"><X size={14} /></button>
               </div>
 
               <div className="flex-1 overflow-auto p-3 space-y-2">
-                {active?.messages?.length ? active.messages.map((m, i) => (
-                  <div key={i} className={`text-xs px-2 py-1.5 rounded max-w-[90%] ${m.role==="user" ? "ml-auto bg-accent/15 border border-accent/30" : "bg-surface-overlay border border-surface-border"}`}>
-                    {m.content}
-                  </div>
-                )) : (
+                {active?.messages?.length ? active.messages.map((m, i) => {
+                  const hasSettingsLink = m.role === "assistant" && m.content.includes("[[open_settings]]");
+                  const text = m.content.replace("[[open_settings]]", "").trim();
+                  return (
+                    <div key={i} className={`text-xs px-2 py-1.5 rounded max-w-[90%] ${m.role==="user" ? "ml-auto bg-accent/15 border border-accent/30" : "bg-surface-overlay border border-surface-border"}`}>
+                      <div>{text}</div>
+                      {hasSettingsLink && (
+                        <button
+                          onClick={() => window.dispatchEvent(new Event("settings:open-add-provider"))}
+                          className="mt-1 text-[11px] underline text-accent hover:opacity-80"
+                        >
+                          Open Settings
+                        </button>
+                      )}
+                    </div>
+                  );
+                }) : (
                   <div className="h-full flex flex-col items-center justify-center text-neutral-500 text-sm gap-2">
                     <Bot size={26} className="opacity-60" />
                     <div>What do you want to know?</div>
