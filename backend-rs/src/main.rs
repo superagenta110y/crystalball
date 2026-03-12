@@ -6,7 +6,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
-use chrono::{Utc, DateTime, FixedOffset};
+use chrono::{Utc, DateTime, FixedOffset, TimeZone};
 use futures_util::{StreamExt, SinkExt};
 use tokio::sync::RwLock;
 use tower_http::{cors::CorsLayer, services::ServeDir, trace::TraceLayer};
@@ -170,6 +170,21 @@ fn alpaca_headers(api_key: &str, secret_key: &str) -> reqwest::header::HeaderMap
     h
 }
 
+fn normalize_time_anchor(v: &str) -> String {
+    let t = v.trim();
+    if t.eq_ignore_ascii_case("now") {
+        return Utc::now().to_rfc3339();
+    }
+    if let Ok(n) = t.parse::<i64>() {
+        // Frontend may send unix seconds (or ms). Alpaca expects RFC3339.
+        let secs = if n > 1_000_000_000_000 { n / 1000 } else { n };
+        if let Some(dt) = Utc.timestamp_opt(secs, 0).single() {
+            return dt.to_rfc3339();
+        }
+    }
+    t.to_string()
+}
+
 async fn market_quote(Path(symbol): Path<String>, State(s): State<AppState>) -> Json<serde_json::Value> {
     let sym = symbol.to_uppercase();
     let client = reqwest::Client::new();
@@ -242,7 +257,7 @@ async fn market_history(Path(symbol): Path<String>, Query(q): Query<HashMap<Stri
         ("sort".into(), "desc".into()),
     ];
 
-    if let Some(e) = end.or(latest) { params.push(("end".into(), if e == "now" { Utc::now().to_rfc3339() } else { e })); }
+    if let Some(e) = end.or(latest) { params.push(("end".into(), normalize_time_anchor(&e))); }
     if let Some(sv) = start { params.push(("start".into(), sv)); }
 
     let r = client
