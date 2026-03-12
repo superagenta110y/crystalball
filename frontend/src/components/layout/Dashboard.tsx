@@ -23,6 +23,7 @@ import { ScreenerWidget }      from "@/components/widgets/ScreenerWidget";
 
 import { useDashboardStore, type WidgetInstance, type WidgetType } from "@/lib/store/dashboardStore";
 import useWindowSize from "@/lib/hooks/useWindowSize";
+import { Sparkles } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -657,18 +658,18 @@ export default function Dashboard() {
         <div className="flex-1 flex flex-col items-center justify-center gap-4 text-neutral-500 px-4">
           <img src="/logo.svg" alt="CrystalBall" className="w-20 h-20 opacity-90" />
           <p className="text-sm text-neutral-300">Build your dashboard:</p>
-          <div className="w-full max-w-md flex flex-col sm:flex-row gap-2">
+          <div className="w-full max-w-md flex flex-col sm:flex-row gap-2 items-center justify-center">
             <button
               onClick={() => window.dispatchEvent(new Event('topbar:add-widget'))}
-              className="flex-1 px-3 py-2 rounded-lg border border-surface-border bg-surface-raised hover:bg-surface-overlay text-xs text-neutral-200"
+              className="w-auto px-3 py-2 rounded-lg border border-surface-border bg-surface-raised hover:bg-surface-overlay text-xs text-white"
             >
               + Add Widget
             </button>
             <button
               onClick={() => window.dispatchEvent(new Event('assistant:open'))}
-              className="flex-1 px-3 py-2 rounded-lg border border-accent/40 bg-accent/10 hover:bg-accent/15 text-xs text-accent"
+              className="w-auto inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-surface-border bg-surface-raised hover:bg-surface-overlay text-xs text-white"
             >
-              ❇️ Use AI
+              <Sparkles size={12} /> Use AI
             </button>
           </div>
         </div>
