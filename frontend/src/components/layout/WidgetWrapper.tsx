@@ -38,10 +38,9 @@ export function WidgetWrapper({ instance, onRemove, onToggleZoom, onRetilePromin
   const newsRef = React.useRef<HTMLDivElement>(null);
   const newsSymbols = React.useMemo(() => (instance.config.symbol || "").split(",").map(s => s.trim().toUpperCase()).filter(Boolean), [instance.config.symbol]);
   const inlineHeaderTypes = new Set(["chart", "gex", "dex", "openinterest", "openinterest3d", "orderflow"]);
-  const disableZoomTypes = new Set(["openinterest"]);
   const isChart = instance.type === "chart";
   const useInlineHeader = inlineHeaderTypes.has(instance.type);
-  const canZoom = !disableZoomTypes.has(instance.type);
+  const canZoom = true;
 
   React.useEffect(() => {
     if (instance.type !== "newsfeed") return;
