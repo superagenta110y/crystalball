@@ -31,7 +31,7 @@ export function SplashScreen() {
   if (phase === "gone") return null;
 
   const fg = isLight ? "#111827" : "#ffffff";
-  const muted = isLight ? "#6b7280" : "#4b5563";
+  const muted = isLight ? "#6b7280" : "#9ca3af";
   const bg = isLight ? "#ffffff" : "#000000";
   const barTrack = isLight ? "#e5e7eb" : "#1f2937";
 
