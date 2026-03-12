@@ -6,6 +6,7 @@ import { SymbolBar } from "./SymbolBar";
 import { useDashboardStore } from "@/lib/store/dashboardStore";
 import { OptionsLightHistogram } from "./OptionsLightHistogram";
 import { AppDropdown } from "@/components/ui/AppDropdown";
+import { SkeletonBars } from "./WidgetSkeletons";
 
 interface GEXWidgetProps {
   symbol?: string;
@@ -143,7 +144,7 @@ export function GEXWidget({ symbol = "SPY", isGlobalOverride, config, onConfigCh
         }
       />
       <div className="flex-1 min-h-0 p-2 relative">
-        {(loading || expLoading) && <div className="flex items-center justify-center h-full text-xs text-neutral-600 animate-pulse">Loading…</div>}
+        {(loading || expLoading) && <SkeletonBars />}
         {error && !loading && !expLoading && <div className="flex items-center justify-center h-full text-xs text-neutral-600">Backend offline</div>}
         {!loading && !error && !expLoading && (
           <OptionsLightHistogram

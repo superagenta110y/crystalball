@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { useDashboardStore } from "@/lib/store/dashboardStore";
 import { AppDropdown } from "@/components/ui/AppDropdown";
+import { SkeletonTable } from "./WidgetSkeletons";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -276,7 +277,7 @@ export function ScreenerWidget() {
         )}
 
       <div ref={listRef} className="flex-1 overflow-auto text-xs relative">
-        {loading && <div className="p-4 text-neutral-500 animate-pulse">Loading screener…</div>}
+        {loading && <SkeletonTable />}
         {!loading && (
           <table className="w-full min-w-[980px]">
             <thead className="sticky top-0 bg-surface-raised border-b border-surface-border">

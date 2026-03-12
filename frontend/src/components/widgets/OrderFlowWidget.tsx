@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ResponsiveContainer, ScatterChart, Scatter, XAxis, YAxis, ZAxis, Tooltip, BarChart, Bar, Cell } from "recharts";
 import { SymbolBar } from "./SymbolBar";
+import { SkeletonBars, SkeletonBubbles } from "./WidgetSkeletons";
 import { useDashboardStore } from "@/lib/store/dashboardStore";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "";
@@ -182,7 +183,12 @@ export function OrderFlowWidget({ symbol = "SPY", isGlobalOverride, onConfigChan
       />
 
       <div className="flex-1 min-h-0 p-2 flex flex-col gap-2">
-        {loading && <div className="h-full flex items-center justify-center text-xs text-neutral-500 animate-pulse">Loading orderflow…</div>}
+        {loading && (
+          <div className="h-full grid grid-rows-[2fr_1fr] gap-2">
+            <SkeletonBubbles />
+            <SkeletonBars />
+          </div>
+        )}
         {error && !loading && <div className="h-full flex items-center justify-center text-xs text-neutral-500">Orderflow unavailable</div>}
 
         {!loading && !error && (

@@ -5,6 +5,7 @@ import { CalendarDays, DollarSign } from "lucide-react";
 import { SymbolBar } from "./SymbolBar";
 import { AppDropdown } from "@/components/ui/AppDropdown";
 import { useDashboardStore } from "@/lib/store/dashboardStore";
+import { SkeletonHeatmap } from "./WidgetSkeletons";
 
 interface OpenInterest3DWidgetProps {
   symbol?: string;
@@ -178,7 +179,7 @@ export function OpenInterest3DWidget({ symbol = "SPY", isGlobalOverride, config,
       />
 
       <div className="flex-1 min-h-0 p-2 overflow-hidden relative">
-        {(loading || expLoading) && <div className="h-full flex items-center justify-center text-xs text-neutral-500 animate-pulse">Loading OI Grid…</div>}
+        {(loading || expLoading) && <SkeletonHeatmap />}
         {error && !loading && <div className="h-full flex items-center justify-center text-xs text-neutral-500">Failed to load OI grid</div>}
 
         {!loading && !error && exps.length > 0 && filteredStrikes.length > 0 && (

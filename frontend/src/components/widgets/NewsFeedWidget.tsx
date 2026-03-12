@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { SkeletonCards } from "./WidgetSkeletons";
 
 interface NewsItem {
   id: string;
@@ -58,9 +59,7 @@ export function NewsFeedWidget({ globalSymbol = "SPY", config, onConfigChange }:
   return (
     <div className="h-full w-full overflow-hidden flex flex-col relative">
       <div className="flex-1 min-h-0 overflow-auto p-2 space-y-2">
-        {loading && (
-          <div className="text-xs text-neutral-600 animate-pulse">Loading news…</div>
-        )}
+        {loading && <SkeletonCards />}
 
         {!loading && error && (
           <div className="text-xs text-bear">{error}</div>

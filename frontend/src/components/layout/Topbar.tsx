@@ -2,7 +2,6 @@
 
 import React, { useState, useRef, useEffect, useId } from "react";
 import { Plus, Palette, Settings, MessageCircle, Moon, Sun, Monitor, X } from "lucide-react";
-import Link from "next/link";
 
 import { useDashboardStore, type WidgetType, type ThemeMode, DEFAULT_THEME } from "@/lib/store/dashboardStore";
 import { AppColorPicker } from "@/components/ui/AppColorPicker";
@@ -32,9 +31,10 @@ type Sparkle = { id: string; x: number; y: number; r: number; delay: number; dur
 const LOGO_PATH_1 = "M0,0 L13,0 L45,3 L71,8 L93,14 L116,22 L122,24 L124,25 L143,35 L162,46 L178,57 L192,68 L207,81 L220,94 L229,105 L238,116 L249,132 L256,144 L258,146 L267,165 L277,190 L285,218 L289,237 L292,262 L293,289 L291,316 L287,342 L281,366 L274,387 L264,410 L253,431 L239,452 L230,464 L221,475 L214,482 L207,490 L192,504 L185,509 L181,510 L142,511 L142,512 L135,512 L135,511 L94,511 L91,512 L91,510 L42,511 L42,512 L31,512 L31,511 L-57,510 L-58,512 L-65,512 L-65,511 L-164,510 L-172,508 L-182,500 L-195,488 L-203,480 L-203,478 L-205,478 L-214,467 L-227,450 L-239,431 L-251,408 L-254,407 L-255,399 L-263,379 L-270,356 L-271,348 L-273,347 L-274,338 L-277,319 L-279,288 L-280,282 L-279,279 L-278,258 L-274,230 L-268,205 L-265,193 L-263,192 L-262,186 L-256,171 L-254,164 L-252,164 L-250,158 L-239,138 L-227,120 L-217,107 L-206,94 L-186,74 L-183,71 L-169,60 L-151,47 L-134,37 L-129,34 L-129,32 L-123,31 L-101,21 L-71,11 L-45,5 L-39,5 L-38,1 L-38,4 L-14,1 Z M62,66 L55,68 L48,76 L48,84 L51,89 L59,95 L75,103 L90,111 L95,114 L97,114 L101,118 L113,126 L127,137 L135,144 L147,155 L154,162 L165,176 L174,188 L185,206 L194,223 L202,243 L207,255 L212,260 L214,261 L222,261 L228,256 L230,252 L230,236 L225,211 L220,197 L219,194 L208,171 L206,168 L203,168 L204,165 L197,154 L186,140 L183,136 L181,136 L179,132 L160,113 L143,100 L125,88 L119,85 L104,77 L86,70 L82,69 L71,66 L64,66 L63,66 Z M-113,116 L-116,118 L-123,142 L-129,154 L-135,161 L-145,167 L-156,171 L-169,175 L-172,177 L-171,180 L-172,183 L-165,186 L-149,190 L-139,196 L-131,204 L-125,214 L-119,232 L-116,241 L-112,242 L-108,234 L-101,213 L-94,202 L-85,194 L-73,188 L-55,184 L-52,181 L-53,177 L-58,174 L-75,169 L-85,164 L-94,156 L-100,146 L-104,139 L-107,128 L-111,117 Z M204,166 Z M109,263 L106,268 L101,285 L94,298 L85,308 L73,315 L46,323 L44,325 L45,330 L68,338 L78,343 L88,352 L95,362 L100,374 L106,393 L109,397 L112,396 L117,381 L122,365 L127,355 L127,352 L131,350 L136,344 L150,336 L170,331 L172,329 L171,324 L160,320 L145,315 L135,308 L128,300 L122,290 L116,275 L113,265 L111,265 L111,263 Z M-141,317 L-144,321 L-149,335 L-155,344 L-161,351 L-167,353 L-177,356 L-186,359 L-187,362 L-186,365 L-175,369 L-165,373 L-155,382 L-149,394 L-145,407 L-143,410 L-138,409 L-136,405 L-135,400 L-130,386 L-124,378 L-124,376 L-120,374 L-112,370 L-100,366 L-97,362 L-98,359 L-101,358 L-102,358 L-105,356 L-111,354 L-120,349 L-127,342 L-132,333 L-134,329 L-136,320 L-138,317 Z M-253,404 L-252,406 Z";
 const LOGO_PATH_2 = "M0,0 L8,1 L12,0 L13,2 L19,1 L25,1 L29,0 L29,2 L40,1 L43,0 L45,1 L60,2 L61,0 L61,2 L81,1 L83,0 L83,2 L98,2 L99,0 L101,0 L101,2 L121,1 L123,0 L123,2 L126,0 L131,0 L132,0 L133,2 L140,2 L141,0 L141,2 L146,2 L147,0 L149,1 L176,1 L180,0 L181,2 L183,0 L187,0 L187,2 L196,2 L197,0 L197,2 L208,1 L211,0 L211,2 L220,2 L221,0 L221,2 L227,1 L234,2 L235,0 L235,2 L248,1 L251,0 L251,2 L257,1 L259,0 L259,2 L272,1 L276,0 L277,2 L283,0 L285,0 L285,2 L288,0 L291,0 L291,2 L304,2 L311,6 L324,24 L336,41 L349,59 L362,77 L367,86 L369,100 L368,109 L361,115 L358,116 L-82,116 L-87,114 L-92,109 L-93,106 L-93,94 L-90,82 L-77,63 L-67,50 L-55,33 L-53,29 L-48,24 L-37,8 L-31,3 L-28,2 L-13,1 L0,1 Z M27,1 Z";
 
-function CrystalBallLogo() {
+function CrystalBallLogo({ onReadyBurst }: { onReadyBurst?: (fn: () => void) => void }) {
   const maskId = useId().replace(/:/g, "-");
   const [sparkles, setSparkles] = useState<Sparkle[]>([]);
+  const [popping, setPopping] = useState(false);
 
   const burst = () => {
     const next: Sparkle[] = Array.from({ length: 8 }).map((_, i) => ({
@@ -47,13 +47,17 @@ function CrystalBallLogo() {
       rot: Math.random() * 180,
     }));
     setSparkles(next);
+    setPopping(true);
     window.setTimeout(() => setSparkles([]), 1300);
+    window.setTimeout(() => setPopping(false), 340);
   };
+
+  useEffect(() => { onReadyBurst?.(burst); }, [onReadyBurst]);
 
   return (
     <svg
       viewBox="0 0 1024 1024"
-      className="logo-img w-6 h-6"
+      className={`logo-img w-6 h-6 ${popping ? "logo-pop" : ""}`}
       aria-label="CrystalBall"
       onClick={burst}
     >
@@ -91,6 +95,7 @@ export function Topbar() {
   const addRef = useRef<HTMLDivElement>(null);
   const styleRef = useRef<HTMLDivElement>(null);
   const overrideRef = useRef<HTMLDivElement>(null);
+  const logoBurstRef = useRef<(() => void) | null>(null);
 
   const globalSymbols = tab?.globalSymbols ?? [];
   const hasOverride = globalSymbols.length > 0;
@@ -161,10 +166,10 @@ export function Topbar() {
 
   return (
     <header className="flex items-center gap-3 px-4 py-2 bg-surface-raised border-b border-surface-border shrink-0 h-12">
-      <Link href="/" className="flex items-center gap-2 shrink-0">
-        <CrystalBallLogo />
+      <div className="flex items-center gap-2 shrink-0 select-none" role="button" aria-label="CrystalBall logo" onClick={() => logoBurstRef.current?.()}>
+        <CrystalBallLogo onReadyBurst={(fn) => { logoBurstRef.current = fn; }} />
         <span className="font-bold text-white text-sm tracking-wide hidden sm:block">CrystalBall</span>
-      </Link>
+      </div>
 
       <div className="w-px h-5 bg-surface-border hidden sm:block" />
 

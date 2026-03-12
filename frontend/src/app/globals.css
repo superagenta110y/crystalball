@@ -262,6 +262,17 @@ html[data-theme="light"] .topbar-btn:hover {
   100% { opacity: 0; transform: scale(1.25) rotate(75deg); }
 }
 
+@keyframes logoPop {
+  0% { transform: scale(1); }
+  20% { transform: scale(1.5); }
+  100% { transform: scale(1); }
+}
+
+.logo-pop {
+  animation: logoPop 340ms ease-out;
+  transform-origin: center;
+}
+
 /* ─── Light mode: AI widget input + chips ────────────────────── */
 html[data-theme="light"] .ai-input {
   background: #ffffff !important;

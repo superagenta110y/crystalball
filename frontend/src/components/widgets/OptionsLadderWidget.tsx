@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { CalendarDays } from "lucide-react";
 import { SymbolBar } from "./SymbolBar";
+import { SkeletonTable } from "./WidgetSkeletons";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -65,9 +66,9 @@ export function OptionsLadderWidget({ symbol = "SPY", isGlobalOverride, config, 
         onSymbolChange={(s) => onConfigChange?.({ symbol: s })}
         extra={
           <details className="relative">
-            <summary className="list-none cursor-pointer text-xs text-neutral-300 relative">
-              <span className="inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-surface-overlay">
-                <CalendarDays size={12} /> {exp || "Select expiration"}
+            <summary className="widget-trigger-summary relative px-2 py-1">
+              <span className="inline-flex items-center gap-1">
+                <CalendarDays size={12} /> <span className="widget-trigger-label">{exp || "Select expiration"}</span>
               </span>
             </summary>
             <div className="absolute z-30 mt-1 w-44 max-h-56 overflow-auto rounded bg-surface-raised shadow-xl p-1 pop-in">
@@ -83,7 +84,7 @@ export function OptionsLadderWidget({ symbol = "SPY", isGlobalOverride, config, 
       />
 
       <div className="flex-1 min-h-0 overflow-auto p-2">
-        {loading ? <div className="text-xs text-neutral-500 animate-pulse">Loading ladder…</div> : (
+        {loading ? <SkeletonTable /> : (
           <table className="w-full text-xs">
             <thead className="sticky top-0 bg-surface-raised">
               <tr className="text-neutral-500">
