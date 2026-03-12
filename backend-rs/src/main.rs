@@ -6,6 +6,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use chrono::Utc;
 use tokio::sync::RwLock;
 use tower_http::{cors::CorsLayer, services::ServeDir, trace::TraceLayer};
 
@@ -127,13 +128,259 @@ async fn status(State(s): State<AppState>) -> Json<StatusResponse> {
     Json(StatusResponse { status: "ok", provider, version: "0.1.0-rs" })
 }
 
-// ---- placeholder handlers (endpoint parity scaffold) ----
-async fn market_quote(Path(_): Path<String>) -> Json<serde_json::Value> { Json(serde_json::json!({"todo":"market_quote"})) }
-async fn market_history(Path(_): Path<String>, Query(_q): Query<HashMap<String,String>>) -> Json<serde_json::Value> { Json(serde_json::json!({"todo":"market_history"})) }
-async fn market_trades(Path(_): Path<String>, Query(_q): Query<HashMap<String,String>>) -> Json<serde_json::Value> { Json(serde_json::json!({"todo":"market_trades"})) }
-async fn market_options(Path(_): Path<String>, Query(_q): Query<HashMap<String,String>>) -> Json<serde_json::Value> { Json(serde_json::json!([])) }
-async fn market_expirations(Path(_): Path<String>) -> Json<serde_json::Value> { Json(serde_json::json!({"expirations": []})) }
-async fn market_symbols(Query(_q): Query<HashMap<String,String>>) -> Json<serde_json::Value> { Json(serde_json::json!({"items": []})) }
+// ---- market/provider implementation (first real parity block) ----
+#[derive(Clone)]
+enum ActiveProvider {
+    Alpaca { api_key: String, secret_key: String, data_url: String },
+    Hoodlink { base_url: String, api_key: String },
+}
+
+fn active_provider(state: &AppState) -> ActiveProvider {
+    let active = state.sqlite.get_setting("active_provider_data").ok().flatten();
+    let providers = state.sqlite.list_providers().unwrap_or_default();
+
+    // Prefer explicitly active provider, otherwise first alpaca/hoodlink.
+    let p = active
+        .as_ref()
+        .and_then(|id| providers.iter().find(|x| &x.id == id))
+        .or_else(|| providers.iter().find(|x| x.r#type == "alpaca"))
+        .or_else(|| providers.iter().find(|x| x.r#type == "hoodlink"));
+
+    if let Some(p) = p {
+        if p.r#type == "hoodlink" {
+            let url = p.config.get("url").and_then(|v| v.as_str()).unwrap_or("http://127.0.0.1:7878");
+            let key = p.config.get("api_key").and_then(|v| v.as_str()).unwrap_or("");
+            return ActiveProvider::Hoodlink { base_url: format!("{}/api/v1", url.trim_end_matches('/')), api_key: key.to_string() };
+        }
+        let api = p.config.get("api_key").and_then(|v| v.as_str()).unwrap_or("");
+        let sec = p.config.get("secret_key").and_then(|v| v.as_str()).unwrap_or("");
+        let data_url = p.config.get("data_url").and_then(|v| v.as_str()).unwrap_or("https://data.alpaca.markets");
+        return ActiveProvider::Alpaca { api_key: api.to_string(), secret_key: sec.to_string(), data_url: data_url.to_string() };
+    }
+
+    ActiveProvider::Alpaca { api_key: String::new(), secret_key: String::new(), data_url: "https://data.alpaca.markets".into() }
+}
+
+fn alpaca_headers(api_key: &str, secret_key: &str) -> reqwest::header::HeaderMap {
+    let mut h = reqwest::header::HeaderMap::new();
+    h.insert("APCA-API-KEY-ID", reqwest::header::HeaderValue::from_str(api_key).unwrap_or(reqwest::header::HeaderValue::from_static("")));
+    h.insert("APCA-API-SECRET-KEY", reqwest::header::HeaderValue::from_str(secret_key).unwrap_or(reqwest::header::HeaderValue::from_static("")));
+    h
+}
+
+async fn market_quote(Path(symbol): Path<String>, State(s): State<AppState>) -> Json<serde_json::Value> {
+    let sym = symbol.to_uppercase();
+    let client = reqwest::Client::new();
+    match active_provider(&s) {
+        ActiveProvider::Hoodlink { base_url, api_key } => {
+            let r = client
+                .get(format!("{}/market/quote/{}", base_url, sym))
+                .header("X-API-Key", api_key)
+                .send().await;
+            if let Ok(resp) = r {
+                if let Ok(v) = resp.json::<serde_json::Value>().await {
+                    return Json(serde_json::json!({
+                        "symbol": sym,
+                        "bid_price": v.get("bid_price"),
+                        "ask_price": v.get("ask_price"),
+                        "last_price": v.get("last_trade_price").or_else(|| v.get("ask_price")),
+                        "timestamp": v.get("updated_at"),
+                    }));
+                }
+            }
+        }
+        ActiveProvider::Alpaca { api_key, secret_key, data_url } => {
+            let headers = alpaca_headers(&api_key, &secret_key);
+            let q = match client.get(format!("{}/v2/stocks/{}/quotes/latest", data_url, sym)).headers(headers.clone()).send().await {
+                Ok(r) => r.json::<serde_json::Value>().await.ok(),
+                Err(_) => None,
+            };
+            let t = match client.get(format!("{}/v2/stocks/{}/trades/latest", data_url, sym)).headers(headers).send().await {
+                Ok(r) => r.json::<serde_json::Value>().await.ok(),
+                Err(_) => None,
+            };
+            let bid = q.as_ref().and_then(|x| x.get("quote")).and_then(|x| x.get("bp")).and_then(|x| x.as_f64());
+            let ask = q.as_ref().and_then(|x| x.get("quote")).and_then(|x| x.get("ap")).and_then(|x| x.as_f64());
+            let last = t.as_ref().and_then(|x| x.get("trade")).and_then(|x| x.get("p")).and_then(|x| x.as_f64()).or_else(|| ask.or(bid));
+            let ts = t.as_ref().and_then(|x| x.get("trade")).and_then(|x| x.get("t")).cloned().or_else(|| q.as_ref().and_then(|x| x.get("quote")).and_then(|x| x.get("t")).cloned());
+            return Json(serde_json::json!({"symbol": sym, "bid_price": bid, "ask_price": ask, "last_price": last, "timestamp": ts}));
+        }
+    }
+    Json(serde_json::json!({"symbol": sym, "bid_price": null, "ask_price": null, "last_price": null}))
+}
+
+async fn market_history(Path(symbol): Path<String>, Query(q): Query<HashMap<String,String>>, State(s): State<AppState>) -> Json<serde_json::Value> {
+    let sym = symbol.to_uppercase();
+    let timeframe = q.get("timeframe").cloned().unwrap_or_else(|| "1Day".into());
+    let limit = q.get("limit").and_then(|x| x.parse::<usize>().ok()).unwrap_or(252);
+    let latest = q.get("latest").cloned();
+    let start = q.get("start").cloned();
+    let end = q.get("end").cloned();
+
+    let (api_key, secret_key, data_url) = match active_provider(&s) {
+        ActiveProvider::Alpaca { api_key, secret_key, data_url } => (api_key, secret_key, data_url),
+        ActiveProvider::Hoodlink { .. } => {
+            // Hoodlink fallback to basic empty parity payload for now.
+            return Json(serde_json::json!({"s":sym,"tf":timeframe,"b":[]}));
+        }
+    };
+
+    let tf = timeframe.clone();
+    let client = reqwest::Client::new();
+    let mut params: Vec<(String,String)> = vec![
+        ("timeframe".into(), tf),
+        ("limit".into(), limit.to_string()),
+        ("adjustment".into(), "raw".into()),
+        ("feed".into(), "sip".into()),
+        ("sort".into(), "desc".into()),
+    ];
+
+    if let Some(e) = end.or(latest) { params.push(("end".into(), if e == "now" { Utc::now().to_rfc3339() } else { e })); }
+    if let Some(sv) = start { params.push(("start".into(), sv)); }
+
+    let r = client
+        .get(format!("{}/v2/stocks/{}/bars", data_url, sym))
+        .headers(alpaca_headers(&api_key, &secret_key))
+        .query(&params)
+        .send().await;
+
+    if let Ok(resp) = r {
+        if let Ok(v) = resp.json::<serde_json::Value>().await {
+            let mut bars = v.get("bars").and_then(|x| x.as_array()).cloned().unwrap_or_default();
+            bars.sort_by(|a,b| {
+                let ta = a.get("t").and_then(|x| x.as_str()).unwrap_or("");
+                let tb = b.get("t").and_then(|x| x.as_str()).unwrap_or("");
+                ta.cmp(tb)
+            });
+            let compact: Vec<serde_json::Value> = bars.into_iter().take(limit).map(|b| serde_json::json!({
+                "ts": b.get("t"), "o": b.get("o"), "h": b.get("h"), "l": b.get("l"), "c": b.get("c"), "v": b.get("v")
+            })).collect();
+            return Json(serde_json::json!({"s": sym, "tf": timeframe, "b": compact}));
+        }
+    }
+
+    Json(serde_json::json!({"s": sym, "tf": timeframe, "b": []}))
+}
+
+async fn market_trades(Path(symbol): Path<String>, Query(q): Query<HashMap<String,String>>, State(s): State<AppState>) -> Json<serde_json::Value> {
+    let sym = symbol.to_uppercase();
+    let limit = q.get("limit").and_then(|x| x.parse::<usize>().ok()).unwrap_or(200);
+    let client = reqwest::Client::new();
+    match active_provider(&s) {
+        ActiveProvider::Alpaca { api_key, secret_key, data_url } => {
+            let r = client.get(format!("{}/v2/stocks/{}/trades", data_url, sym))
+                .headers(alpaca_headers(&api_key, &secret_key))
+                .query(&[("limit", limit.to_string()), ("feed", "sip".into())])
+                .send().await;
+            if let Ok(resp) = r {
+                if let Ok(v) = resp.json::<serde_json::Value>().await {
+                    let out: Vec<serde_json::Value> = v.get("trades").and_then(|x| x.as_array()).cloned().unwrap_or_default().into_iter().map(|t| serde_json::json!({
+                        "price": t.get("p"), "size": t.get("s"), "timestamp": t.get("t"), "conditions": t.get("c").cloned().unwrap_or(serde_json::json!([]))
+                    })).collect();
+                    return Json(serde_json::Value::Array(out));
+                }
+            }
+        }
+        ActiveProvider::Hoodlink { .. } => {}
+    }
+    Json(serde_json::json!([]))
+}
+
+async fn market_options(Path(symbol): Path<String>, Query(q): Query<HashMap<String,String>>, State(s): State<AppState>) -> Json<serde_json::Value> {
+    let sym = symbol.to_uppercase();
+    let expiration = q.get("expiration_date").cloned();
+    let otype = q.get("option_type").cloned();
+    let client = reqwest::Client::new();
+
+    match active_provider(&s) {
+        ActiveProvider::Hoodlink { base_url, api_key } => {
+            let mut qp: Vec<(String,String)> = vec![];
+            if let Some(e) = expiration { qp.push(("expiration_dates".into(), e)); }
+            if let Some(t) = otype { qp.push(("type".into(), t)); }
+            let r = client.get(format!("{}/market/options/{}", base_url, sym))
+                .header("X-API-Key", api_key)
+                .query(&qp)
+                .send().await;
+            if let Ok(resp) = r {
+                if let Ok(v) = resp.json::<serde_json::Value>().await {
+                    return Json(v.get("results").cloned().unwrap_or_else(|| serde_json::json!([])));
+                }
+            }
+        }
+        ActiveProvider::Alpaca { api_key, secret_key, .. } => {
+            let mut qp: Vec<(String,String)> = vec![
+                ("underlying_symbols".into(), sym.clone()),
+                ("limit".into(), "500".into()),
+            ];
+            if let Some(e) = expiration.clone() {
+                qp.push(("expiration_date_gte".into(), e.clone()));
+                qp.push(("expiration_date_lte".into(), e));
+            }
+            if let Some(t) = otype { qp.push(("type".into(), t)); }
+            let r = client.get("https://paper-api.alpaca.markets/v2/options/contracts")
+                .headers(alpaca_headers(&api_key, &secret_key))
+                .query(&qp)
+                .send().await;
+            if let Ok(resp) = r {
+                if let Ok(v) = resp.json::<serde_json::Value>().await {
+                    return Json(v.get("option_contracts").cloned().unwrap_or_else(|| serde_json::json!([])));
+                }
+            }
+        }
+    }
+
+    Json(serde_json::json!([]))
+}
+
+async fn market_expirations(Path(symbol): Path<String>, State(s): State<AppState>) -> Json<serde_json::Value> {
+    let sym = symbol.to_uppercase();
+    let client = reqwest::Client::new();
+    match active_provider(&s) {
+        ActiveProvider::Alpaca { api_key, secret_key, .. } => {
+            let today = Utc::now().date_naive().to_string();
+            let r = client
+                .get("https://paper-api.alpaca.markets/v2/options/contracts")
+                .headers(alpaca_headers(&api_key, &secret_key))
+                .query(&[("underlying_symbols", sym.clone()), ("expiration_date_gte", today), ("limit", "500".into())])
+                .send().await;
+            if let Ok(resp) = r {
+                if let Ok(v) = resp.json::<serde_json::Value>().await {
+                    let mut exps: Vec<String> = v.get("option_contracts")
+                        .and_then(|x| x.as_array())
+                        .cloned()
+                        .unwrap_or_default()
+                        .into_iter()
+                        .filter_map(|c| c.get("expiration_date").and_then(|x| x.as_str()).map(|s| s.to_string()))
+                        .collect();
+                    exps.sort(); exps.dedup();
+                    return Json(serde_json::json!({"symbol": sym, "expirations": exps}));
+                }
+            }
+        }
+        ActiveProvider::Hoodlink { .. } => {}
+    }
+    Json(serde_json::json!({"symbol": sym, "expirations": []}))
+}
+
+async fn market_symbols(Query(q): Query<HashMap<String,String>>) -> Json<serde_json::Value> {
+    let query = q.get("q").cloned().unwrap_or_default().to_uppercase();
+    let limit = q.get("limit").and_then(|x| x.parse::<usize>().ok()).unwrap_or(20).min(100);
+    let symbols = vec![
+        ("SPY","SPDR S&P 500 ETF"),("QQQ","Invesco QQQ Trust"),("IWM","iShares Russell 2000 ETF"),
+        ("AAPL","Apple Inc."),("MSFT","Microsoft Corp."),("NVDA","NVIDIA Corp."),("AMZN","Amazon.com Inc."),
+        ("GOOGL","Alphabet Class A"),("META","Meta Platforms"),("TSLA","Tesla Inc."),("AMD","Advanced Micro Devices"),
+        ("NFLX","Netflix Inc."),("JPM","JPMorgan Chase"),("BAC","Bank of America"),("GS","Goldman Sachs"),
+        ("XOM","Exxon Mobil"),("CVX","Chevron"),("UNH","UnitedHealth Group"),("PFE","Pfizer Inc."),
+        ("PLTR","Palantir"),("COIN","Coinbase"),("MSTR","MicroStrategy")
+    ];
+    let out: Vec<serde_json::Value> = symbols.into_iter()
+        .filter(|(s,n)| query.is_empty() || s.contains(&query) || n.to_uppercase().contains(&query))
+        .take(limit)
+        .map(|(s,n)| serde_json::json!({"symbol": s, "name": n}))
+        .collect();
+    let syms: Vec<String> = out.iter().filter_map(|x| x.get("symbol").and_then(|v| v.as_str()).map(|s| s.to_string())).collect();
+    Json(serde_json::json!({"symbols": syms, "items": out}))
+}
 async fn analytics_gex(Path(_): Path<String>, Query(_q): Query<HashMap<String,String>>) -> Json<serde_json::Value> { Json(serde_json::json!([])) }
 async fn analytics_dex(Path(_): Path<String>, Query(_q): Query<HashMap<String,String>>) -> Json<serde_json::Value> { Json(serde_json::json!([])) }
 async fn analytics_oi(Path(_): Path<String>, Query(_q): Query<HashMap<String,String>>) -> Json<serde_json::Value> { Json(serde_json::json!([])) }
