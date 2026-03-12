@@ -933,7 +933,7 @@ export function ChartWidget({
         <details className="relative">
           <summary className="list-none cursor-pointer h-6 px-1 rounded text-xs leading-none text-neutral-500 hover:text-white hover:bg-surface-overlay inline-flex items-center gap-1">
             <SlidersHorizontal size={13} />
-            {enabledCount > 1 && <span className="text-[11px] font-mono text-neutral-400">{enabledCount}</span>}
+            {enabledCount > 0 && <span className="text-[11px] font-mono text-neutral-400">{enabledCount}</span>}
           </summary>
           <div className="absolute z-20 mt-1 w-64 rounded bg-surface p-2 shadow-xl text-xs space-y-1 pop-in">
             {[
