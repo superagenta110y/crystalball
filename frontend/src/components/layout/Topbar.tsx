@@ -233,7 +233,10 @@ export function Topbar() {
           <Settings size={15} />
           <span className="hidden sm:inline text-xs">Settings</span>
         </button>
-        <button onClick={() => window.dispatchEvent(new Event('assistant:open'))} className="p-1.5 rounded-md hover:bg-surface-overlay [color:var(--text-primary)] transition inline-flex items-center gap-1.5" title="Chat">
+        <button id="topbar-chat-button" onClick={(e) => {
+          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+          window.dispatchEvent(new CustomEvent('assistant:open', { detail: { anchor: { top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left } } }));
+        }} className="p-1.5 rounded-md hover:bg-surface-overlay [color:var(--text-primary)] transition inline-flex items-center gap-1.5" title="Chat">
           <MessageCircle size={15} />
           <span className="hidden sm:inline text-xs">Chat</span>
         </button>

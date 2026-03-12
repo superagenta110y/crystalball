@@ -21,6 +21,9 @@ const SUGGESTIONS = [
 export function AssistantFab({ showFab = false }: { showFab?: boolean }) {
   const [open, setOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [anchor, setAnchor] = useState<{ top: number; right: number; bottom: number; left: number } | null>(null);
+  const [vw, setVw] = useState<number>(typeof window !== "undefined" ? window.innerWidth : 1200);
+  const [vh, setVh] = useState<number>(typeof window !== "undefined" ? window.innerHeight : 900);
   const [threads, setThreads] = useState<Thread[]>([]);
   const [activeId, setActiveId] = useState<string>("");
   const [input, setInput] = useState("");
@@ -45,9 +48,27 @@ export function AssistantFab({ showFab = false }: { showFab?: boolean }) {
   }, []);
 
   useEffect(() => {
-    const onOpen = () => setOpen(true);
+    const onOpen = (e: Event) => {
+      const ce = e as CustomEvent<any>;
+      const a = ce?.detail?.anchor;
+      if (a && typeof a.top === "number") setAnchor(a);
+      else {
+        const el = document.getElementById("topbar-chat-button");
+        if (el) {
+          const r = el.getBoundingClientRect();
+          setAnchor({ top: r.top, right: r.right, bottom: r.bottom, left: r.left });
+        }
+      }
+      setOpen(true);
+    };
     window.addEventListener("assistant:open", onOpen as EventListener);
     return () => window.removeEventListener("assistant:open", onOpen as EventListener);
+  }, []);
+
+  useEffect(() => {
+    const onResize = () => { setVw(window.innerWidth); setVh(window.innerHeight); };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
   }, []);
 
   const active = useMemo(() => threads.find(t => t.id === activeId), [threads, activeId]);
@@ -108,6 +129,12 @@ export function AssistantFab({ showFab = false }: { showFab?: boolean }) {
     }
   };
 
+  const isMobile = vw < 768;
+  const panelW = 380;
+  const panelH = 560;
+  const anchoredLeft = Math.max(8, Math.min((anchor ? anchor.right : vw - 16) - panelW, vw - panelW - 8));
+  const anchoredTop = Math.max(8, Math.min(anchor ? anchor.top : 64, vh - panelH - 8));
+
   return (
     <>
       {showFab && (
@@ -117,7 +144,12 @@ export function AssistantFab({ showFab = false }: { showFab?: boolean }) {
       )}
 
       {open && (
-        <div className="fixed bottom-16 right-4 z-40 w-[380px] h-[560px] bg-surface-raised border border-surface-border rounded-xl shadow-2xl overflow-hidden">
+        <div
+          className={isMobile
+            ? "fixed inset-0 z-50 w-screen h-[100dvh] bg-surface-raised overflow-hidden"
+            : "fixed z-40 w-[380px] h-[560px] bg-surface-raised border border-surface-border rounded-xl shadow-2xl overflow-hidden"}
+          style={isMobile ? undefined : { left: anchoredLeft, top: anchoredTop }}
+        >
           <div className="h-full flex">
             {drawerOpen && (
               <div className="w-44 border-r border-surface-border p-2 flex flex-col gap-2">
