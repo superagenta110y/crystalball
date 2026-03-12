@@ -916,12 +916,12 @@ export function ChartWidget({
           )}
         </div>
 
-        <div className="ml-auto flex items-center gap-2 opacity-100 md:opacity-0 md:group-hover/widget:opacity-100 transition">
+        <div className="ml-auto flex items-center justify-end gap-2 min-w-[120px] opacity-100 md:opacity-0 md:group-hover/widget:opacity-100 transition">
           {/* Timeframes */}
           <div ref={tfRef} className="relative">
-            <button onClick={() => setTfOpen(v => !v)} className="h-6 px-1.5 rounded text-xs font-mono leading-none text-neutral-300 hover:text-white hover:bg-surface-overlay inline-flex items-center gap-1">
+            <button onClick={() => setTfOpen(v => !v)} className="widget-trigger-btn px-1.5 text-xs font-mono leading-none gap-1">
               <Clock3 size={11} className="opacity-80" />
-              <span>{timeframe}</span>
+              <span className="widget-trigger-label">{timeframe}</span>
             </button>
             {tfOpen && (
               <div className="absolute right-0 top-6 z-40 rounded-md bg-surface-raised shadow-xl p-1 pop-in min-w-[52px]">
@@ -933,9 +933,9 @@ export function ChartWidget({
           </div>
 
           <details className="relative">
-            <summary className="list-none cursor-pointer h-6 px-1 rounded text-xs leading-none text-neutral-500 hover:text-white hover:bg-surface-overlay inline-flex items-center gap-1">
+            <summary className="list-none cursor-pointer widget-trigger-btn px-1 text-xs leading-none gap-1">
               <SlidersHorizontal size={13} />
-              {enabledCount > 0 && <span className="text-[11px] font-mono text-neutral-400">{enabledCount}</span>}
+              {enabledCount > 0 && <span className="text-[11px] font-mono widget-trigger-label">{enabledCount}</span>}
             </summary>
             <div className="absolute right-0 z-20 mt-1 w-52 max-w-[calc(100vw-16px)] rounded bg-surface p-2 shadow-xl text-xs space-y-1 pop-in">
             {[

@@ -123,6 +123,14 @@ select:focus {
   color: var(--text-muted);
 }
 
+.widget-trigger-btn {
+  @apply inline-flex items-center justify-center h-6 rounded text-neutral-500 hover:text-white hover:bg-surface-overlay transition;
+}
+
+.widget-trigger-label {
+  @apply text-neutral-500 hover:text-white transition;
+}
+
 /* ─── React Grid Layout ─────────────────────────────────────── */
 .react-grid-item.react-grid-placeholder {
   background: var(--accent) !important;

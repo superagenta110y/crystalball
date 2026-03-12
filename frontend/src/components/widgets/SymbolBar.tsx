@@ -83,7 +83,7 @@ export function SymbolBar({ symbol, isGlobalOverride, onSymbolChange, extra, lab
         )}
       </div>
       {isGlobalOverride && <span className="text-neutral-700 text-xs leading-none" title="Global override active">⬡</span>}
-      {extra && <div className="ml-auto flex items-center gap-2 leading-none opacity-100 md:opacity-0 md:group-hover/widget:opacity-100 transition">{extra}</div>}
+      {extra && <div className="ml-auto flex items-center justify-end gap-2 min-w-[96px] leading-none opacity-100 md:opacity-0 md:group-hover/widget:opacity-100 transition">{extra}</div>}
     </div>
   );
 }
