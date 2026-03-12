@@ -170,15 +170,36 @@ fn alpaca_headers(api_key: &str, secret_key: &str) -> reqwest::header::HeaderMap
     h
 }
 
-fn normalize_time_anchor(v: &str) -> String {
+fn tf_step_seconds(tf: &str) -> i64 {
+    match tf {
+        "1Min" => 60,
+        "5Min" => 300,
+        "15Min" => 900,
+        "30Min" => 1800,
+        "1Hour" => 3600,
+        "4Hour" => 14400,
+        "1Day" => 86400,
+        "1Week" => 604800,
+        _ => 300,
+    }
+}
+
+fn normalize_time_anchor(v: &str, tf: &str) -> String {
     let t = v.trim();
+    let step = tf_step_seconds(tf).max(1);
     if t.eq_ignore_ascii_case("now") {
+        let now = Utc::now().timestamp();
+        let snapped = (now / step) * step;
+        if let Some(dt) = Utc.timestamp_opt(snapped, 0).single() {
+            return dt.to_rfc3339();
+        }
         return Utc::now().to_rfc3339();
     }
     if let Ok(n) = t.parse::<i64>() {
         // Frontend may send unix seconds (or ms). Alpaca expects RFC3339.
         let secs = if n > 1_000_000_000_000 { n / 1000 } else { n };
-        if let Some(dt) = Utc.timestamp_opt(secs, 0).single() {
+        let snapped = (secs / step) * step;
+        if let Some(dt) = Utc.timestamp_opt(snapped, 0).single() {
             return dt.to_rfc3339();
         }
     }
@@ -249,41 +270,71 @@ async fn market_history(Path(symbol): Path<String>, Query(q): Query<HashMap<Stri
 
     let tf = timeframe.clone();
     let client = reqwest::Client::new();
+    let end_anchor = end.or(latest).unwrap_or_else(|| "now".into());
+    let end_iso = normalize_time_anchor(&end_anchor, &tf);
+    let start_iso = if let Some(sv) = start {
+        sv
+    } else {
+        // Cursor-like bounded window (parity with Python behavior for pan/backfill).
+        let step = tf_step_seconds(&tf);
+        let end_secs = DateTime::parse_from_rfc3339(&end_iso).map(|d| d.timestamp()).unwrap_or_else(|_| Utc::now().timestamp());
+        let lookback_bars = std::cmp::max((limit as i64 * 3) / 2, 400);
+        let start_secs = std::cmp::max(0, end_secs - step * lookback_bars);
+        Utc.timestamp_opt(start_secs, 0).single().map(|d| d.to_rfc3339()).unwrap_or_else(|| end_iso.clone())
+    };
+
+    let mut bars: Vec<serde_json::Value> = vec![];
     let mut params: Vec<(String,String)> = vec![
-        ("timeframe".into(), tf),
+        ("timeframe".into(), tf.clone()),
         ("limit".into(), limit.to_string()),
         ("adjustment".into(), "raw".into()),
         ("feed".into(), "sip".into()),
         ("sort".into(), "desc".into()),
+        ("end".into(), end_iso.clone()),
+        ("start".into(), start_iso.clone()),
     ];
-
-    if let Some(e) = end.or(latest) { params.push(("end".into(), normalize_time_anchor(&e))); }
-    if let Some(sv) = start { params.push(("start".into(), sv)); }
-
-    let r = client
+    if let Ok(resp) = client
         .get(format!("{}/v2/stocks/{}/bars", data_url, sym))
         .headers(alpaca_headers(&api_key, &secret_key))
         .query(&params)
-        .send().await;
-
-    if let Ok(resp) = r {
-        if let Ok(v) = resp.json::<serde_json::Value>().await {
-            let mut bars = v.get("bars").and_then(|x| x.as_array()).cloned().unwrap_or_default();
-            bars.sort_by(|a,b| {
-                let ta = a.get("t").and_then(|x| x.as_str()).unwrap_or("");
-                let tb = b.get("t").and_then(|x| x.as_str()).unwrap_or("");
-                ta.cmp(tb)
-            });
-            let compact: Vec<serde_json::Value> = bars.into_iter().take(limit).map(|b| serde_json::json!({
-                "ts": b.get("t"), "o": b.get("o"), "h": b.get("h"), "l": b.get("l"), "c": b.get("c"), "v": b.get("v")
-            })).collect();
-            let payload = serde_json::json!({"s": sym, "tf": timeframe, "b": compact});
-            let _ = s.lmdb.set_json(&cache_key, &payload, 10);
-            return Json(payload);
+        .send().await
+    {
+        if resp.status().is_success() {
+            if let Ok(v) = resp.json::<serde_json::Value>().await {
+                bars = v.get("bars").and_then(|x| x.as_array()).cloned().unwrap_or_default();
+            }
+        }
+    }
+    if bars.is_empty() {
+        params.retain(|(k, _)| k != "feed");
+        params.push(("feed".into(), "iex".into()));
+        if let Ok(resp) = client
+            .get(format!("{}/v2/stocks/{}/bars", data_url, sym))
+            .headers(alpaca_headers(&api_key, &secret_key))
+            .query(&params)
+            .send().await
+        {
+            if resp.status().is_success() {
+                if let Ok(v) = resp.json::<serde_json::Value>().await {
+                    bars = v.get("bars").and_then(|x| x.as_array()).cloned().unwrap_or_default();
+                }
+            }
         }
     }
 
-    Json(serde_json::json!({"s": sym, "tf": timeframe, "b": []}))
+    bars.sort_by(|a,b| {
+        let ta = a.get("t").and_then(|x| x.as_str()).unwrap_or("");
+        let tb = b.get("t").and_then(|x| x.as_str()).unwrap_or("");
+        ta.cmp(tb)
+    });
+    if bars.len() > limit { bars = bars.split_off(bars.len() - limit); }
+
+    let compact: Vec<serde_json::Value> = bars.into_iter().map(|b| serde_json::json!({
+        "ts": b.get("t"), "o": b.get("o"), "h": b.get("h"), "l": b.get("l"), "c": b.get("c"), "v": b.get("v")
+    })).collect();
+    let payload = serde_json::json!({"s": sym, "tf": timeframe, "b": compact});
+    let _ = s.lmdb.set_json(&cache_key, &payload, 10);
+    Json(payload)
 }
 
 async fn market_trades(Path(symbol): Path<String>, Query(q): Query<HashMap<String,String>>, State(s): State<AppState>) -> Json<serde_json::Value> {
