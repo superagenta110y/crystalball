@@ -5,9 +5,9 @@
 /* ─── Dark theme (default) ─────────────────────────────────── */
 :root {
   --surface:          #0d0d0d;
-  --surface-raised:   #141414;
-  --surface-overlay:  #1a1a1a;
-  --surface-border:   #2a2a2a;
+  --surface-raised:   #1a1a1a;
+  --surface-overlay:  #212121;
+  --surface-border:   #333333;
   --accent:           #00d4aa;
   --accent-muted:     rgba(0, 212, 170, 0.2);
 
@@ -67,6 +67,15 @@ html[data-theme="light"] input::placeholder,
 html[data-theme="light"] textarea::placeholder { color: #9ca3af !important; }
 /* Font-mono code blocks */
 html[data-theme="light"] .font-mono { color: #1f2937; }
+
+/* Topbar button tuning in light mode */
+html[data-theme="light"] .topbar-btn {
+  color: #374151 !important;
+}
+html[data-theme="light"] .topbar-btn:hover {
+  color: #000000 !important;
+  background: #e5e7eb !important;
+}
 
 /* ─── Base ─────────────────────────────────────────────────── */
 html, body {

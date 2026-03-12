@@ -392,24 +392,34 @@ async fn market_options(Path(symbol): Path<String>, Query(q): Query<HashMap<Stri
             }
         }
         ActiveProvider::Alpaca { api_key, secret_key, .. } => {
-            let mut qp: Vec<(String,String)> = vec![
-                ("underlying_symbols".into(), sym.clone()),
-                ("limit".into(), "500".into()),
-            ];
-            if let Some(e) = expiration.clone() {
-                qp.push(("expiration_date_gte".into(), e.clone()));
-                qp.push(("expiration_date_lte".into(), e));
-            }
-            if let Some(t) = otype { qp.push(("type".into(), t)); }
-            let r = client.get("https://paper-api.alpaca.markets/v2/options/contracts")
-                .headers(alpaca_headers(&api_key, &secret_key))
-                .query(&qp)
-                .send().await;
-            if let Ok(resp) = r {
-                if let Ok(v) = resp.json::<serde_json::Value>().await {
-                    return Json(v.get("option_contracts").cloned().unwrap_or_else(|| serde_json::json!([])));
+            let mut all: Vec<serde_json::Value> = Vec::new();
+            let mut page_token: Option<String> = None;
+            for _ in 0..20 {
+                let mut qp: Vec<(String,String)> = vec![
+                    ("underlying_symbols".into(), sym.clone()),
+                    ("limit".into(), "1000".into()),
+                ];
+                if let Some(e) = expiration.clone() {
+                    qp.push(("expiration_date_gte".into(), e.clone()));
+                    qp.push(("expiration_date_lte".into(), e));
                 }
+                if let Some(t) = otype.clone() { qp.push(("type".into(), t)); }
+                if let Some(tok) = page_token.clone() { qp.push(("page_token".into(), tok)); }
+
+                let r = client.get("https://paper-api.alpaca.markets/v2/options/contracts")
+                    .headers(alpaca_headers(&api_key, &secret_key))
+                    .query(&qp)
+                    .send().await;
+                let Ok(resp) = r else { break; };
+                let Ok(v) = resp.json::<serde_json::Value>().await else { break; };
+                let page = v.get("option_contracts").and_then(|x| x.as_array()).cloned().unwrap_or_default();
+                if page.is_empty() { break; }
+                all.extend(page);
+                page_token = v.get("next_page_token").and_then(|x| x.as_str()).map(|s| s.to_string());
+                if page_token.is_none() { break; }
+                if expiration.is_some() { break; }
             }
+            return Json(serde_json::Value::Array(all));
         }
     }
 
@@ -422,24 +432,36 @@ async fn market_expirations(Path(symbol): Path<String>, State(s): State<AppState
     match active_provider(&s) {
         ActiveProvider::Alpaca { api_key, secret_key, .. } => {
             let today = Utc::now().date_naive().to_string();
-            let r = client
-                .get("https://paper-api.alpaca.markets/v2/options/contracts")
-                .headers(alpaca_headers(&api_key, &secret_key))
-                .query(&[("underlying_symbols", sym.clone()), ("expiration_date_gte", today), ("limit", "500".into())])
-                .send().await;
-            if let Ok(resp) = r {
-                if let Ok(v) = resp.json::<serde_json::Value>().await {
-                    let mut exps: Vec<String> = v.get("option_contracts")
-                        .and_then(|x| x.as_array())
-                        .cloned()
-                        .unwrap_or_default()
-                        .into_iter()
-                        .filter_map(|c| c.get("expiration_date").and_then(|x| x.as_str()).map(|s| s.to_string()))
-                        .collect();
-                    exps.sort(); exps.dedup();
-                    return Json(serde_json::json!({"symbol": sym, "expirations": exps}));
-                }
+            let mut exps: Vec<String> = Vec::new();
+            let mut page_token: Option<String> = None;
+            for _ in 0..20 {
+                let mut qp: Vec<(String,String)> = vec![
+                    ("underlying_symbols".into(), sym.clone()),
+                    ("expiration_date_gte".into(), today.clone()),
+                    ("limit".into(), "1000".into()),
+                ];
+                if let Some(tok) = page_token.clone() { qp.push(("page_token".into(), tok)); }
+                let r = client
+                    .get("https://paper-api.alpaca.markets/v2/options/contracts")
+                    .headers(alpaca_headers(&api_key, &secret_key))
+                    .query(&qp)
+                    .send().await;
+                let Ok(resp) = r else { break; };
+                let Ok(v) = resp.json::<serde_json::Value>().await else { break; };
+                let page: Vec<String> = v.get("option_contracts")
+                    .and_then(|x| x.as_array())
+                    .cloned()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter_map(|c| c.get("expiration_date").and_then(|x| x.as_str()).map(|s| s.to_string()))
+                    .collect();
+                if page.is_empty() { break; }
+                exps.extend(page);
+                page_token = v.get("next_page_token").and_then(|x| x.as_str()).map(|s| s.to_string());
+                if page_token.is_none() { break; }
             }
+            exps.sort(); exps.dedup();
+            return Json(serde_json::json!({"symbol": sym, "expirations": exps}));
         }
         ActiveProvider::Hoodlink { .. } => {}
     }

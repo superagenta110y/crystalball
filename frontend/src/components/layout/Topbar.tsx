@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Plus, Palette, ChevronDown, Settings, MessageCircle, Moon, Sun, Monitor, X } from "lucide-react";
+import { Plus, Palette, Settings, MessageCircle, Moon, Sun, Monitor, X } from "lucide-react";
 import Link from "next/link";
 
 import { useDashboardStore, type WidgetType, type ThemeMode, DEFAULT_THEME } from "@/lib/store/dashboardStore";
@@ -170,7 +170,7 @@ export function Topbar() {
           >
             <Plus size={13} />
             <span className="hidden sm:inline">Add Widget</span>
-            <ChevronDown size={11} className={`hidden sm:inline transition-transform ${showAddWidget ? "rotate-180" : ""}`} />
+
           </button>
           {showAddWidget && (
             <div className="absolute right-0 top-full mt-1 w-52 bg-surface-raised rounded-xl shadow-2xl z-50 overflow-hidden pop-in">
@@ -235,14 +235,14 @@ export function Topbar() {
           )}
         </div>
 
-        <button onClick={() => window.dispatchEvent(new Event('settings:open'))} className="p-1.5 rounded-md hover:bg-surface-overlay [color:var(--text-primary)] transition inline-flex items-center gap-1.5" title="Settings">
-          <Settings size={15} />
+        <button onClick={() => window.dispatchEvent(new Event('settings:open'))} className="topbar-btn flex items-center gap-1.5 px-2 py-1.5 sm:px-2.5 sm:py-1 rounded-md text-xs text-neutral-500 sm:text-neutral-300 hover:text-white hover:bg-surface-overlay transition" title="Settings">
+          <Settings size={13} />
           <span className="hidden sm:inline text-xs">Settings</span>
         </button>
         <button id="topbar-chat-button" onClick={(e) => {
           const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
           window.dispatchEvent(new CustomEvent('assistant:open', { detail: { anchor: { top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left } } }));
-        }} className="p-1.5 rounded-md hover:bg-surface-overlay [color:var(--text-primary)] transition inline-flex items-center gap-1.5" title="Chat">
+        }} className="topbar-btn flex items-center gap-1.5 px-2 py-1.5 sm:px-2.5 sm:py-1 rounded-md text-xs text-neutral-500 sm:text-neutral-300 hover:text-white hover:bg-surface-overlay transition" title="Chat">
           <MessageCircle size={15} />
           <span className="hidden sm:inline text-xs">Chat</span>
         </button>
