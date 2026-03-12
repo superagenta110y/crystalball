@@ -396,7 +396,7 @@ export default function Dashboard() {
     setSideSplitTarget(hit);
   }, [width, height, detectSnapZone, gapTargets]);
 
-  const handleDragStop = useCallback((newLayout: Layout[], _oldItem: Layout, newItem: Layout) => {
+  const handleDragStop = useCallback((newLayout: Layout[], oldItem: Layout, newItem: Layout) => {
     const l = newLayout.map(it => ({ ...it }));
     const idx = l.findIndex(it => it.i === newItem.i);
     if (idx < 0) return updateLayout(activeTabId, newLayout);
@@ -436,12 +436,12 @@ export default function Dashboard() {
       }
     }
 
+    const rectOverlaps = (a: Layout | GridRect, b: Layout | GridRect) => !(a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y);
+
     const hasOverlap = (layoutIn: Layout[]) => {
       for (let i = 0; i < layoutIn.length; i++) {
         for (let j = i + 1; j < layoutIn.length; j++) {
-          const a = layoutIn[i], b = layoutIn[j];
-          const overlaps = !(a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y);
-          if (overlaps) return true;
+          if (rectOverlaps(layoutIn[i], layoutIn[j])) return true;
         }
       }
       return false;
@@ -459,6 +459,28 @@ export default function Dashboard() {
       if (zoneAtDrop === "top-right") { l[idx].x = 6; l[idx].y = 0; l[idx].w = 6; l[idx].h = halfH; }
       if (zoneAtDrop === "bottom-left")  { l[idx].x = 0; l[idx].y = maxRowsAllowed - halfH; l[idx].w = 6; l[idx].h = halfH; }
       if (zoneAtDrop === "bottom-right") { l[idx].x = 6; l[idx].y = maxRowsAllowed - halfH; l[idx].w = 6; l[idx].h = halfH; }
+
+      // Custom snap-zones are outside RGL's built-in drop targets.
+      // Ensure blockers are actively moved out of the anchor before final compaction.
+      const anchor = l[idx];
+      const sourceRect: GridRect = {
+        x: Math.max(0, Math.min(12 - oldItem.w, oldItem.x)),
+        y: Math.max(0, oldItem.y),
+        w: Math.max(2, Math.min(12, oldItem.w)),
+        h: Math.max(3, oldItem.h),
+      };
+      const blockers = l.filter((it, i) => i !== idx && rectOverlaps(it, anchor));
+      for (const b of blockers) {
+        const sourceBlocked = l.some((it) => it.i !== b.i && it.i !== anchor.i && rectOverlaps(it, sourceRect));
+        const fitsSource = sourceRect.w >= 2 && sourceRect.h >= 3 && !sourceBlocked;
+        if (fitsSource) {
+          b.x = sourceRect.x;
+          b.y = sourceRect.y;
+          b.w = Math.min(b.w, sourceRect.w);
+          b.h = Math.min(b.h, sourceRect.h);
+        }
+      }
+
       shouldRetileOthers = true;
     } else {
       // no anchor zone: keep dropped footprint, but if this causes overflow for other widgets,
