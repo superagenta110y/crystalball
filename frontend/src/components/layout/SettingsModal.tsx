@@ -32,7 +32,7 @@ type ProviderDef = {
 };
 
 const PROVIDER_LOGOS: Record<ProviderType, string> = {
-  alpaca: "https://cdn.simpleicons.org/alpacadotjs/ffffff",
+  alpaca: "https://s3.tradingview.com/brokers/logo/160x160_LS__alpaca.svg",
   hoodlink: "https://cdn.simpleicons.org/linktree/ffffff",
   openai: "https://cdn.simpleicons.org/openai/ffffff",
   gemini: "https://cdn.simpleicons.org/googlegemini/ffffff",
@@ -67,6 +67,7 @@ export function SettingsModal() {
   const [form, setForm] = useState<Record<string, string>>({});
   const [anchor, setAnchor] = useState<{ top: number; right: number; bottom: number; left: number } | null>(null);
   const [vw, setVw] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1200);
+  const [isLight, setIsLight] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -87,6 +88,14 @@ export function SettingsModal() {
     };
     const onOpenAdd = () => { setOpen(true); setView("pick"); load(); };
     const onResize = () => setVw(window.innerWidth);
+    const syncTheme = () => {
+      const t = document.documentElement.getAttribute("data-theme");
+      setIsLight(t === "light");
+    };
+    syncTheme();
+    const obs = new MutationObserver(syncTheme);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
     window.addEventListener("settings:open", onOpen as EventListener);
     window.addEventListener("settings:open-add-provider", onOpenAdd as EventListener);
     window.addEventListener("resize", onResize);
@@ -94,6 +103,7 @@ export function SettingsModal() {
       window.removeEventListener("settings:open", onOpen as EventListener);
       window.removeEventListener("settings:open-add-provider", onOpenAdd as EventListener);
       window.removeEventListener("resize", onResize);
+      obs.disconnect();
     };
   }, []);
 
@@ -157,7 +167,7 @@ export function SettingsModal() {
 
   if (!open) return null;
   const isMobile = vw < 768;
-  const panelW = 760;
+  const panelW = 570;
   const panelH = 620;
   const left = Math.max(8, Math.min((anchor ? anchor.right : vw - 20) - panelW, vw - panelW - 8));
   const top = Math.max(8, (anchor?.top ?? 56));
@@ -187,7 +197,7 @@ export function SettingsModal() {
                   const active = state.active.data === p.id || state.active.ai === p.id;
                   return (
                     <button key={p.id} onClick={() => openDetail(p)} className="w-full flex items-center gap-3 px-2 py-2 rounded hover:bg-surface-overlay text-left">
-                      <img src={PROVIDER_LOGOS[p.type]} alt={p.type} className="w-4 h-4 rounded-sm" />
+                      <img src={PROVIDER_LOGOS[p.type]} alt={p.type} className="w-4 h-4 rounded-sm" style={p.type === "alpaca" && isLight ? { filter: "brightness(0)" } : undefined} />
                       <span className="text-sm text-white">{def?.label || p.type}</span>
                       <span className={`ml-auto w-2 h-2 rounded-full ${active ? "bg-green-400" : "bg-green-500/80"}`} />
                     </button>
@@ -227,7 +237,7 @@ export function SettingsModal() {
               )}
             </div>
             <div className="space-y-3">
-              <div className="text-sm text-white inline-flex items-center gap-2"><img src={PROVIDER_LOGOS[currentDef.type]} alt={currentDef.type} className="w-4 h-4 rounded-sm" /> {currentDef.label}</div>
+              <div className="text-sm text-white inline-flex items-center gap-2"><img src={PROVIDER_LOGOS[currentDef.type]} alt={currentDef.type} className="w-4 h-4 rounded-sm" style={currentDef.type === "alpaca" && isLight ? { filter: "brightness(0)" } : undefined} /> {currentDef.label}</div>
               {currentDef.fields.map((f) => (
                 <div key={f.key} className="space-y-1">
                   <label className="text-[11px] text-neutral-500">{f.label}</label>
