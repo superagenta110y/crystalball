@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, DollarSign } from "lucide-react";
 import { SymbolBar } from "./SymbolBar";
 import { AppDropdown } from "@/components/ui/AppDropdown";
 import { useDashboardStore } from "@/lib/store/dashboardStore";
@@ -164,7 +164,7 @@ export function OpenInterest3DWidget({ symbol = "SPY", isGlobalOverride, config,
                 ))}
               </div>
             </details>
-            <AppDropdown value={strikeRange} onChange={(v) => { setStrikeRange(v); onConfigChange?.({ strikeRange: v }); }} options={[
+            <AppDropdown prefix={<DollarSign size={11} className="opacity-80" />} value={strikeRange} onChange={(v) => { setStrikeRange(v); onConfigChange?.({ strikeRange: v }); }} options={[
               { value: "all", label: "All Strikes" },
               { value: "1", label: "± 1%" },
               { value: "2", label: "± 2%" },

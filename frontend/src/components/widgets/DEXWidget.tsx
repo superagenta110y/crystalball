@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, DollarSign } from "lucide-react";
 import { SymbolBar } from "./SymbolBar";
 import { useDashboardStore } from "@/lib/store/dashboardStore";
 import { OptionsLightHistogram } from "./OptionsLightHistogram";
@@ -120,6 +120,7 @@ export function DEXWidget({ symbol = "SPY", isGlobalOverride, config, onConfigCh
               </div>
             </details>
             <AppDropdown
+              prefix={<DollarSign size={11} className="opacity-80" />}
               value={strikeRange}
               onChange={(v) => { setStrikeRange(v); onConfigChange?.({ strikeRange: v }); }}
               options={[

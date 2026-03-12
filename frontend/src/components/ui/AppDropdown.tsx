@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 
 type Option = { value: string; label: string };
 
-export function AppDropdown({ value, options, onChange, className = "", menuClassName = "" }: { value: string; options: Option[]; onChange: (v: string) => void; className?: string; menuClassName?: string }) {
+export function AppDropdown({ value, options, onChange, className = "", menuClassName = "", prefix }: { value: string; options: Option[]; onChange: (v: string) => void; className?: string; menuClassName?: string; prefix?: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const current = options.find(o => o.value === value) || options[0];
@@ -19,7 +19,8 @@ export function AppDropdown({ value, options, onChange, className = "", menuClas
 
   return (
     <div ref={ref} className={`relative ${className}`}>
-      <button type="button" onClick={() => setOpen(v => !v)} className="px-2 py-1 rounded hover:bg-surface-overlay text-xs text-neutral-300">
+      <button type="button" onClick={() => setOpen(v => !v)} className="px-2 py-1 rounded hover:bg-surface-overlay text-xs text-neutral-300 inline-flex items-center gap-1">
+        {prefix}
         {current?.label}
       </button>
       {open && (
