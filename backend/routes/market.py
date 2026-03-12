@@ -38,6 +38,40 @@ def _ts_to_iso(ts: int) -> str:
     return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def _to_unix_ts(ts_raw) -> int | None:
+    if ts_raw is None:
+        return None
+    if isinstance(ts_raw, (int, float)):
+        return int(ts_raw)
+    s = str(ts_raw).strip()
+    if not s:
+        return None
+    try:
+        return int(float(s))
+    except Exception:
+        pass
+
+    # Normalize ISO with optional nanoseconds + trailing Z.
+    try:
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+        if "." in s:
+            head, rest = s.split(".", 1)
+            tz_part = ""
+            frac = rest
+            for sep in ("+", "-"):
+                ix = rest.find(sep)
+                if ix > 0:
+                    frac = rest[:ix]
+                    tz_part = rest[ix:]
+                    break
+            frac = (frac[:6]).ljust(6, "0")
+            s = f"{head}.{frac}{tz_part}"
+        return int(datetime.fromisoformat(s).timestamp())
+    except Exception:
+        return None
+
+
 @router.get("/history/{symbol}")
 async def history(
     symbol: str,
@@ -89,15 +123,8 @@ async def history(
 
             compact_batch = []
             for b in batch:
-                ts_raw = b.get("timestamp")
-                if ts_raw is None:
-                    continue
-                try:
-                    if isinstance(ts_raw, (int, float)):
-                        ts = int(ts_raw)
-                    else:
-                        ts = int(datetime.fromisoformat(str(ts_raw).replace("Z", "+00:00")).timestamp())
-                except Exception:
+                ts = _to_unix_ts(b.get("timestamp"))
+                if ts is None:
                     continue
                 compact = {"ts": ts, "o": b.get("open"), "h": b.get("high"), "l": b.get("low"), "c": b.get("close"), "v": b.get("volume")}
                 compact_batch.append(compact)

@@ -167,7 +167,7 @@ export function SettingsModal() {
 
   if (!open) return null;
   const isMobile = vw < 768;
-  const panelW = 570;
+  const panelW = 380;
   const panelH = 620;
   const left = Math.max(8, Math.min((anchor ? anchor.right : vw - 20) - panelW, vw - panelW - 8));
   const top = Math.max(8, (anchor?.top ?? 56));
