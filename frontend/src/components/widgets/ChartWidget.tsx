@@ -933,7 +933,7 @@ export function ChartWidget({
           </div>
 
           <details className="relative">
-            <summary className="list-none cursor-pointer widget-trigger-btn px-1 text-xs leading-none gap-1">
+            <summary className="widget-trigger-summary px-1 leading-none">
               <SlidersHorizontal size={13} />
               {enabledCount > 0 && <span className="text-[11px] font-mono widget-trigger-label">{enabledCount}</span>}
             </summary>

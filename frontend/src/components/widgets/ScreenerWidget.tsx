@@ -297,7 +297,7 @@ export function ScreenerWidget() {
                 return (
                   <tr key={r.symbol} className={`hover:bg-surface-overlay/60 ${selected ? "bg-accent/10" : ""}`}>
                     <td className="px-2 py-1.5 font-mono text-white">
-                      <button onClick={() => toggleGlobalSymbol(r.symbol)} className="inline-flex items-center gap-2 hover:underline">
+                      <button onClick={() => toggleGlobalSymbol(r.symbol)} className={`inline-flex items-center gap-2 hover:underline ${selected ? "text-accent" : "text-white"}`}>
                         {r.logo && <img src={`https://logo.clearbit.com/${r.logo}`} alt="" className="w-4 h-4 rounded-full" onError={(e: any) => { e.currentTarget.style.display = "none"; }} />}
                         <span>{r.symbol}</span>
                       </button>

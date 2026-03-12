@@ -131,6 +131,19 @@ select:focus {
   @apply text-neutral-500 hover:text-white transition;
 }
 
+.widget-trigger-summary {
+  @apply list-none cursor-pointer widget-trigger-btn px-1 text-xs gap-1;
+}
+
+.widget-trigger-summary[open],
+details[open] > .widget-trigger-summary {
+  @apply text-white bg-surface-overlay;
+}
+
+details[open] > .widget-trigger-summary .widget-trigger-label {
+  @apply text-white;
+}
+
 /* ─── React Grid Layout ─────────────────────────────────────── */
 .react-grid-item.react-grid-placeholder {
   background: var(--accent) !important;

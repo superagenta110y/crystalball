@@ -19,9 +19,9 @@ export function AppDropdown({ value, options, onChange, className = "", menuClas
 
   return (
     <div ref={ref} className={`relative ${className}`}>
-      <button type="button" onClick={() => setOpen(v => !v)} className="px-2 py-1 rounded hover:bg-surface-overlay text-xs text-neutral-300 inline-flex items-center gap-1">
+      <button type="button" aria-expanded={open} onClick={() => setOpen(v => !v)} className={`widget-trigger-btn px-2 py-1 text-xs gap-1 ${open ? "text-white bg-surface-overlay" : ""}`}>
         {prefix}
-        {current?.label}
+        <span className={`widget-trigger-label ${open ? "text-white" : ""}`}>{current?.label}</span>
       </button>
       {open && (
         <div className={`absolute left-0 top-full mt-1 z-50 rounded bg-surface-raised shadow-xl p-1 pop-in min-w-[110px] ${menuClassName}`}>

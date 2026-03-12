@@ -51,7 +51,7 @@ export function SymbolBar({ symbol, isGlobalOverride, onSymbolChange, extra, lab
   };
 
   return (
-    <div className="flex items-center gap-2 px-2 py-1.5 pr-14 border-b border-surface-border shrink-0 text-xs">
+    <div className="flex items-center gap-2 px-2 py-1.5 pr-16 border-b border-surface-border shrink-0 text-xs">
       {(label || mobileLabel) && (
         <div className="widget-drag-handle cursor-grab active:cursor-grabbing select-none inline-flex items-center gap-1.5 text-neutral-500">
           <GripHorizontal size={11} className="opacity-50" />
@@ -83,7 +83,7 @@ export function SymbolBar({ symbol, isGlobalOverride, onSymbolChange, extra, lab
         )}
       </div>
       {isGlobalOverride && <span className="text-neutral-700 text-xs leading-none" title="Global override active">⬡</span>}
-      {extra && <div className="ml-auto flex items-center justify-end gap-2 min-w-[96px] leading-none opacity-100 md:opacity-0 md:group-hover/widget:opacity-100 transition">{extra}</div>}
+      {extra && <div className="ml-auto mr-2 flex items-center justify-end gap-2 min-w-[96px] leading-none opacity-100 md:opacity-0 md:group-hover/widget:opacity-100 transition">{extra}</div>}
     </div>
   );
 }
